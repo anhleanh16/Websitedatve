@@ -11,18 +11,18 @@ import Login from '../pages/Login/Login';
 import Register from '../pages/Register/Register';
 
 export function AppRoutes() {
-  return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/movie/:id" element={<MovieDetail />} />
-      <Route path="/booking" element={<Booking />} />
-      <Route path="/payment" element={<Payment />} />
-      <Route path="/cinemas" element={<Cinemas />} />
-      <Route path="/ai-assistant" element={<AIAssistant />} />
-      <Route path="/notifications" element={<Notifications />} />
-      <Route path="/profile" element={<Profile />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-    </Routes>
-  );
+    return (
+        <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/movie/:id" element={<MovieDetail />} />
+        <Route path="/booking" element={<Booking />} />
+        <Route path="/payment" element={<Payment />} />
+        <Route path="/cinemas" element={<Cinemas />} />
+        <Route path="/ai-assistant" element={<AIAssistant />} />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        </Routes>
+    );
 }
