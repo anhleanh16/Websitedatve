@@ -1,14 +1,14 @@
 import { Routes, Route } from 'react-router-dom';
-import Home from '../../pages/Home/Home';
-import MovieDetail from '../../pages/MovieDetail/MovieDetail';
-import Booking from '../../pages/Booking/Booking';
-import Payment from '../../pages/Payment/Payment';
-import Cinemas from '../../pages/Cinemas/Cinemas';
-import AIAssistant from '../../pages/AIAssistant/AIAssistant';
-import Notifications from '../../pages/Notifications/Notifications';
-import Profile from '../../pages/Profile/Profile';
-import Login from '../../pages/Login/Login';
-import Register from '../../pages/Register/Register';
+import Home from '../pages/Home';
+import MovieDetail from '../pages/MovieDetail';
+import Booking from '../pages/Booking';
+import Payment from '../pages/Payment';
+import Cinemas from '../pages/Cinemas';
+import AIAssistant from '../pages/AIAssistant';
+import Notifications from '../pages/Notifications';
+import Profile from '../pages/Profile';
+import Login from '../pages/Login';
+import Register from '../pages/Register';
 
 export function UserRoutes() {
   return (
