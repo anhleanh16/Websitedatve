@@ -1,35 +1,34 @@
-<<<<<<< HEAD
-# React + Vite
+﻿# Lunexa-Movix
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Monorepo dự án Lunexa-Movix gồm frontend React/Vite và backend Node.js/Express.
 
-Currently, two official plugins are available:
+## Cấu trúc thư mục
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `frontend/` - React app hiện tại với Vite
+- `backend/` - Node.js + Express API
+- `database/` - chứa file `db.sql`
 
-## React Compiler
+## Chạy dự án
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Cài dependency cho cả workspace:
+   ```bash
+   npm install
+   ```
+2. Chạy frontend:
+   ```bash
+   npm run dev
+   ```
+3. Chạy backend:
+   ```bash
+   npm run start:backend
+   ```
 
-## Expanding the ESLint configuration
+## Backend mẫu
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-=======
-# React + Vite
+- `backend/app.js` - cấu hình Express cơ bản
+- `backend/server.js` - khởi động server
+- `backend/config/db.js` - kết nối MySQL mẫu
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Ghi chú
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
->>>>>>> a900c6250dcf962c0ad06c2919b86e6a8fa75df7
+Nếu muốn mở rộng backend, thêm controller vào `backend/controllers`, route vào `backend/routes`, model vào `backend/models`, middleware vào `backend/middleware`, và dịch vụ vào `backend/services`.
