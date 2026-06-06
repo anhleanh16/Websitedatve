@@ -14,7 +14,8 @@ export function UserRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
-      <Route path="/movie/:id" element={<MovieDetail />} />
+      <Route path="/moviedetail" caseSensitive={false} element={<MovieDetail />} />
+      <Route path="/movie/:id" caseSensitive={false} element={<MovieDetail />} />
       <Route path="/booking" element={<Booking />} />
       <Route path="/payment" element={<Payment />} />
       <Route path="/cinemas" element={<Cinemas />} />

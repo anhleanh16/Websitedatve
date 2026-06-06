@@ -2,14 +2,16 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background: transparent;
 }
 
 .app-content {
   flex: 1;
-  max-width: 1200px;
+  max-width: 1400px;
   width: 100%;
   margin: 0 auto;
   padding: 2rem;
+  background: transparent;
 }
 
 .movies-grid {
