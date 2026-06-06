@@ -1,34 +1,80 @@
 ﻿# Lunexa-Movix
 
-Monorepo dự án Lunexa-Movix gồm frontend React/Vite và backend Node.js/Express.
+Dự án monorepo gồm frontend (React + Vite) và backend (Node.js + Express). Tài nguyên chính:
 
-## Cấu trúc thư mục
+- `frontend/` — ứng dụng React (Vite)
+- `backend/` — API Node.js/Express
+- `database/` — file SQL mẫu `db.sql`
 
-- `frontend/` - React app hiện tại với Vite
-- `backend/` - Node.js + Express API
-- `database/` - chứa file `db.sql`
+**Yêu cầu**
 
-## Chạy dự án
+- Node.js và npm đã cài sẵn
+- MySQL (để import `database/db.sql` nếu cần)
 
-1. Cài dependency cho cả workspace:
-   ```bash
-   npm install
-   ```
-2. Chạy frontend:
-   ```bash
-   npm run dev
-   ```
-3. Chạy backend:
-   ```bash
-   npm run start:backend
-   ```
+**Cài đặt phụ thuộc**
 
-## Backend mẫu
+- Từ thư mục gốc của repo, cài tất cả package (workspaces):
 
-- `backend/app.js` - cấu hình Express cơ bản
-- `backend/server.js` - khởi động server
-- `backend/config/db.js` - kết nối MySQL mẫu
+```bash
+npm run install:all
+# hoặc
+npm install
+```
 
-## Ghi chú
+**Biến môi trường (backend)**
 
-Nếu muốn mở rộng backend, thêm controller vào `backend/controllers`, route vào `backend/routes`, model vào `backend/models`, middleware vào `backend/middleware`, và dịch vụ vào `backend/services`.
+Tạo file `.env` trong thư mục `backend/` với các biến tối thiểu:
+
+```
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=lunexa
+PORT=4000
+```
+
+**Thiết lập cơ sở dữ liệu**
+
+- Import `database/db.sql` vào MySQL (ví dụ dùng `mysql` CLI hoặc MySQL Workbench):
+
+```bash
+mysql -u root -p < database/db.sql
+```
+
+**Chạy dự án (phát triển)**
+
+- Chạy frontend (từ root hoặc vào `frontend`):
+
+```bash
+npm run dev           # từ root, gọi workspace frontend
+# hoặc
+cd frontend && npm run dev
+```
+
+- Chạy backend (từ root hoặc vào `backend`):
+
+```bash
+npm run start:backend # từ root, gọi workspace backend (chạy nodemon)
+# hoặc
+cd backend && npm run dev
+```
+
+**Build & Preview frontend**
+
+```bash
+npm run build      # build frontend (từ root)
+npm run preview    # preview bản build
+```
+
+**Các script chính (tại root `package.json`)**
+
+- `dev` : chạy frontend trong chế độ phát triển
+- `start:backend` : chạy backend (script `dev` của `backend` sử dụng `nodemon`)
+- `install:all` : cài dependencies cho tất cả workspaces
+
+**Cấu trúc nhanh**
+
+- Backend: `backend/app.js`, `backend/server.js`, `backend/config/db.js`, `backend/src/*`
+- Frontend: `frontend/src/` chứa các component, routes và services
+
+Nếu bạn muốn mình cập nhật README tiếng Anh hoặc thêm hướng dẫn triển khai (Docker, PM2, CI), nói mình biết.
