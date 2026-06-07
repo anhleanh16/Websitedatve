@@ -438,6 +438,9 @@
   }
   .film-right {
     width: 100%;
+    min-width: auto;
+    position: static;
+    top: auto;
   }
   .movie-grid {
     grid-template-columns: repeat(2, 1fr);

@@ -16,6 +16,29 @@ export default function MovieDetail() {
   const scheduleRef = useRef(null);
   const cinemaListRef = useRef(null);
   const videoRef = useRef(null);
+  const trailerContainerRef = useRef(null);
+  const [bannerCollapsed, setBannerCollapsed] = useState(false);
+
+  // Reset về đầu trang khi mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Collapse khi scroll xuống qua banner, expand lại khi scroll lên đầu
+  useEffect(() => {
+    const getBannerHeight = () => Math.min(window.innerWidth * 9 / 16, 620);
+    const onScroll = () => {
+      const scrolled = window.scrollY;
+      const bannerH = getBannerHeight();
+      if (scrolled >= bannerH) {
+        setBannerCollapsed(true);
+      } else if (scrolled < bannerH * 0.2) {
+        setBannerCollapsed(false);
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   const galleryImages = [
     'https://cdn.popsww.com/blog/sites/2/2023/05/doraemon-nobita-va-cuoc-chien-vu-tru-ti-hon-2021.jpg',
     'https://cdn.popsww.com/blog/sites/2/2023/05/USGofPw3-image-2.png',
@@ -34,8 +57,7 @@ export default function MovieDetail() {
     if (video) {
       video.muted = false;
       setIsMuted(false);
-      video.play().catch(() => {
-      });
+      video.play().catch(() => {});
     }
   };
 
@@ -192,16 +214,32 @@ export default function MovieDetail() {
     },
   ];
   const [activeCinema, setActiveCinema] = useState(cinemas[0].id);
+  const [selectedTime, setSelectedTime] = useState(null);
   const currentCinema = cinemas.find((cinema) => cinema.id === activeCinema);
   const showTimes = currentCinema?.schedule[activeDay] ?? [];
   const navigate = useNavigate();
 
+  // Reset selected time when cinema or day changes
+  const handleCinemaChange = (id) => {
+    setActiveCinema(id);
+    setSelectedTime(null);
+  };
+
+  const handleDayChange = (day) => {
+    setActiveDay(day);
+    setSelectedTime(null);
+  };
+
   const handleScheduleClick = (time) => {
+    setSelectedTime((prev) => (prev === time ? null : time));
+  };
+
+  const handleBookNow = () => {
     navigate('/booking', {
       state: {
         cinema: currentCinema?.name ?? 'Lunexa Movix',
         day: activeDay,
-        time,
+        time: selectedTime,
       },
     });
   };
@@ -222,10 +260,40 @@ export default function MovieDetail() {
 
   return (
     <div className="movie-detail-page">
-      <div className="movie-detail-header">
+
+      {/* ── Banner cố định phía sau, nội dung scroll lên trên ── */}
+      <div
+        className={`trailer-hero-banner${bannerCollapsed ? ' trailer-hero-banner--hidden' : ''}`}
+        onClick={handleStartAudio}
+      >
+        <video
+          ref={videoRef}
+          className="trailer-hero-video"
+          autoPlay
+          muted={isMuted}
+          loop
+          playsInline
+          poster="https://upload.wikimedia.org/wikipedia/vi/0/0e/Little_Star_Wars_2021.jpg"
+          src={trailerSrc}
+        >
+          Trình duyệt của bạn không hỗ trợ video.
+        </video>
+        <div className="trailer-hero-overlay">
+          <div className="trailer-hero-badge"><span>▶</span> Trailer</div>
+          {isMuted && <div className="trailer-hero-sound">🔊 Bấm để bật tiếng</div>}
+          <div className="trailer-hero-scroll-hint">Cuộn xuống để xem chi tiết ↓</div>
+        </div>
+      </div>
+
+      {/* ── Nội dung trang, có padding-top = chiều cao banner để scroll overlap ── */}
+      <div className="movie-detail-content">
+
+        {/* Gradient fade che banner khi nội dung scroll lên */}
+        <div className="trailer-fade-cover" />
+
+        <div className="movie-detail-header">
         <div className="breadcrumb-bar">
           <nav className="breadcrumb">
-            <button className="breadcrumb-item breadcrumb-back" type="button" onClick={() => navigate(-1)}>Quay lại</button>
             <button className="breadcrumb-link" type="button" onClick={() => navigate('/')}>Trang chủ</button>
             <span className="breadcrumb-sep">›</span>
             <button className="breadcrumb-link" type="button" onClick={() => navigate('/movies')}>Phim</button>
@@ -295,22 +363,36 @@ export default function MovieDetail() {
 
         <div className="movie-detail-trailer">
           <div className="trailer-label"><span className="icon">▶</span>Trailer</div>
-          <div className="trailer-video-container" onClick={handleStartAudio}>
-            <video
-              ref={videoRef}
-              className="trailer-video"
-              autoPlay
-              muted={isMuted}
-              loop
-              playsInline
-              poster="https://upload.wikimedia.org/wikipedia/vi/0/0e/Little_Star_Wars_2021.jpg"
-              src={trailerSrc}
-            >
-              Trình duyệt của bạn không hỗ trợ video.
-            </video>
-            {isMuted && (
-              <div className="video-unmute-overlay">
-                Bấm để bật tiếng
+          <div
+            ref={trailerContainerRef}
+            className={`trailer-video-container${bannerCollapsed ? ' trailer-fadein' : ''}`}
+            onClick={handleStartAudio}
+          >
+            {bannerCollapsed ? (
+              <>
+                <video
+                  ref={videoRef}
+                  className="trailer-video"
+                  autoPlay
+                  muted={isMuted}
+                  loop
+                  playsInline
+                  poster="https://upload.wikimedia.org/wikipedia/vi/0/0e/Little_Star_Wars_2021.jpg"
+                  src={trailerSrc}
+                >
+                  Trình duyệt của bạn không hỗ trợ video.
+                </video>
+                {isMuted && (
+                  <div className="video-unmute-overlay">Bấm để bật tiếng</div>
+                )}
+              </>
+            ) : (
+              <div className="trailer-waiting-poster">
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/vi/0/0e/Little_Star_Wars_2021.jpg"
+                  alt="Trailer"
+                />
+                <div className="trailer-waiting-hint">↑ Cuộn lên xem trailer</div>
               </div>
             )}
           </div>
@@ -427,7 +509,7 @@ export default function MovieDetail() {
                 key={cinema.id}
                 type="button"
                 className={activeCinema === cinema.id ? 'active' : ''}
-                onClick={() => setActiveCinema(cinema.id)}
+                onClick={() => handleCinemaChange(cinema.id)}
               >
                 {cinema.name}
               </li>
@@ -451,7 +533,7 @@ export default function MovieDetail() {
                 key={day}
                 type="button"
                 className={activeDay === day ? 'active' : ''}
-                onClick={() => setActiveDay(day)}
+                onClick={() => handleDayChange(day)}
               >
                 {scheduleLabel(day)}
               </button>
@@ -474,7 +556,7 @@ export default function MovieDetail() {
                   <button
                     key={time}
                     type="button"
-                    className="time-slot"
+                    className={`time-slot${selectedTime === time ? ' selected' : ''}`}
                     onClick={() => handleScheduleClick(time)}
                   >
                     {time}
@@ -487,6 +569,28 @@ export default function MovieDetail() {
           </div>
         </div>
       </div>
+
+      {selectedTime && (
+        <div className="schedule-book-bar">
+          <div className="schedule-book-bar-info">
+            <span className="schedule-book-bar-label">Suất đã chọn</span>
+            <span className="schedule-book-bar-detail">
+              {currentCinema?.name} &nbsp;·&nbsp; {activeDay} &nbsp;·&nbsp; <strong>{selectedTime}</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn-book-now"
+            onClick={handleBookNow}
+          >
+            🎟️ Đặt vé ngay
+          </button>
+        </div>
+      )}
+
+      </div>{/* end movie-detail-content */}
+
+      {/* Trailer trong layout — fade in sau khi banner collapse */}
     </div>
   );
 }

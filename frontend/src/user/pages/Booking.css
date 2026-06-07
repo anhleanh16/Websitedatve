@@ -33,11 +33,16 @@
   gap: 0.55rem;
   color: #bfc6ff;
   font-size: 0.95rem;
+  min-width: 0;
 }
 
 .booking-breadcrumb-item,
 .booking-breadcrumb-link,
 .booking-breadcrumb-current {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
   background: transparent;
   border: none;
   color: #cfd6ff;
@@ -45,6 +50,7 @@
   padding: 0.35rem 0.45rem;
   border-radius: 10px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .booking-breadcrumb-item:hover,
@@ -183,9 +189,9 @@
 
 .seat-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 0.85rem;
-  margin-bottom: 0.95rem;
+  grid-template-columns: 28px 1fr;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
   align-items: center;
 }
 
@@ -198,78 +204,51 @@
   text-align: right;
   color: #8c9dff;
   font-weight: 700;
+  font-size: 0.82rem;
   letter-spacing: 0.02em;
-}
-
-.seat-row {
-  position: static;
 }
 
 .seat-row-sections {
   display: flex;
-  gap: 0;
-  justify-content: stretch;
-  min-width: 0;
-  position: relative;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .seat-section {
   display: flex;
-  gap: 0.7rem;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
   align-items: center;
   justify-content: center;
-  min-width: 0;
 }
 
 .seat-aisle {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  min-width: 28px;
-  height: 100%;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.seat-aisle::before {
-  content: '';
-  position: absolute;
-  width: 8px;
-  height: 52%;
-  top: 24%;
-  left: 50%;
-  transform: translateX(-50%) rotate(18deg);
-  border-radius: 10px;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.2) 0,
-    rgba(255, 255, 255, 0.2) 4px,
-    transparent 4px,
-    transparent 8px
-  );
-  opacity: 0.55;
-  pointer-events: none;
+  flex-shrink: 0;
+  width: 20px;
+  min-width: 20px;
 }
 
 .booking-seat {
   position: relative;
   z-index: 2;
-  width: 46px;
-  height: 46px;
+  width: 36px;
+  height: 36px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
   color: #eef2ff;
-  font-size: 0.88rem;
-  font-weight: 700;
+  font-size: 0;
   cursor: pointer;
   transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(10px);
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .booking-seat:hover {
@@ -285,14 +264,15 @@
 }
 
 .booking-seat.booking-seat-couple {
-  min-width: 92px;
-  width: 92px;
-  border-radius: 18px;
-  padding: 0;
+  width: 76px;
+  height: 36px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #ff6d72 0%, #ff3e67 100%);
   border-color: rgba(255, 108, 120, 0.7);
   color: #ffffff;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .booking-seat.booking-seat-couple:hover {
@@ -555,6 +535,31 @@
   }
 }
 
+/* ── Mobile header (hidden on desktop) ── */
+.booking-mobile-header {
+  display: none;
+}
+
+/* ── Stepper (hidden on desktop) ── */
+.booking-stepper {
+  display: none;
+}
+
+/* ── Mobile combo panel (hidden on desktop) ── */
+.booking-mobile-combo {
+  display: none;
+}
+
+/* ── Mobile summary (hidden on desktop) ── */
+.booking-mobile-summary {
+  display: none;
+}
+
+/* ── Promo banner (hidden on desktop) ── */
+.booking-promo-banner {
+  display: none;
+}
+
 @media (max-width: 760px) {
   .booking-page {
     padding: 1.4rem;
@@ -565,8 +570,28 @@
     padding: 1.4rem;
   }
 
+  .booking-breadcrumb,
+  .booking-header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
   .seat-row {
-    grid-template-columns: 24px minmax(0, 1fr);
+    grid-template-columns: 24px 1fr;
+  }
+
+  .seat-row-sections {
+    justify-content: center;
+    gap: 0.3rem;
+  }
+
+  .seat-section {
+    gap: 0.3rem;
+  }
+
+  .seat-aisle {
+    width: 14px;
+    min-width: 14px;
   }
 
   .screen-label {
@@ -575,22 +600,426 @@
   }
 
   .seat-map {
-    padding: 1.4rem 1.1rem 1.2rem;
+    padding: 1.4rem 1rem 1.2rem;
   }
 
   .booking-seat {
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
   }
 
   .booking-seat.booking-seat-couple {
-    width: 82px;
-    min-width: 82px;
+    width: 68px;
+    height: 32px;
+    border-radius: 12px;
   }
 
   .combo-card,
   .dropdown-header {
     padding: 0.9rem 0.95rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* ── Show mobile-only elements ── */
+  .booking-mobile-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .booking-back-btn {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 1.15rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .booking-mobile-title {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .booking-mobile-title strong {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .booking-mobile-title span {
+    font-size: 0.82rem;
+    color: #9da5d6;
+  }
+
+  /* ── Stepper ── */
+  .booking-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 1.4rem;
+    padding: 1rem 1.2rem;
+    background: rgba(8, 10, 30, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+  }
+
+  .stepper-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .stepper-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.9rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stepper-step.active .stepper-circle {
+    background: linear-gradient(135deg, #9a7cff, #7e57f2);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 0 16px rgba(154, 124, 255, 0.45);
+  }
+
+  .stepper-step.done .stepper-circle {
+    background: rgba(154, 124, 255, 0.3);
+    border-color: rgba(154, 124, 255, 0.5);
+    color: #c9c2ff;
+  }
+
+  .stepper-step.done span {
+    color: #9da5d6;
+  }
+
+  .stepper-step span {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.4);
+    white-space: nowrap;
+  }
+
+  .stepper-step.active span {
+    color: #c9c2ff;
+    font-weight: 600;
+  }
+
+  .stepper-line {
+    flex: 1;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 0 0.5rem;
+    margin-bottom: 1.4rem;
+  }
+
+  .stepper-line.done {
+    background: rgba(154, 124, 255, 0.5);
+  }
+
+  /* ── Hide desktop elements ── */
+  .booking-breadcrumb-bar,
+  .booking-header,
+  .booking-sidebar {
+    display: none;
+  }
+
+  .booking-page {
+    padding: 1rem;
+  }
+
+  .booking-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .booking-seat-panel {
+    padding: 1rem 0.75rem;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .screen-label {
+    font-size: 0.78rem;
+    padding: 0.5rem 0.9rem;
+    letter-spacing: 0.25em;
+  }
+
+  /* seat-map: no scroll, seats scale to fit */
+  .seat-map {
+    overflow: hidden;
+    padding: 1.6rem 0.5rem 1rem;
+  }
+
+  .seat-row {
+    grid-template-columns: 14px 1fr;
+    gap: 0.3rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .seat-row-label {
+    min-width: 14px;
+    font-size: 0.7rem;
+  }
+
+  /* fill container — no overflow */
+  .seat-row-sections {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+    gap: 0.2rem;
+  }
+
+  .seat-section {
+    flex: 1;
+    gap: 0.2rem;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .seat-aisle {
+    width: 8px;
+    min-width: 8px;
+    flex-shrink: 0;
+  }
+
+  /* seats: scale via vw so they always fit screen width
+     Screen ~390px, panel padding ~2rem, label ~14px, aisles 2×8px
+     12 seats + 2 aisles per row → each seat ≈ (100vw - 64px) / 12.5 */
+  .booking-seat {
+    flex: 1;
+    min-width: 0;
+    width: calc((100vw - 5rem) / 13);
+    max-width: 30px;
+    height: calc((100vw - 5rem) / 13);
+    max-height: 30px;
+    aspect-ratio: unset;
+    border-radius: 7px;
+    font-size: 0;
+    flex-shrink: 1;
+  }
+
+  .booking-seat.booking-seat-couple {
+    flex: 2;
+    min-width: 0;
+    width: calc((100vw - 5rem) / 6.5);
+    max-width: 62px;
+    height: calc((100vw - 5rem) / 13);
+    max-height: 30px;
+    aspect-ratio: unset;
+    border-radius: 9px;
+    font-size: 0;
+    flex-shrink: 1;
+  }
+
+  /* ── Legend compact 3-col ── */
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    justify-content: center;
+    gap: 0.6rem 1rem;
+    margin-top: 1.2rem;
+    font-size: 0.82rem;
+  }
+
+  /* ── Hide seat layout on step 2 ── */
+  .booking-layout.mobile-hide {
+    display: none;
+  }
+
+  /* ── Mobile combo panel ── */
+  .booking-mobile-combo {
+    display: none;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .booking-mobile-combo.mobile-step-visible {
+    display: flex;
+  }
+
+  .mobile-combo-section {
+    background: rgba(8, 10, 30, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .mobile-combo-heading {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #c9c2ff;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    margin-bottom: 0.25rem;
+  }
+
+  /* ── Mobile summary card ── */
+  .booking-mobile-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 1rem;
+    background: rgba(8, 10, 30, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .mobile-summary-movie {
+    padding: 1.1rem 1.2rem 0.9rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .mobile-summary-movie strong {
+    font-size: 0.97rem;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .mobile-summary-movie span {
+    font-size: 0.82rem;
+    color: #8f98c8;
+  }
+
+  .mobile-summary-rows {
+    padding: 0.8rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .mobile-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #9da5d6;
+    font-size: 0.9rem;
+  }
+
+  .mobile-summary-row strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .mobile-summary-footer {
+    padding: 0.9rem 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .mobile-summary-total {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .mobile-summary-total span {
+    font-size: 0.78rem;
+    color: #8f98c8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .mobile-summary-total strong {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .mobile-checkout-btn {
+    padding: 0.75rem 1.6rem;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #9a7cff 0%, #c46bff 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    box-shadow: 0 8px 24px rgba(154, 124, 255, 0.35);
+  }
+
+  .mobile-checkout-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .mobile-checkout-btn:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 30px rgba(154, 124, 255, 0.5);
+  }
+
+  /* ── Promo banner ── */
+  .booking-promo-banner {
+    display: block;
+    margin-top: 1rem;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(100, 60, 180, 0.55), rgba(140, 60, 210, 0.45));
+    border: 1px solid rgba(180, 100, 255, 0.3);
+    padding: 1.1rem 1.2rem;
+  }
+
+  .promo-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .promo-content strong {
+    font-size: 0.97rem;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .promo-content p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #cbb8f5;
+  }
+
+  .promo-link {
+    background: none;
+    border: none;
+    color: #e0c8ff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+    margin-top: 0.35rem;
   }
 }

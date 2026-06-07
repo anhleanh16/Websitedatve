@@ -1,4 +1,4 @@
-import React, { Fragment, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './Booking.css';
 
@@ -53,6 +53,7 @@ export default function Booking() {
   const [comboCounts, setComboCounts] = useState({ couple: 0, friends: 0, family: 0 });
   const [snackCounts, setSnackCounts] = useState({ corn: 0, drink: 0 });
   const [openDropdown, setOpenDropdown] = useState('snacks'); // ensure snacks open by default
+  const [mobileStep, setMobileStep] = useState(1); // 1=ghế, 2=combo, 3=thanh toán
 
   const toggleSeat = (seat) => {
     setSelectedSeats((prev) =>
@@ -108,9 +109,9 @@ export default function Booking() {
 
   return (
     <div className="booking-page">
+      {/* ── Breadcrumb (desktop only) ── */}
       <div className="booking-breadcrumb-bar">
         <nav className="booking-breadcrumb">
-          <button className="booking-breadcrumb-item booking-back" type="button" onClick={() => navigate(-1)}>Quay lại</button>
           <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/')}>Trang chủ</button>
           <span className="booking-breadcrumb-sep">›</span>
           <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/movies')}>Phim</button>
@@ -119,6 +120,35 @@ export default function Booking() {
         </nav>
       </div>
 
+      {/* ── Mobile header ── */}
+      <div className="booking-mobile-header">
+        <button
+          type="button"
+          className="booking-back-btn"
+          onClick={() => mobileStep > 1 ? setMobileStep(mobileStep - 1) : navigate(-1)}
+        >
+          ←
+        </button>
+        <div className="booking-mobile-title">
+          <strong>Doraemon: Nobita và cuộc chiến vũ trụ tí hon</strong>
+          <span>{time} • {cinema}</span>
+        </div>
+      </div>
+
+      {/* ── Stepper ── */}
+      <div className="booking-stepper">
+        {[{ label: 'Ghế ngồi' }, { label: 'Combo' }, { label: 'Thanh toán' }].map((s, i) => (
+          <Fragment key={s.label}>
+            <div className={`stepper-step ${mobileStep === i + 1 ? 'active' : mobileStep > i + 1 ? 'done' : ''}`}>
+              <div className="stepper-circle">{mobileStep > i + 1 ? '✓' : i + 1}</div>
+              <span>{s.label}</span>
+            </div>
+            {i < 2 && <div className={`stepper-line ${mobileStep > i + 1 ? 'done' : ''}`} />}
+          </Fragment>
+        ))}
+      </div>
+
+      {/* ── Desktop header ── */}
       <div className="booking-header">
         <div>
           <p className="booking-subtitle">Chọn ghế và combo</p>
@@ -130,7 +160,7 @@ export default function Booking() {
         </button>
       </div>
 
-      <div className="booking-layout">
+      <div className={`booking-layout${mobileStep === 2 ? ' mobile-hide' : ''}`}>
         <section className="booking-seat-panel">
           <div className="screen-label">MÀN HÌNH</div>
           <div className="seat-map">
@@ -176,23 +206,23 @@ export default function Booking() {
           <div className="legend">
             <div className="legend-item">
               <span className="legend-marker" style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.1)' }} />
-              Ghế thường
-            </div>
-            <div className="legend-item">
-              <span className="legend-marker" style={{ background: 'linear-gradient(135deg, #9e71ff, #7d4ff6)' }} />
-              Ghế đang chọn
-            </div>
-            <div className="legend-item">
-              <span className="legend-marker" style={{ background: 'linear-gradient(135deg, #ff8a8a, #ff4a4a)' }} />
-              Ghế đôi
+              Thường
             </div>
             <div className="legend-item">
               <span className="legend-marker" style={{ background: 'linear-gradient(135deg, #ffc260, #ff7d2c)' }} />
-              Ghế VIP
+              VIP
+            </div>
+            <div className="legend-item">
+              <span className="legend-marker" style={{ background: 'linear-gradient(135deg, #ff8a8a, #ff4a4a)' }} />
+              Ghế Đôi
+            </div>
+            <div className="legend-item">
+              <span className="legend-marker" style={{ background: 'linear-gradient(135deg, #9e71ff, #7d4ff6)' }} />
+              Đang chọn
             </div>
             <div className="legend-item">
               <span className="legend-marker" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)' }} />
-              Ghế đã bán
+              Đã bán
             </div>
           </div>
         </section>
@@ -291,6 +321,118 @@ export default function Booking() {
             </button>
           </div>
         </aside>
+      </div>
+
+      {/* ── Mobile step 2: Combo & Bắp nước ── */}
+      <div className={`booking-mobile-combo${mobileStep === 2 ? ' mobile-step-visible' : ''}`}>
+        <div className="mobile-combo-section">
+          <div className="mobile-combo-heading">🍿 Bắp &amp; Nước</div>
+          {snackItems.map((item) => (
+            <div className="combo-card" key={item.key}>
+              <div className="combo-info">
+                <span className="item-icon" aria-hidden>{item.icon}</span>
+                <div>
+                  <h4>{item.label}</h4>
+                  <p>{item.price.toLocaleString('vi-VN')}đ</p>
+                </div>
+              </div>
+              <div className="combo-control">
+                <button type="button" className="combo-button" onClick={() => updateSnack(item.key, -1)}>-</button>
+                <span className="combo-count">{snackCounts[item.key]}</span>
+                <button type="button" className="combo-button" onClick={() => updateSnack(item.key, 1)}>+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mobile-combo-section">
+          <div className="mobile-combo-heading">🎁 Combo</div>
+          {comboItems.map((item) => (
+            <div className="combo-card" key={item.key}>
+              <div className="combo-info">
+                <span className="item-icon" aria-hidden>{item.icon}</span>
+                <div>
+                  <h4>{item.label}</h4>
+                  <p>{item.description}</p>
+                </div>
+              </div>
+              <div className="combo-control">
+                <button type="button" className="combo-button" onClick={() => updateCombo(item.key, -1)}>-</button>
+                <span className="combo-count">{comboCounts[item.key]}</span>
+                <button type="button" className="combo-button" onClick={() => updateCombo(item.key, 1)}>+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Mobile summary card ── */}
+      <div className="booking-mobile-summary">
+        <div className="mobile-summary-movie">
+          <strong>Doraemon: Nobita và cuộc chiến vũ trụ tí hon</strong>
+          <span>🗓 {time} • {day}, {new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
+        </div>
+        <div className="mobile-summary-rows">
+          <div className="mobile-summary-row">
+            <span>Phòng chiếu</span>
+            <strong>IMAX 04</strong>
+          </div>
+          <div className="mobile-summary-row">
+            <span>Ghế</span>
+            <strong>{selectedSeats.length > 0 ? selectedSeats.join(', ') : '—'}</strong>
+          </div>
+          {mobileStep === 2 && (
+            <>
+              <div className="mobile-summary-row">
+                <span>Bắp &amp; Nước</span>
+                <strong>{snackTotal > 0 ? snackTotal.toLocaleString('vi-VN') + 'đ' : '0đ'}</strong>
+              </div>
+              <div className="mobile-summary-row">
+                <span>Combo</span>
+                <strong>{comboTotal > 0 ? comboTotal.toLocaleString('vi-VN') + 'đ' : '0đ'}</strong>
+              </div>
+            </>
+          )}
+          {mobileStep === 1 && (
+            <div className="mobile-summary-row">
+              <span>Phí dịch vụ</span>
+              <strong>0đ</strong>
+            </div>
+          )}
+        </div>
+        <div className="mobile-summary-footer">
+          <div className="mobile-summary-total">
+            <span>Tổng cộng</span>
+            <strong>{totalWithSnacks.toLocaleString('vi-VN')}đ</strong>
+          </div>
+          {mobileStep === 1 && (
+            <button
+              type="button"
+              className="mobile-checkout-btn"
+              disabled={selectedSeats.length === 0}
+              onClick={() => setMobileStep(2)}
+            >
+              Tiếp tục
+            </button>
+          )}
+          {mobileStep === 2 && (
+            <button
+              type="button"
+              className="mobile-checkout-btn"
+              onClick={() => navigate('/payment', { state: { cinema, day, time, selectedSeats, comboCounts, total } })}
+            >
+              Thanh toán
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Promo banner ── */}
+      <div className="booking-promo-banner">
+        <div className="promo-content">
+          <strong>Ưu đãi Member</strong>
+          <p>Giảm 5% cho thành viên Star Member khi đặt qua Lunexa App</p>
+          <button type="button" className="promo-link">Khám phá ngay &rsaquo;</button>
+        </div>
       </div>
     </div>
   );
