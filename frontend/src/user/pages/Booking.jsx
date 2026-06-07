@@ -114,7 +114,9 @@ export default function Booking() {
         <nav className="booking-breadcrumb">
           <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/')}>Trang chủ</button>
           <span className="booking-breadcrumb-sep">›</span>
-          <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/movies')}>Phim</button>
+          <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/films')}>Phim</button>
+          <span className="booking-breadcrumb-sep">›</span>
+          <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/moviedetail')}>Doraemon: Nobita và cuộc chiến vũ trụ tí hon</button>
           <span className="booking-breadcrumb-sep">›</span>
           <span className="booking-breadcrumb-current">Đặt vé</span>
         </nav>
