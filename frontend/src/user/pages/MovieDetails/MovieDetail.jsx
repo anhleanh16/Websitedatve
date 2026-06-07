@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import './MovieDetail.css';
 
 export default function MovieDetail() {
+  const selectedRegion = useSelector((state) => state.region.selectedRegion);
   const vietnameseWeekdays = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
   const today = new Date();
   const todayIndex = today.getDay();
@@ -300,6 +302,29 @@ export default function MovieDetail() {
   const showTimes = currentCinema?.schedule[activeDay] ?? [];
   const navigate = useNavigate();
 
+  // Kiểm tra thời gian Việt Nam hiện tại
+  const isTimePast = (timeStr, dayLabel) => {
+    // Chỉ kiểm tra nếu là hôm nay
+    if (dayLabel !== todayLabel) return false;
+    
+    // Lấy giờ phút từ timeStr (vd: '09:00 - 2D)
+    const [hourStr] = timeStr.split(' - ');
+    const [hour, minute] = hourStr.split(':').map(Number);
+    
+    // Lấy giờ Việt Nam hiện tại
+    const now = new Date();
+    // Chuyển sang múi giờ Việt Nam (UTC+7)
+    const vietnamTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+    const currentHour = vietnamTime.getHours();
+    const currentMinute = vietnamTime.getMinutes();
+    
+    // So sánh
+    if (hour < currentHour) return true;
+    if (hour === currentHour && minute <= currentMinute) return true;
+    
+    return false;
+  };
+
   // Reset selected time when cinema or day changes
   const handleCinemaChange = (id) => {
     setActiveCinema(id);
@@ -312,6 +337,8 @@ export default function MovieDetail() {
   };
 
   const handleScheduleClick = (time) => {
+    // Không cho chọn nếu thời gian đã qua
+    if (isTimePast(time, activeDay)) return;
     setSelectedTime((prev) => (prev === time ? null : time));
   };
 
@@ -319,7 +346,7 @@ export default function MovieDetail() {
     navigate('/booking', {
       state: {
         cinema: currentCinema?.name ?? 'Lunexa Movix',
-        day: activeDay,
+        day: scheduleLabel(activeDay),
         time: selectedTime,
       },
     });
@@ -702,16 +729,20 @@ export default function MovieDetail() {
                 </div>
                 <div className="schedule-times">
                   {showTimes.length > 0 ? (
-                    showTimes.map((time) => (
-                      <button
-                        key={time}
-                        type="button"
-                        className={`time-slot${selectedTime === time ? ' selected' : ''}`}
-                        onClick={() => handleScheduleClick(time)}
-                      >
-                        {time}
-                      </button>
-                    ))
+                    showTimes.map((time) => {
+                      const past = isTimePast(time, activeDay);
+                      return (
+                        <button
+                          key={time}
+                          type="button"
+                          className={`time-slot${selectedTime === time ? ' selected' : ''}${past ? ' past' : ''}`}
+                          onClick={() => handleScheduleClick(time)}
+                          disabled={past}
+                        >
+                          {time}
+                        </button>
+                      );
+                    })
                   ) : (
                     <div className="schedule-empty">Chưa có lịch cho ngày này.</div>
                   )}

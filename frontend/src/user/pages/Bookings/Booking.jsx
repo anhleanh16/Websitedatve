@@ -112,14 +112,14 @@ export default function Booking() {
       {/* ── Breadcrumb (desktop only) ── */}
       <div className="booking-breadcrumb-bar">
         <nav className="booking-breadcrumb">
-          <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/')}>Trang chủ</button>
-          <span className="booking-breadcrumb-sep">›</span>
-          <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/films')}>Phim</button>
-          <span className="booking-breadcrumb-sep">›</span>
-          <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/moviedetail')}>Doraemon: Nobita và cuộc chiến vũ trụ tí hon</button>
-          <span className="booking-breadcrumb-sep">›</span>
-          <span className="booking-breadcrumb-current">Đặt vé</span>
-        </nav>
+                <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/')}>Trang chủ</button>
+                <span className="booking-breadcrumb-sep">›</span>
+                <button className="booking-breadcrumb-link" type="button" onClick={() => navigate('/films')}>Phim</button>
+                <span className="booking-breadcrumb-sep">›</span>
+                <button className="booking-breadcrumb-link" type="button" onClick={() => navigate(-1)}>Doraemon: Nobita và cuộc chiến vũ trụ tí hon</button>
+                <span className="booking-breadcrumb-sep">›</span>
+                <span className="booking-breadcrumb-current">Đặt vé</span>
+              </nav>
       </div>
 
       {/* ── Mobile header ── */}

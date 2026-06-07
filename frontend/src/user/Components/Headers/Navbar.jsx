@@ -16,23 +16,27 @@ const NAV_ITEMS = [
   { to: '/News',       label: 'Tin tức',    icon: <FaNewspaper /> },
 ]
 
+// Map regions to cinema IDs from MovieDetail.jsx
 const REGIONS = [
-  { value: 'dn',  label: 'Đà Nẵng' },
-  { value: 'hcm', label: 'TP. Hồ Chí Minh' },
-  { value: 'hn',  label: 'Hà Nội' },
-  { value: 'hue', label: 'Huế' },
-  { value: 'ctn', label: 'Cần Thơ' },
-  { value: 'vt',  label: 'Vũng Tàu' },
+  { value: 'danang',  label: 'Đà Nẵng' },
+  { value: 'hcm',     label: 'TP. Hồ Chí Minh' },
+  { value: 'hanoi',   label: 'Hà Nội' },
+  { value: 'haiphong',label: 'Hải Phòng' },
+  { value: 'hue',     label: 'Huế' },
+  { value: 'quangngai', label: 'Quảng Ngãi' },
 ]
 
 export default function Navbar() {
   const profile  = useSelector((state) => state.user.profile)
   const notifications = useSelector((state) => state.notifications.items)
+  const selectedRegion = useSelector((state) => state.region.selectedRegion)
   const location = useLocation()
   const dispatch = useDispatch()
   const navigate = useNavigate()
 
   const unreadCount = notifications.filter(n => !n.read).length
+  // Find region object from value
+  const region = REGIONS.find(r => r.value === selectedRegion) || REGIONS[0]
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [searchOpen,   setSearchOpen]   = useState(false)
@@ -40,7 +44,6 @@ export default function Navbar() {
   const [scrolled,     setScrolled]     = useState(false)
   const [mobileOpen,   setMobileOpen]   = useState(false)
   const [regionOpen,   setRegionOpen]   = useState(false)
-  const [region,       setRegion]       = useState(REGIONS[0])
   const [bellOpen,     setBellOpen]     = useState(false)
 
   const dropdownRef = useRef(null)
@@ -81,7 +84,7 @@ export default function Navbar() {
     to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
 
   const handleRegionSelect = (r) => {
-    setRegion(r)
+    dispatch({ type: 'region/setRegion', payload: r.value })
     setRegionOpen(false)
   }
 
@@ -348,7 +351,7 @@ export default function Navbar() {
           <select
             className='mobile-region-select'
             value={region.value}
-            onChange={(e) => setRegion(REGIONS.find(r => r.value === e.target.value))}
+            onChange={(e) => dispatch({ type: 'region/setRegion', payload: e.target.value })}
           >
             {REGIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>

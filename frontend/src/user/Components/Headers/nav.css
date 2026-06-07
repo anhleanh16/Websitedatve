@@ -826,18 +826,26 @@
 }
 
 @media (max-width: 768px) {
-  .navbar-container { padding: 0 1.25rem; }
+  .navbar-container {
+    padding: 0 1rem;
+    height: 70px;
+  }
+  .nav-logo img { height: 75px; }
   .nav-menu { display: none; }
   .hamburger { display: flex; }
-  .mobile-drawer { display: block; }
+  .mobile-drawer { display: block; top: 70px; }
   .mobile-overlay { display: block; }
   .account-label { display: none; }
   .account-caret { display: none; }
   .account-btn { padding: 0.45rem 0.55rem; }
+  .region-wrap { margin-right: 0.5rem; }
+  .region-label { display: none; }
+  .region-btn { padding: 0.45rem 0.6rem; }
+  .search-wrap { display: none; }
 }
 
 @media (max-width: 480px) {
-  .search-wrap.open .search-input { width: 160px; max-width: 160px; }
+  .navbar-container { padding: 0 0.75rem; }
 }
 
 /* =============================================

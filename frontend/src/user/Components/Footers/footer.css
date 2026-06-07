@@ -215,28 +215,33 @@ a.contact-value:hover {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .footer {
     grid-template-columns: 1fr;
-    gap: 2rem;
-    padding: 2rem 1.5rem 0;
-    text-align: center;
+    gap: 1.75rem;
+    padding: 2rem 1.25rem 0;
+    text-align: left;
   }
 
-  .footer-col { align-items: center; }
-  .footer-brand-desc { text-align: center; }
+  .footer-col { align-items: flex-start; }
+  .footer-brand-desc { text-align: left; }
   .footer-links-list a:hover { transform: none; }
   .social-item:hover { transform: none; }
 
+  .social-list { flex-direction: row; flex-wrap: wrap; gap: 0.5rem; }
+
   .footer-contact-item {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
+    flex-direction: row;
+    align-items: flex-start;
+    text-align: left;
   }
 
   .footer-bottom {
     flex-direction: column;
-    align-items: center;
-    text-align: center;
+    align-items: flex-start;
+    text-align: left;
+    gap: 0.5rem;
   }
+
+  .footer-bottom-links { gap: 0.85rem; }
 }
