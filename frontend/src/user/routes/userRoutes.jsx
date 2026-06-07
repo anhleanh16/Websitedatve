@@ -6,7 +6,7 @@ import Booking from "../pages/Bookings/Booking";
 import Payment from "../pages/Payment";
 import Cinemas from "../pages/Cinemas";
 import AIAssistant from "../pages/AIAssistant";
-import Notifications from "../pages/Notifications";
+import Notifications from "../pages/Notifications/Notifications";
 import Profile from "../pages/Profiles/Profile";
 import Login from "../pages/Logins/Login";
 import Register from "../pages/Registers/Register";

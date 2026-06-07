@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useSelector, useDispatch } from 'react-redux'
 import {
   FaBell, FaSearch, FaUser, FaFilm, FaHome,
-  FaMapMarkerAlt, FaCrown, FaNewspaper, FaTimes, FaChevronDown
+  FaMapMarkerAlt, FaCrown, FaNewspaper, FaTimes, FaChevronDown, FaTicketAlt, FaStar, FaGift, FaCog, FaTrash
 } from 'react-icons/fa'
+import { markAsRead, markAllAsRead, deleteNotification } from '../../../redux/slices/notificationSlice'
 import './nav.css'
 
 const NAV_ITEMS = [
@@ -26,7 +27,12 @@ const REGIONS = [
 
 export default function Navbar() {
   const profile  = useSelector((state) => state.user.profile)
+  const notifications = useSelector((state) => state.notifications.items)
   const location = useLocation()
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+
+  const unreadCount = notifications.filter(n => !n.read).length
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [searchOpen,   setSearchOpen]   = useState(false)
@@ -35,10 +41,12 @@ export default function Navbar() {
   const [mobileOpen,   setMobileOpen]   = useState(false)
   const [regionOpen,   setRegionOpen]   = useState(false)
   const [region,       setRegion]       = useState(REGIONS[0])
+  const [bellOpen,     setBellOpen]     = useState(false)
 
   const dropdownRef = useRef(null)
   const searchRef   = useRef(null)
   const regionRef   = useRef(null)
+  const bellRef     = useRef(null)
   const inputRef    = useRef(null)
 
   /* scroll → blur navbar */
@@ -54,6 +62,7 @@ export default function Navbar() {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false)
       if (searchRef.current   && !searchRef.current.contains(e.target))   { setSearchOpen(false) }
       if (regionRef.current   && !regionRef.current.contains(e.target))   setRegionOpen(false)
+      if (bellRef.current     && !bellRef.current.contains(e.target))     setBellOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -66,7 +75,7 @@ export default function Navbar() {
   }, [searchOpen])
 
   /* close mobile menu on route change */
-  useEffect(() => { setMobileOpen(false) }, [location.pathname])
+  useEffect(() => { setMobileOpen(false); setBellOpen(false) }, [location.pathname])
 
   const isActive = (to) =>
     to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
@@ -75,6 +84,8 @@ export default function Navbar() {
     setRegion(r)
     setRegionOpen(false)
   }
+
+  const NOTIF_ICONS = { ticket: '🎟️', promo: '🎁', movie: '🎬', points: '⭐', system: '⚙️' }
 
   return (
     <header className={`navbar-container${scrolled ? ' scrolled' : ''}`}>
@@ -172,11 +183,64 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Notification */}
-        <Link to='/notifications' className='nav-icon-btn notif-btn' aria-label='Thông báo'>
-          <FaBell />
-          <span className='notif-dot' />
-        </Link>
+        {/* Bell dropdown */}
+        <div ref={bellRef} className={`bell-wrap${bellOpen ? ' open' : ''}`}>
+          <button
+            className='nav-icon-btn notif-btn'
+            aria-label='Thông báo'
+            onClick={() => setBellOpen(v => !v)}
+          >
+            <FaBell />
+            {unreadCount > 0 && <span className='notif-dot'>{unreadCount > 9 ? '9+' : unreadCount}</span>}
+          </button>
+
+          <div className='bell-dropdown'>
+            <div className='bell-header'>
+              <span className='bell-title'>Thông báo</span>
+              {unreadCount > 0 && (
+                <button className='bell-mark-all' onClick={() => dispatch(markAllAsRead())}>
+                  Đánh dấu tất cả đã đọc
+                </button>
+              )}
+            </div>
+
+            <div className='bell-list'>
+              {notifications.length === 0 ? (
+                <div className='bell-empty'>
+                  <FaBell />
+                  <p>Không có thông báo nào</p>
+                </div>
+              ) : (
+                notifications.slice(0, 5).map(n => (
+                  <div
+                    key={n.id}
+                    className={`bell-item${n.read ? '' : ' unread'}`}
+                    onClick={() => { dispatch(markAsRead(n.id)); setBellOpen(false); navigate('/notifications') }}
+                  >
+                    <span className='bell-item-icon'>{NOTIF_ICONS[n.type] || '🔔'}</span>
+                    <div className='bell-item-body'>
+                      <div className='bell-item-title'>{n.title}</div>
+                      <div className='bell-item-desc'>{n.desc}</div>
+                      <div className='bell-item-time'>{n.time}</div>
+                    </div>
+                    {!n.read && <span className='bell-item-dot' />}
+                    <button
+                      className='bell-item-del'
+                      onClick={e => { e.stopPropagation(); dispatch(deleteNotification(n.id)) }}
+                      aria-label='Xoá'
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <Link to='/notifications' className='bell-footer' onClick={() => setBellOpen(false)}>
+              Xem tất cả thông báo →
+            </Link>
+          </div>
+        </div>
 
         {/* Account dropdown */}
         <div
