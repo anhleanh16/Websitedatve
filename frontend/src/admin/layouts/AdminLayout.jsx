@@ -1,5 +1,6 @@
-import AdminSidebar from '../components/AdminSidebar';
-import AdminHeader from '../components/AdminHeader';
+import AdminSidebar from "../components/AdminSidebar";
+import AdminHeader from "../components/AdminHeader";
+import "../admin.css";
 
 export default function AdminLayout({ children }) {
   return (
@@ -7,9 +8,7 @@ export default function AdminLayout({ children }) {
       <AdminSidebar />
       <div className="admin-content">
         <AdminHeader />
-        <main className="admin-main">
-          {children}
-        </main>
+        <main className="admin-main">{children}</main>
       </div>
     </div>
   );
