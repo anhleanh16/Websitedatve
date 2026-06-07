@@ -1,85 +1,50 @@
 import { NavLink } from "react-router-dom";
 
-export default function AdminSidebar() {
+const NAV_ITEMS = [
+  { to: "/admin/dashboard",     label: "Tổng quan",    icon: "⊞" },
+  { to: "/admin/users",         label: "Người dùng",   icon: "👤" },
+  { to: "/admin/movies",        label: "Phim",         icon: "🎬" },
+  { to: "/admin/showtimes",     label: "Lịch chiếu",   icon: "🕐" },
+  { to: "/admin/cinemas",       label: "Rạp chiếu",    icon: "🎭" },
+  { to: "/admin/bookings",      label: "Đặt vé",       icon: "🎟" },
+  { to: "/admin/promotions",    label: "Khuyến mãi",   icon: "🏷" },
+  { to: "/admin/notifications", label: "Thông báo",    icon: "🔔" },
+  { to: "/admin/comments",      label: "Bình luận",    icon: "💬" },
+  { to: "/admin/reports",       label: "Báo cáo",      icon: "📊" },
+  { to: "/admin/settings",      label: "Cài đặt",      icon: "⚙" },
+];
+
+export default function AdminSidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
   return (
-    <aside className="admin-sidebar">
+    <aside className={`admin-sidebar${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`}>
+      {/* Header */}
       <div className="sidebar-header">
-        <h2>Lunexa Quản trị</h2>
+        {!collapsed && <h2 className="sidebar-logo">Lunexa</h2>}
+        <button
+          className="sidebar-toggle"
+          onClick={onToggle}
+          title={collapsed ? "Mở rộng" : "Thu gọn"}
+        >
+          {collapsed ? "▶" : "◀"}
+        </button>
       </div>
+
+      {/* Nav */}
       <nav className="sidebar-nav">
         <ul>
-          <li>
-            <NavLink
-              to="/admin/dashboard"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Trang tổng quan
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/admin/users"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Người dùng
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/admin/movies"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Phim
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/admin/bookings"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Đặt vé
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/admin/notifications"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Thông báo
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/admin/comments"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Bình luận
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/admin/statistics"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Thống kê
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/admin/reports"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Báo cáo
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/admin/settings"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Cài đặt
-            </NavLink>
-          </li>
+          {NAV_ITEMS.map(({ to, label, icon }) => (
+            <li key={to}>
+              <NavLink
+                to={to}
+                className={({ isActive }) => isActive ? "active" : ""}
+                title={collapsed ? label : undefined}
+                onClick={onMobileClose}
+              >
+                <span className="nav-icon">{icon}</span>
+                <span className="nav-label">{label}</span>
+              </NavLink>
+            </li>
+          ))}
         </ul>
       </nav>
     </aside>
