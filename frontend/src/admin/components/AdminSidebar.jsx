@@ -13,7 +13,7 @@ export default function AdminSidebar() {
               to="/admin/dashboard"
               className={({ isActive }) => (isActive ? "active" : "")}
             >
-              Trang tổng quan
+              Tổng quan
             </NavLink>
           </li>
           <li>
@@ -34,10 +34,28 @@ export default function AdminSidebar() {
           </li>
           <li>
             <NavLink
-              to="/admin/bookings"
+              to="/admin/showtimes"
               className={({ isActive }) => (isActive ? "active" : "")}
             >
+              Lịch chiếu
+            </NavLink>
+          </li>
+          <li>
+            <NavLink
+              to="/admin/cinemas"
+              className={({ isActive }) => (isActive ? "active" : "")}
+            >
+              Rạp chiếu
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/admin/bookings" className={({ isActive }) => (isActive ? "active" : "")}>
               Đặt vé
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/admin/promotions" className={({ isActive }) => (isActive ? "active" : "")}>
+              Khuyến mãi
             </NavLink>
           </li>
           <li>
@@ -54,14 +72,6 @@ export default function AdminSidebar() {
               className={({ isActive }) => (isActive ? "active" : "")}
             >
               Bình luận
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/admin/statistics"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Thống kê
             </NavLink>
           </li>
           <li>

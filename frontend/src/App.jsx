@@ -5,14 +5,22 @@ import { AdminRoutes } from './admin/routes/adminRoutes';
 
 function App() {
   return (
-    <div className="app">
-      <main className="app-content">
-        <Routes>
-          <Route path="/admin/*" element={<AdminRoutes />} />
-          <Route path="/*" element={<UserRoutes />} />
-        </Routes>
-      </main>
-    </div>
+    <Routes>
+      {/* Admin: full-width, layout riêng, không bọc trong .app-content */}
+      <Route path="/admin/*" element={<AdminRoutes />} />
+
+      {/* User: bọc trong .app để dùng layout user */}
+      <Route
+        path="/*"
+        element={
+          <div className="app">
+            <main className="app-content">
+              <UserRoutes />
+            </main>
+          </div>
+        }
+      />
+    </Routes>
   );
 }
 
