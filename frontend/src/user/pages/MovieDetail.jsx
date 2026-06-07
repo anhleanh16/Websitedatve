@@ -23,6 +23,7 @@ export default function MovieDetail() {
     'https://newsmd2fr.keeng.vn/tiin/archive/imageslead/2022/05/27/83xubpzq2jbhhjtktbq2ucf4arul1qyd.jpg',
     'https://static1.dienanh.net/upload/202204/4b2c2669-be26-4a13-b42f-f0a96fa172ed.jpg',
     'https://static1.dienanh.net/upload/202204/c53cb69d-45e3-4b09-ab65-15a011c20239.jpg',
+    'https://cdn.eva.vn/upload/2-2022/images/2022-06-06/doraemon-003-1654512377-236-width650height366.jpg',
   ];
   const handleBookClick = () => {
     scheduleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -211,6 +212,12 @@ export default function MovieDetail() {
     { stars: 4, percent: 28, count: '2.8K' },
     { stars: 3, percent: 11, count: '1.1K' },
   ];
+  // gallery display logic: show up to 6 tiles
+  // if there are more than 6 images, show first 5 and a 6th tile with +N
+  const VISIBLE_LIMIT = 6;
+  const totalImages = galleryImages.length;
+  const showOverlay = totalImages > VISIBLE_LIMIT;
+  const normalCount = showOverlay ? VISIBLE_LIMIT - 1 : Math.min(totalImages, VISIBLE_LIMIT);
   
 
   return (
@@ -362,11 +369,21 @@ export default function MovieDetail() {
         <div className="score-card">
           <h3><span className="icon">✨</span>Ảnh nổi bật</h3>
           <div className="score-gallery">
-            {galleryImages.slice(0, 6).map((src, idx) => (
+            {galleryImages.slice(0, normalCount).map((src, idx) => (
               <div className="gallery-item" key={idx} onClick={() => openLightbox(idx)}>
                 <img src={src} alt={`Ảnh nổi bật ${idx + 1}`} />
               </div>
             ))}
+            {showOverlay && (
+              <div
+                className="gallery-item gallery-overlay"
+                key={normalCount}
+                onClick={() => openLightbox(normalCount)}
+              >
+                <img src={galleryImages[normalCount]} alt={`Ảnh nổi bật ${normalCount + 1}`} />
+                <div className="overlay-count">+{totalImages - normalCount}</div>
+              </div>
+            )}
           </div>
         </div>
 
