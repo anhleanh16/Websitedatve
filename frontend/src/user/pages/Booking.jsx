@@ -1,19 +1,32 @@
-import { useState } from 'react';
+import React, { Fragment, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './Booking.css';
 
 const defaultLayout = [
-  { row: 'A', sections: [['A1', 'A2', 'A3', 'A4']] },
-  { row: 'B', sections: [['B1', 'B2', 'B3'], ['B4', 'B5', 'B6', 'B7'], ['B8', 'B9', 'B10']] },
-  { row: 'C', sections: [['C1', 'C2', 'C3'], ['C4', 'C5', 'C6', 'C7'], ['C8', 'C9', 'C10']] },
-  { row: 'D', sections: [['D1', 'D2', 'D3'], ['D4', 'D5', 'D6', 'D7'], ['D8', 'D9', 'D10']] },
-  { row: 'E', sections: [['E1', 'E2', 'E3'], ['E4', 'E5', 'E6', 'E7'], ['E8', 'E9', 'E10']] },
-  { row: 'F', sections: [['F1', 'F2', 'F3'], ['F4', 'F5', 'F6', 'F7'], ['F8', 'F9', 'F10']] },
-  { row: 'G', isCouple: true, sections: [['G1', 'G2', 'G3'], ['G4', 'G5', 'G6', 'G7'], ['G8', 'G9', 'G10']] },
-  { row: 'H', isCouple: true, sections: [['H1', 'H2', 'H3'], ['H4', 'H5', 'H6', 'H7'], ['H8', 'H9', 'H10']] },
+  { row: 'A', sections: [['A1', 'A2', 'A3', 'A4'], ['A5', 'A6', 'A7', 'A8'], ['A9', 'A10', 'A11', 'A12']] },
+  { row: 'B', sections: [['B1', 'B2', 'B3', 'B4'], ['B5', 'B6', 'B7', 'B8'], ['B9', 'B10', 'B11', 'B12']] },
+  { row: 'C', sections: [['C1', 'C2', 'C3', 'C4'], ['C5', 'C6', 'C7', 'C8'], ['C9', 'C10', 'C11', 'C12']] },
+  { row: 'D', sections: [['D1', 'D2', 'D3', 'D4'], ['D5', 'D6', 'D7', 'D8'], ['D9', 'D10', 'D11', 'D12']] },
+  { row: 'E', sections: [['E1', 'E2', 'E3', 'E4'], ['E5', 'E6', 'E7', 'E8'], ['E9', 'E10', 'E11', 'E12']] },
+  { row: 'F', sections: [
+    { seats: ['F1', 'F2', 'F3', 'F4'], weight: 4 },
+    { seats: ['F5', 'F6', 'F7', 'F8'], weight: 4 },
+    { seats: ['F9', 'F10', 'F11', 'F12'], weight: 4 },
+  ] },
+  { row: 'G', isCouple: true, sections: [
+    { seats: [{ id: 'G1_G2', label: '1-2' }, { id: 'G3_G4', label: '3-4' }], weight: 6 },
+    { seats: [{ id: 'G5_G6', label: '5-6' }, { id: 'G7_G8', label: '7-8' }], weight: 6 },
+    { seats: [{ id: 'G9_G10', label: '9-10' }, { id: 'G11_G12', label: '11-12' }], weight: 6 },
+  ] },
+  { row: 'H', isCouple: true, sections: [
+    { seats: [{ id: 'H1_H2', label: '1-2' }, { id: 'H3_H4', label: '3-4' }], weight: 6 },
+    { seats: [{ id: 'H5_H6', label: '5-6' }, { id: 'H7_H8', label: '7-8' }], weight: 6 },
+    { seats: [{ id: 'H9_H10', label: '9-10' }, { id: 'H11_H12', label: '11-12' }], weight: 6 },
+  ] },
 ];
 
-const vipSeats = new Set(['E4', 'E5', 'E6', 'E7', 'F4', 'F5', 'F6', 'F7']);
+const vipSeats = new Set(['E5', 'E6', 'E7', 'E8', 'F5', 'F6', 'F7', 'F8']);
+const soldSeats = new Set(['A3', 'B6', 'C8', 'E5', 'E6', 'G1_G2']);
 
 const getSeatType = (seat, isRowCouple) => {
   if (isRowCouple) return 'couple';
@@ -37,7 +50,7 @@ export default function Booking() {
   const navigate = useNavigate();
   const { cinema = 'Lunexa Movix Đà Nẵng', day = 'Hôm nay', time = '10:00 - 2D' } = location.state ?? {};
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [comboCounts, setComboCounts] = useState({ couple: 1, friends: 0, family: 0 });
+  const [comboCounts, setComboCounts] = useState({ couple: 0, friends: 0, family: 0 });
   const [snackCounts, setSnackCounts] = useState({ corn: 0, drink: 0 });
   const [openDropdown, setOpenDropdown] = useState('snacks'); // ensure snacks open by default
 
@@ -66,8 +79,22 @@ export default function Booking() {
     setOpenDropdown((prev) => (prev === key ? prev : key));
   };
 
-  const seatPrice = 80000;
-  const seatTotal = selectedSeats.length * seatPrice;
+  const seatPrices = {
+    regular: 80000,
+    vip: 100000,
+    couple: 120000,
+  };
+
+  const getSelectedSeatType = (seatId) => {
+    if (seatId.includes('_')) return 'couple';
+    if (vipSeats.has(seatId)) return 'vip';
+    return 'regular';
+  };
+
+  const seatTotal = selectedSeats.reduce((sum, seatId) => {
+    const type = getSelectedSeatType(seatId);
+    return sum + seatPrices[type];
+  }, 0);
   const comboTotal = comboItems.reduce(
     (sum, item) => sum + item.price * comboCounts[item.key],
     0
@@ -111,23 +138,37 @@ export default function Booking() {
               <div className="seat-row" key={row.row}>
                 <span className="seat-row-label">{row.row}</span>
                 <div className="seat-row-sections">
-                  {row.sections.map((section, sectionIndex) => (
-                    <div className="seat-section" key={sectionIndex}>
-                      {section.map((seat) => {
-                        const seatType = getSeatType(seat, row.isCouple);
-                        return (
-                          <button
-                            key={seat}
-                            type="button"
-                            className={`booking-seat booking-seat-${seatType} ${selectedSeats.includes(seat) ? 'selected' : ''}`}
-                            onClick={() => toggleSeat(seat)}
-                          >
-                            {seat.slice(1)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
+                  {row.sections.map((section, sectionIndex) => {
+                    const sectionSeats = Array.isArray(section) ? section : section.seats;
+                    const sectionWeight = section.weight ?? sectionSeats.length;
+                    return (
+                      <Fragment key={`section-group-${row.row}-${sectionIndex}`}>
+                        <div
+                          className="seat-section"
+                          style={{ flex: `${sectionWeight} 1 0` }}
+                        >
+                          {sectionSeats.map((seat) => {
+                            const seatId = typeof seat === 'string' ? seat : seat.id;
+                            const isSold = soldSeats.has(seatId);
+                            const seatType = getSeatType(seatId, row.isCouple);
+                            return (
+                              <button
+                                key={seatId}
+                                type="button"
+                                className={`booking-seat booking-seat-${seatType} ${isSold ? 'booking-seat-sold' : ''} ${selectedSeats.includes(seatId) ? 'selected' : ''}`}
+                                onClick={() => !isSold && toggleSeat(seatId)}
+                                disabled={isSold}
+                                aria-label={`${seatId} ${isSold ? 'đã bán' : 'còn trống'}`}
+                              />
+                            );
+                          })}
+                        </div>
+                        {sectionIndex < row.sections.length - 1 && (
+                          <div className="seat-aisle" key={`aisle-${row.row}-${sectionIndex}`} />
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -135,7 +176,7 @@ export default function Booking() {
           <div className="legend">
             <div className="legend-item">
               <span className="legend-marker" style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.1)' }} />
-              Ghế trống
+              Ghế thường
             </div>
             <div className="legend-item">
               <span className="legend-marker" style={{ background: 'linear-gradient(135deg, #9e71ff, #7d4ff6)' }} />
@@ -148,6 +189,10 @@ export default function Booking() {
             <div className="legend-item">
               <span className="legend-marker" style={{ background: 'linear-gradient(135deg, #ffc260, #ff7d2c)' }} />
               Ghế VIP
+            </div>
+            <div className="legend-item">
+              <span className="legend-marker" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)' }} />
+              Ghế đã bán
             </div>
           </div>
         </section>
