@@ -1,19 +1,31 @@
-import { Routes, Route } from 'react-router-dom';
-import './App.css';
-import { UserRoutes } from './user/routes/userRoutes';
-import { AdminRoutes } from './admin/routes/adminRoutes';
+import './App.css'
+import AppRoutes from './routes/AppRoutes'
+import { setUser } from './redux/slices/userSlice'
+import store from './redux/store'
 
-function App() {
-  return (
-    <div className="app">
-      <main className="app-content">
-        <Routes>
-          <Route path="/admin/*" element={<AdminRoutes />} />
-          <Route path="/*" element={<UserRoutes />} />
-        </Routes>
-      </main>
-    </div>
-  );
+function parseJwt(token) {
+  try {
+    const payload = token.split('.')[1]
+    return JSON.parse(atob(payload))
+  } catch {
+    return null
+  }
 }
 
-export default App;
+const token = localStorage.getItem('token')
+if (token) {
+  const payload = parseJwt(token)
+  if (payload?.role) {
+    store.dispatch(setUser({
+      role: payload.role,
+      userId: payload.userId,
+      email: payload.email || null,
+    }))
+  }
+}
+
+function App(){
+  return <AppRoutes />
+}
+
+export default App
