@@ -3,7 +3,8 @@ import Home from "../pages/Homes/Home";
 import MovieDetail from "../pages/MovieDetails/MovieDetail";
 import Film from "../pages/Films/Film";
 import Booking from "../pages/Bookings/Booking";
-import Payment from "../pages/Payment";
+import Payment from "../pages/Payment/Payment";
+import News from "../pages/News/News";
 import Cinemas from "../pages/Cinemas";
 import AIAssistant from "../pages/AIAssistant";
 import Notifications from "../pages/Notifications/Notifications";
@@ -24,6 +25,7 @@ export function UserRoutes() {
         <Route path="/booking" element={<Booking />} />
         <Route path="/Bookings/Booking" element={<Booking />} />
         <Route path="/payment" element={<Payment />} />
+        <Route path="/news" element={<News />} />
         <Route path="/cinemas" element={<Cinemas />} />
         <Route path="/ai-assistant" element={<AIAssistant />} />
         <Route path="/notifications" element={<Notifications />} />
