@@ -810,28 +810,131 @@
 ============================================= */
 
 @media (max-width: 1100px) {
-  .main-layout { grid-template-columns: 1fr 290px; }
+  .main-layout { grid-template-columns: 1fr 280px; }
 }
 
+/* ── Tablet 768–900px ── */
 @media (max-width: 900px) {
-  .main-layout {
-    grid-template-columns: 1fr;
+  .home-page { padding: 1.25rem 1.25rem 3rem; }
+
+  .main-layout { grid-template-columns: 1fr; }
+  .col-right {
+    position: static;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
   }
-  .col-right { position: static; }
+  .ad-mini-banner { grid-column: 1 / -1; }
+
   .movies-grid { grid-template-columns: repeat(4, 1fr); }
   .showtime-grid-blocks { grid-template-columns: repeat(2, 1fr); }
   .news-grid { grid-template-columns: 1fr 1fr; }
+  .hero-slider { min-height: 340px; }
 }
 
+/* ── Mobile 480–640px ── */
 @media (max-width: 640px) {
-  .home-page { padding: 1rem 1rem 3rem; }
-  .hero-slide-content { padding: 2rem 1.5rem; }
-  .hero-title { font-size: 1.4rem; }
-  .movies-grid { grid-template-columns: repeat(2, 1fr); }
-  .news-grid { grid-template-columns: 1fr; }
-  .showtime-grid-blocks { grid-template-columns: 1fr; }
-  .hero-actions { flex-direction: column; }
-  .hero-btn-primary, .hero-btn-secondary { justify-content: center; }
+  .home-page { padding: 0.75rem 0.75rem 5rem; }
+
+  .main-layout { gap: 0.75rem; }
+  .col-left { gap: 0.75rem; }
+  .col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  /* Hero */
+  .hero-slider { min-height: 260px; border-radius: 16px; }
+  .hero-slide-content { padding: 1.5rem 1.25rem; gap: 0.6rem; }
+  .hero-title { font-size: 1.2rem; }
+  .hero-desc {
+    font-size: 0.82rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .hero-chip { font-size: 0.65rem; padding: 0.2rem 0.65rem; }
+  .hero-meta-item { font-size: 0.75rem; }
+  .hero-meta-sep { display: none; }
+  .hero-actions { gap: 0.6rem; }
+  .hero-btn-primary, .hero-btn-secondary {
+    flex: 1;
+    justify-content: center;
+    padding: 0.65rem 1rem;
+    font-size: 0.82rem;
+  }
+  .hero-counter { display: none; }
+
+  /* Movies */
+  .movies-block { padding: 1rem; border-radius: 16px; gap: 0.75rem; }
+  .sec-title-group h2 { font-size: 1rem; }
+  .sec-tab { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
+  .movie-nav-btn { width: 28px; height: 28px; font-size: 0.7rem; }
+  .movies-grid { grid-template-columns: repeat(2, 1fr); gap: 0.65rem; }
+  .movie-info { padding: 0.55rem; }
+  .movie-title { font-size: 0.78rem; }
+  .movie-genre { font-size: 0.65rem; }
+  .movie-rating-num, .movie-votes { font-size: 0.65rem; }
+
+  /* Suất chiếu */
+  .showtime-card { padding: 1rem; border-radius: 16px; gap: 0.85rem; }
+  .showtime-top { flex-direction: column; gap: 0.6rem; }
+  .showtime-top h3 { font-size: 0.95rem; }
+  .showtime-format-tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.3rem;
+  }
+  .fmt-tab { font-size: 0.72rem; padding: 0.32rem 0.4rem; text-align: center; }
+  .showtime-grid-blocks { grid-template-columns: 1fr; gap: 0.65rem; }
+  .showtime-block { padding: 0.8rem; }
+  .sb-title { font-size: 0.82rem; }
+  .sb-time-btn { font-size: 0.72rem; padding: 0.28rem 0.55rem; }
+
+  /* Tin tức */
+  .news-block { padding: 1rem; border-radius: 16px; }
+  .news-grid { grid-template-columns: repeat(2, 1fr); gap: 0.65rem; }
+  .news-card { padding: 0.65rem; gap: 0.6rem; border-radius: 12px; }
+  .news-img { width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px; }
+  .news-title { font-size: 0.76rem; }
+  .news-tag { font-size: 0.6rem; }
+  .news-time { font-size: 0.65rem; }
+
+  /* Đặt vé nhanh */
+  .quick-book-card { padding: 1.1rem; border-radius: 16px; }
+  .qb-header h2 { font-size: 1rem; }
+  .qb-header p { font-size: 0.76rem; }
+  .qb-step { padding: 0.6rem 0.8rem; font-size: 0.82rem; }
+  .qb-step-num { width: 22px; height: 22px; font-size: 0.7rem; }
+  .qb-cta { font-size: 0.85rem; padding: 0.75rem; }
+
+  /* Ưu đãi */
+  .deals-card { padding: 1.1rem; border-radius: 16px; }
+  .deal-item { padding: 0.6rem; }
+  .deal-emoji { font-size: 1.1rem; }
+  .deal-title { font-size: 0.8rem; }
+  .deal-desc { font-size: 0.7rem; }
+  .deals-more-btn { font-size: 0.8rem; padding: 0.6rem; }
+
+  /* Banner */
+  .ad-mini-banner { padding: 1rem; border-radius: 14px; }
+  .ad-mini-title { font-size: 0.85rem; }
+  .ad-mini-desc { font-size: 0.72rem; }
+
+  /* AI button */
+  .ai-float-btn { right: 14px; bottom: 14px; padding: 0.7rem; }
   .ai-float-label { display: none; }
-  .ai-float-btn { padding: 0.75rem; }
+  .ai-float-icon { width: 32px; height: 32px; font-size: 0.95rem; }
+}
+
+/* ── Mobile nhỏ < 380px ── */
+@media (max-width: 380px) {
+  .home-page { padding: 0.6rem 0.6rem 5rem; }
+  .hero-title { font-size: 1.05rem; }
+  .news-grid { grid-template-columns: 1fr; }
+  .showtime-format-tabs { grid-template-columns: repeat(2, 1fr); }
+  .movies-grid { gap: 0.5rem; }
 }
