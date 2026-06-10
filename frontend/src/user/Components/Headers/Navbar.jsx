@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { to: '/Films/Film', label: 'Phim',       icon: <FaFilm /> },
   { to: '/cinemas',    label: 'Rạp chiếu',  icon: <FaMapMarkerAlt /> },
   { to: '/Membership', label: 'Thành viên', icon: <FaCrown /> },
-  { to: '/News',       label: 'Tin tức',    icon: <FaNewspaper /> },
+  { to: '/news',       label: 'Tin tức',    icon: <FaNewspaper /> },
 ]
 
 // Map regions to cinema IDs from MovieDetail.jsx

@@ -11,6 +11,7 @@ import Reports from "../pages/Reports";
 import Settings from "../pages/Settings";
 import Notifications from "../pages/Notifications";
 import Comments from "../pages/Comments";
+import Staff from "../pages/Staff";
 
 export function AdminRoutes() {
   return (
@@ -18,6 +19,7 @@ export function AdminRoutes() {
       <Routes>
         <Route index element={<Dashboard />} />
         <Route path="dashboard"     element={<Dashboard />}     />
+        <Route path="staff"         element={<Staff />}         />
         <Route path="users"         element={<Users />}         />
         <Route path="movies"        element={<Movies />}        />
         <Route path="showtimes"     element={<Showtimes />}     />

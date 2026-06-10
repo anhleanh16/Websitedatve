@@ -714,7 +714,7 @@
 .mobile-drawer {
   display: none;
   position: fixed;
-  top: 85px;
+  top: 64px;
   left: 0;
   right: 0;
   background: rgba(10, 14, 28, 0.98);
@@ -825,27 +825,96 @@
   .nav-link { padding: 0.5rem 0.7rem; font-size: 0.87rem; }
 }
 
+/* ── Tablet / Mobile ≤768px ── */
 @media (max-width: 768px) {
   .navbar-container {
     padding: 0 1rem;
-    height: 70px;
+    height: 64px;
+    gap: 0.5rem;
   }
-  .nav-logo img { height: 75px; }
+
+  /* Logo nhỏ hơn */
+  .nav-logo img { height: 56px; }
+
+  /* Ẩn menu desktop */
   .nav-menu { display: none; }
+
+  /* Hiện hamburger */
   .hamburger { display: flex; }
-  .mobile-drawer { display: block; top: 70px; }
+
+  /* Mobile drawer bắt đầu từ 64px */
+  .mobile-drawer { display: block; top: 64px; }
   .mobile-overlay { display: block; }
+
+  /* Ẩn label tài khoản + caret */
   .account-label { display: none; }
   .account-caret { display: none; }
-  .account-btn { padding: 0.45rem 0.55rem; }
-  .region-wrap { margin-right: 0.5rem; }
+  .account-btn { padding: 0.38rem 0.5rem; }
+
+  /* Region: ẩn label, chỉ hiện icon */
   .region-label { display: none; }
-  .region-btn { padding: 0.45rem 0.6rem; }
+  .region-btn {
+    padding: 0.38rem 0.55rem;
+    gap: 0;
+    min-width: 34px;
+    justify-content: center;
+  }
+  .region-caret { display: none; }
+  .region-wrap { margin-right: 0; }
+
+  /* Ẩn ô search expand trên mobile (đã có trong drawer) */
   .search-wrap { display: none; }
+
+  /* Gap nhỏ hơn giữa các icon */
+  .nav-right { gap: 0.5rem; }
+
+  /* Bell dropdown: cố định không bể màn hình */
+  .bell-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    left: auto;
+    width: min(360px, calc(100vw - 1.5rem));
+    max-width: none;
+    border-radius: 16px;
+    max-height: calc(100svh - 80px);
+    overflow: hidden;
+    transform-origin: top right;
+  }
+
+  /* Submenu tài khoản: không bể sang phải */
+  .nav-submenu {
+    right: 0;
+    left: auto;
+    width: min(220px, calc(100vw - 1.5rem));
+  }
+
+  /* Region dropdown: không bể */
+  .region-dropdown {
+    left: auto;
+    right: 0;
+    min-width: 180px;
+  }
 }
 
+/* ── Mobile nhỏ ≤480px ── */
 @media (max-width: 480px) {
-  .navbar-container { padding: 0 0.75rem; }
+  .navbar-container { padding: 0 0.75rem; height: 60px; }
+  .nav-logo img { height: 50px; }
+  .mobile-drawer { top: 60px; padding: 1rem; }
+
+  /* Bell: full width với margin */
+  .bell-dropdown {
+    width: min(340px, calc(100vw - 1rem));
+    right: 0;
+    left: auto;
+  }
+  .bell-list { max-height: 280px; }
+
+  /* Icon buttons nhỏ hơn */
+  .nav-icon-btn { width: 34px; height: 34px; font-size: 1rem; }
+  .account-btn { padding: 0.35rem 0.45rem; }
+  .account-avatar { width: 26px; height: 26px; font-size: 0.75rem; }
 }
 
 /* =============================================
@@ -1065,11 +1134,4 @@
 .bell-footer:hover {
   background: rgba(124, 58, 237, 0.08);
   color: #c4b5fd;
-}
-
-@media (max-width: 480px) {
-  .bell-dropdown {
-    width: calc(100vw - 2rem);
-    right: -8px;
-  }
 }
