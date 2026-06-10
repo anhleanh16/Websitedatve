@@ -7,10 +7,24 @@ export default function MovieDetail() {
   const selectedRegion = useSelector((state) => state.region.selectedRegion);
   const vietnameseWeekdays = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
   const today = new Date();
-  const todayIndex = today.getDay();
-  const todayLabel = todayIndex === 0 ? 'Chủ nhật' : vietnameseWeekdays[todayIndex - 1];
-  const scheduleDays = vietnameseWeekdays;
-  const [activeDay, setActiveDay] = useState(todayLabel);
+  const todayIndex = today.getDay(); // 0=CN, 1=T2...6=T7
+
+  // Tạo 7 ngày từ hôm nay trở đi
+  const scheduleDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const dow = d.getDay(); // 0=CN
+    const label = dow === 0 ? 'Chủ nhật' : vietnameseWeekdays[dow - 1];
+    return {
+      label,                          // "Thứ 2", "Chủ nhật"...
+      date: d,
+      dateStr: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`, // "10/06"
+      isToday: i === 0,
+    };
+  });
+
+  const todayLabel = scheduleDays[0].label;
+  const [activeDay, setActiveDay] = useState(scheduleDays[0].label);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -705,14 +719,15 @@ export default function MovieDetail() {
 
             <div className="schedule-main">
               <div className="schedule-days-row">
-                {scheduleDays.map((day) => (
+                {scheduleDays.map((dayObj) => (
                   <button
-                    key={day}
+                    key={dayObj.label + dayObj.dateStr}
                     type="button"
-                    className={activeDay === day ? 'active' : ''}
-                    onClick={() => handleDayChange(day)}
+                    className={activeDay === dayObj.label ? 'active' : ''}
+                    onClick={() => handleDayChange(dayObj.label)}
                   >
-                    {scheduleLabel(day)}
+                    <span className="day-label">{dayObj.isToday ? 'Hôm nay' : dayObj.label}</span>
+                    <span className="day-date">{dayObj.dateStr}</span>
                   </button>
                 ))}
               </div>
@@ -724,7 +739,14 @@ export default function MovieDetail() {
                   </div>
                   <div>
                     <p>Ngày</p>
-                    <strong>{activeDay}</strong>
+                    <strong>
+                      {(() => {
+                        const dayObj = scheduleDays.find(d => d.label === activeDay);
+                        return dayObj
+                          ? `${dayObj.isToday ? 'Hôm nay' : dayObj.label}, ${dayObj.dateStr}`
+                          : activeDay;
+                      })()}
+                    </strong>
                   </div>
                 </div>
                 <div className="schedule-times">
