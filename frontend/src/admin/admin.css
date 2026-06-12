@@ -140,6 +140,7 @@
   flex-direction: column;
   transition: none;
   overflow-x: hidden;
+  margin-left: 10px;
 }
 
 /* ── Header ── */
