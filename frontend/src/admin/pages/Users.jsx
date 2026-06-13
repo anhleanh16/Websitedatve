@@ -1,61 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { adminUserService } from '../services/adminApi.js';
+import './users.css';
 
-// ─── Sample Data ──────────────────────────────────────────────────────────────
 const MEMBERSHIP_LEVELS = [
   { id: 1, name: "Đồng",   minPoints: 0,    maxPoints: 499,  color: "#cd7f32", discount: 0  },
   { id: 2, name: "Bạc",    minPoints: 500,  maxPoints: 1499, color: "#9ca3af", discount: 5  },
   { id: 3, name: "Vàng",   minPoints: 1500, maxPoints: 2999, color: "#fbbf24", discount: 10 },
   { id: 4, name: "Kim Cương", minPoints: 3000, maxPoints: 99999, color: "#60a5fa", discount: 15 },
-];
-
-const SAMPLE_USERS = [
-  {
-    id: 1, name: "Nguyễn Văn An", email: "an.nguyen@email.com", phone: "0901234567",
-    birthday: "1995-03-15", sex: "Nam", avatar: "", role: "user", status: "active",
-    points: 2400, memberLevel: 3, createdAt: "2024-01-10",
-    transactions: [
-      { id: "T001", type: "booking", desc: "Đặt vé phim Đêm Thiên Cầu", amount: 250000, points: +25, date: "08/06/2026" },
-      { id: "T002", type: "refund",  desc: "Hoàn vé B0051",             amount: -120000, points: -12, date: "01/06/2026" },
-      { id: "T003", type: "booking", desc: "Đặt vé phim Hỗn Loạn Tokyo", amount: 180000, points: +18, date: "25/05/2026" },
-      { id: "T004", type: "points",  desc: "Thưởng điểm sinh nhật",     amount: 0,       points: +100, date: "15/03/2026" },
-    ],
-  },
-  {
-    id: 2, name: "Trần Thị Bình", email: "binh.tran@email.com", phone: "0912345678",
-    birthday: "1998-07-22", sex: "Nữ", avatar: "", role: "user", status: "active",
-    points: 820, memberLevel: 2, createdAt: "2024-03-05",
-    transactions: [
-      { id: "T005", type: "booking", desc: "Đặt vé phim Tiếng Vọng Im Lặng", amount: 120000, points: +12, date: "09/06/2026" },
-      { id: "T006", type: "booking", desc: "Đặt vé phim Doraemon",           amount: 95000,  points: +9,  date: "03/05/2026" },
-    ],
-  },
-  {
-    id: 3, name: "Lê Minh Chi", email: "chi.le@email.com", phone: "0923456789",
-    birthday: "2001-11-08", sex: "Nam", avatar: "", role: "user", status: "blocked",
-    points: 150, memberLevel: 1, createdAt: "2024-06-18",
-    transactions: [
-      { id: "T007", type: "booking", desc: "Đặt vé phim Hỗn Loạn Tokyo", amount: 390000, points: +39, date: "09/06/2026" },
-      { id: "T008", type: "refund",  desc: "Hoàn vé B0095",              amount: -390000, points: -39, date: "09/06/2026" },
-    ],
-  },
-  {
-    id: 4, name: "Phạm Đức Hùng", email: "hung.pham@email.com", phone: "0934567890",
-    birthday: "1990-05-30", sex: "Nam", avatar: "", role: "admin", status: "active",
-    points: 4200, memberLevel: 4, createdAt: "2023-11-01",
-    transactions: [
-      { id: "T009", type: "booking", desc: "Đặt vé phim Đêm Thiên Cầu VIP", amount: 480000, points: +48, date: "10/06/2026" },
-      { id: "T010", type: "points",  desc: "Thưởng hạng Kim Cương",          amount: 0,       points: +500, date: "01/01/2026" },
-    ],
-  },
-  {
-    id: 5, name: "Nguyễn Thị Lan", email: "lan.nguyen@email.com", phone: "0945678901",
-    birthday: "1996-09-14", sex: "Nữ", avatar: "", role: "user", status: "active",
-    points: 1650, memberLevel: 3, createdAt: "2024-02-20",
-    transactions: [
-      { id: "T011", type: "booking", desc: "Đặt vé phim Ánh Sao Cuối Trời", amount: 280000, points: +28, date: "11/06/2026" },
-      { id: "T012", type: "booking", desc: "Đặt vé phim Vương Quốc Bóng Tối", amount: 220000, points: +22, date: "15/04/2026" },
-    ],
-  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -79,6 +30,9 @@ function formatMoney(n) {
 }
 function getInitials(name) {
   return name.split(" ").slice(-2).map((w) => w[0]).join("").toUpperCase();
+}
+function isDefaultAdmin(user) {
+  return user?.id === 1 && user?.role === 'admin';
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -156,12 +110,14 @@ function UserList({ users, onView, onToggleStatus }) {
                   <td>
                     <div className="us-actions">
                       <button className="us-btn us-btn-view" onClick={() => onView(u)}>Chi tiết</button>
-                      <button
-                        className={`us-btn ${u.status === "blocked" ? "us-btn-unblock" : "us-btn-block"}`}
-                        onClick={() => onToggleStatus(u)}
-                      >
-                        {u.status === "blocked" ? "Mở khóa" : "Khóa"}
-                      </button>
+                      {!isDefaultAdmin(u) && (
+                        <button
+                          className={`us-btn ${u.status === "blocked" ? "us-btn-unblock" : "us-btn-block"}`}
+                          onClick={() => onToggleStatus(u)}
+                        >
+                          {u.status === "blocked" ? "Mở khóa" : "Khóa"}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -454,9 +410,15 @@ function UserDetail({ user, onClose, onToggleStatus, onAdjustPoints }) {
           </div>
         </div>
         <div className="us-modal-footer">
-          <button className={`us-btn us-btn-lg ${user.status === "blocked" ? "us-btn-unblock" : "us-btn-block"}`} onClick={() => onToggleStatus(user)}>
-            {user.status === "blocked" ? "Mở khóa tài khoản" : "Khóa tài khoản"}
-          </button>
+          {!isDefaultAdmin(user) ? (
+            <button className={`us-btn us-btn-lg ${user.status === "blocked" ? "us-btn-unblock" : "us-btn-block"}`} onClick={() => onToggleStatus(user)}>
+              {user.status === "blocked" ? "Mở khóa tài khoản" : "Khóa tài khoản"}
+            </button>
+          ) : (
+            <div style={{ color: '#fbbf71', padding: '10px 0', fontSize: 13 }}>
+              Tài khoản admin mặc định không thể khóa/mở khóa.
+            </div>
+          )}
           <button className="us-btn us-btn-view us-btn-lg" onClick={() => onAdjustPoints(user)}>Điều chỉnh điểm</button>
           <button className="us-btn us-btn-secondary us-btn-lg" onClick={onClose}>Đóng</button>
         </div>
@@ -530,15 +492,55 @@ function Toast({ message, onClose }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminUsers() {
-  const [users, setUsers]         = useState(SAMPLE_USERS);
-  const [activeTab, setActiveTab] = useState("list");
-  const [viewUser, setViewUser]   = useState(null);
+  const [users, setUsers]           = useState([]);
+  const [activeTab, setActiveTab]   = useState("list");
+  const [viewUser, setViewUser]     = useState(null);
   const [adjustUser, setAdjustUser] = useState(null);
-  const [toast, setToast]         = useState("");
+  const [toast, setToast]           = useState("");
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState("");
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
+  const loadUsers = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await adminUserService.getAllUsers();
+      const normalized = (data.users || []).map((user) => ({
+        id: user.id,
+        name: user.full_name || user.name || "—",
+        email: user.email || "",
+        phone: user.phone || "",
+        birthday: user.birthday || "",
+        sex: user.sex || "",
+        avatar: user.avatar || "",
+        role: user.role || user.role_name || (user.role_id === 1 ? "admin" : "user"),
+        status: user.status || "inactive",
+        points: Number(user.point ?? user.points ?? 0),
+        createdAt: user.created_at ? new Date(user.created_at).toLocaleDateString("vi-VN") : (user.createdAt || ""),
+        transactions: user.transactions || [],
+      }));
+      setUsers(normalized);
+    } catch (err) {
+      console.error('Failed to load admin users', err);
+      setError('Không thể tải danh sách khách hàng. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
   const handleToggleStatus = (u) => {
+    if (u.id === 1) {
+      showToast('Tài khoản admin mặc định không thể thay đổi trạng thái.');
+      return;
+    }
+
     const next = u.status === "blocked" ? "active" : "blocked";
     setUsers((prev) => prev.map((x) => x.id === u.id ? { ...x, status: next } : x));
     setViewUser((v) => v?.id === u.id ? { ...v, status: next } : v);
@@ -578,6 +580,12 @@ export default function AdminUsers() {
         <p>Quản lý tài khoản, hạng thành viên, điểm thưởng và lịch sử giao dịch</p>
       </div>
 
+      {error && (
+        <div className="us-error-banner" style={{ marginBottom: 16, color: '#f87171' }}>
+          {error}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="us-stats-row">
         {stats.map((s) => (
@@ -597,10 +605,18 @@ export default function AdminUsers() {
         ))}
       </div>
 
-      {activeTab === "list"        && <UserList        users={users} onView={setViewUser} onToggleStatus={handleToggleStatus} />}
-      {activeTab === "membership"  && <MembershipTab   users={users} />}
-      {activeTab === "points"      && <PointsTab       users={users} onAdjust={setAdjustUser} />}
-      {activeTab === "transaction" && <TransactionTab  users={users} />}
+      {loading ? (
+        <div className="us-loading-state" style={{ padding: 32, textAlign: 'center', color: '#9cb2ff' }}>
+          Đang tải danh sách khách hàng...
+        </div>
+      ) : (
+        <>
+          {activeTab === "list"        && <UserList        users={users} onView={setViewUser} onToggleStatus={handleToggleStatus} />}
+          {activeTab === "membership"  && <MembershipTab   users={users} />}
+          {activeTab === "points"      && <PointsTab       users={users} onAdjust={setAdjustUser} />}
+          {activeTab === "transaction" && <TransactionTab  users={users} />}
+        </>
+      )}
 
       {viewUser   && <UserDetail user={viewUser} onClose={() => setViewUser(null)} onToggleStatus={handleToggleStatus} onAdjustPoints={(u) => { setViewUser(null); setAdjustUser(u); }} />}
       {adjustUser && <AdjustPointsModal user={adjustUser} onClose={() => setAdjustUser(null)} onConfirm={handleAdjustPoints} />}

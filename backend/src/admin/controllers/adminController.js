@@ -19,10 +19,24 @@ export const adminDashboard = async (req, res) => {
 export const getAdminUsers = async (req, res) => {
   try {
     const [users] = await db.query(
-      'SELECT id, full_name, email, phone, status, role_id, created_at FROM User ORDER BY created_at DESC'
+      `SELECT u.id,
+              u.full_name,
+              u.email,
+              u.phone,
+              u.birthday,
+              u.sex,
+              u.point,
+              u.status,
+              u.created_at,
+              u.role_id,
+              r.role_name AS role
+       FROM User u
+       LEFT JOIN Roles r ON r.role_id = u.role_id
+       ORDER BY u.created_at DESC`
     );
     res.json({ users });
-  } catch {
+  } catch (err) {
+    console.error('getAdminUsers error:', err);
     res.json({ users: [] });
   }
 };
@@ -30,9 +44,20 @@ export const getAdminUsers = async (req, res) => {
 export const deactivateAdminUser = async (req, res) => {
   try {
     const { userId } = req.params;
+    const [[user]] = await db.query('SELECT id, role_id FROM User WHERE id = ? LIMIT 1', [userId]);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (Number(user.id) === 1 && Number(user.role_id) === 1) {
+      return res.status(403).json({ message: 'Không thể thay đổi trạng thái tài khoản admin mặc định.' });
+    }
+
     await db.query("UPDATE User SET status='inactive' WHERE id=?", [userId]);
     res.json({ message: 'User deactivated' });
-  } catch {
+  } catch (err) {
+    console.error('deactivateAdminUser error:', err);
     res.status(500).json({ message: 'Error deactivating user' });
   }
 };

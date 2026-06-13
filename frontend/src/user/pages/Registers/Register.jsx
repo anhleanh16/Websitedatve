@@ -41,7 +41,16 @@ export default function Register() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          full_name: formData.fullName,
+          email:     formData.email,
+          password:  formData.password,
+          phone:     formData.phone,
+          birthday:  formData.birthDate || null,
+          sex:       formData.gender === 'male' ? 'Nam'
+                   : formData.gender === 'female' ? 'Nu'
+                   : formData.gender === 'other' ? 'Khac' : null,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Đăng ký thất bại')

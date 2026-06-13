@@ -2,51 +2,48 @@ import { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { Link, useNavigate } from 'react-router-dom'
 import { setUser } from '../../../redux/slices/userSlice'
-import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaUser, FaPhone } from 'react-icons/fa'
+import { FaEye, FaEyeSlash, FaEnvelope, FaLock } from 'react-icons/fa'
 import './login.css'
 
-function parseJwt(token) {
-  try {
-    return JSON.parse(atob(token.split('.')[1]))
-  } catch {
-    return null
-  }
-}
-
 export default function Login() {
-  const [email, setEmail] = useState('')
+  const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
-  const [showPwd, setShowPwd] = useState(false)
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [showPwd,  setShowPwd]  = useState(false)
+  const [message,  setMessage]  = useState('')
+  const [loading,  setLoading]  = useState(false)
 
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
+  const dispatch  = useDispatch()
+  const navigate  = useNavigate()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setMessage('')
+
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
+      const res  = await fetch('/api/auth/login', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body:    JSON.stringify({ email, password }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || 'Đăng nhập thất bại')
 
+      if (!res.ok) {
+        setMessage(data.message || 'Đăng nhập thất bại')
+        return
+      }
+
+      // Lưu token và user vào localStorage
       localStorage.setItem('token', data.token)
-      const payload = parseJwt(data.token)
-      dispatch(setUser({
-        role: payload?.role || null,
-        userId: payload?.userId || null,
-        email,
-        name: payload?.name || email,
-      }))
-      navigate(payload?.role === 'admin' ? '/admin' : '/')
-    } catch (err) {
-      setMessage(err.message)
+      localStorage.setItem('user',  JSON.stringify(data.user))
+
+      // Dispatch vào Redux
+      dispatch(setUser({ token: data.token, user: data.user }))
+
+      // Điều hướng về trang chủ sau khi đăng nhập
+      navigate('/')
+    } catch {
+      setMessage('Không thể kết nối máy chủ, vui lòng thử lại.')
     } finally {
       setLoading(false)
     }
@@ -79,34 +76,36 @@ export default function Login() {
               '--tx': `${tx}px`,
               '--ty': `${ty}px`,
             }}></div>
-          );
+          )
         })}
       </div>
-      <div className='auth-container' style={{ zIndex: 1 }}>
+      <div className='auth-container'>
         <div className='auth-card'>
           <div className='auth-header'>
             <h1>Đăng nhập</h1>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginTop: '8px' }}>
+              Đăng nhập để tiếp tục đặt vé và nhận ưu đãi từ Lunexa Movix.
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className='auth-form'>
             <div className='form-group'>
-              <label>Email hoặc số điện thoại</label>
+              <label>Email</label>
               <div className='input-wrapper'>
                 <FaEnvelope className='input-icon' />
                 <input
-                  type='text'
-                  placeholder='Nhập email hoặc số điện thoại'
+                  type='email'
+                  placeholder='example@email.com'
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete='email'
                 />
               </div>
             </div>
 
             <div className='form-group'>
-              <div className='label-row'>
-                <label>Mật khẩu</label>
-              </div>
+              <label>Mật khẩu</label>
               <div className='input-wrapper'>
                 <FaLock className='input-icon' />
                 <input
@@ -115,16 +114,17 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete='current-password'
                 />
                 <button
                   type='button'
                   className='toggle-pwd'
-                  onClick={() => setShowPwd(!showPwd)}
+                  onClick={() => setShowPwd((v) => !v)}
+                  aria-label={showPwd ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                 >
                   {showPwd ? <FaEyeSlash /> : <FaEye />}
                 </button>
               </div>
-              <Link to='/forgot-password' className='forgot-link'>Quên mật khẩu?</Link>
             </div>
 
             {message && (
@@ -137,10 +137,6 @@ export default function Login() {
               {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </button>
           </form>
-
-          <div className='auth-divider'>
-            <span>hoặc</span>
-          </div>
 
           <div className='auth-footer'>
             <p>Chưa có tài khoản? <Link to='/Registers/Register'>Đăng ký ngay</Link></p>

@@ -46,6 +46,17 @@ export default function AdminSidebar({ collapsed, onToggle, mobileOpen, onMobile
               </NavLink>
             </li>
           ))}
+          <li>
+            <NavLink
+              to="/"
+              className={({ isActive }) => isActive ? "active" : ""}
+              title={collapsed ? "Về trang chủ" : undefined}
+              onClick={onMobileClose}
+            >
+              <span className="nav-icon">🏠</span>
+              <span className="nav-label">Về trang chủ</span>
+            </NavLink>
+          </li>
         </ul>
       </nav>
     </aside>

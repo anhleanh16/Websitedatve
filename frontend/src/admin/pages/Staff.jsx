@@ -1,6 +1,5 @@
 import { useState } from "react";
-
-// ─── Sample Data ──────────────────────────────────────────────────────────────
+import './staff.css';
 const DEPARTMENTS = [
   { id: 1, name: "Vé & Quầy thu ngân" },
   { id: 2, name: "Kỹ thuật chiếu phim" },

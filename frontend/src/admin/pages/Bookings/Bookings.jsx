@@ -1,4 +1,5 @@
 import { useState } from "react";
+import './bookings.css';
 
 // ─── Sample Data ──────────────────────────────────────────────────────────────
 const sampleBookings = [

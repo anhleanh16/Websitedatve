@@ -1,4 +1,5 @@
 import { useState } from "react";
+import './showtimes.css';
 
 // ─── Sample Data ──────────────────────────────────────────────────────────────
 const CINEMAS = [

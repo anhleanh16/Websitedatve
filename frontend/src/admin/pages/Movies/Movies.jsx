@@ -1,4 +1,5 @@
 import { useState } from "react";
+import './movies.css';
 
 // ─── Sample Data ──────────────────────────────────────────────────────────────
 const SAMPLE_CATEGORIES = [

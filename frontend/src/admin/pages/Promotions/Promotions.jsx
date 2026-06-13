@@ -1,4 +1,5 @@
 import { useState } from "react";
+import './promotions.css';
 
 // ─── Sample Data ──────────────────────────────────────────────────────────────
 const SAMPLE_COUPONS = [

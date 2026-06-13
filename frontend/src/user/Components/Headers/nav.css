@@ -143,6 +143,28 @@
   flex-shrink: 0;
 }
 
+/* ── Admin button ── */
+.nav-admin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 20px;
+  background: rgba(124, 58, 237, 0.18);
+  border: 1px solid rgba(124, 58, 237, 0.4);
+  color: #c4b5fd;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.2s, transform 0.2s;
+  white-space: nowrap;
+}
+.nav-admin-btn:hover {
+  background: rgba(124, 58, 237, 0.32);
+  transform: translateY(-1px);
+}
+.nav-admin-label { white-space: nowrap; }
+
 /* ── Search ── */
 .search-wrap {
   display: flex;
@@ -850,6 +872,10 @@
   .account-label { display: none; }
   .account-caret { display: none; }
   .account-btn { padding: 0.38rem 0.5rem; }
+
+  /* Ẩn chữ "Quản trị" trên mobile, chỉ để icon */
+  .nav-admin-label { display: none; }
+  .nav-admin-btn { padding: 0.38rem 0.55rem; min-width: 34px; justify-content: center; }
 
   /* Region: ẩn label, chỉ hiện icon */
   .region-label { display: none; }
