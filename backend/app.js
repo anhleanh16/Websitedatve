@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import adminRoutes from './src/admin/routes/adminRoutes.js';
 import userRoutes from './src/user/routes/userRoutes.js';
+import authRoutes from './src/auth/authRoutes.js';
 
 dotenv.config();
 
@@ -35,19 +36,13 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Auth routes (login, register, me)
+app.use('/api/auth', authRoutes);
+
 // Admin routes
 app.use('/api/admin', adminRoutes);
 
 // User routes
 app.use('/api/user', userRoutes);
-
-// Auth routes (temporary)
-app.post('/api/auth/login', (req, res) => {
-  res.json({ token: 'sample-token' });
-});
-
-app.post('/api/auth/register', (req, res) => {
-  res.json({ message: 'User registered' });
-});
 
 export default app;
