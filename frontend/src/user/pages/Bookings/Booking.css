@@ -2,9 +2,9 @@
   min-height: 100vh;
   padding: 2.4rem;
   color: #edf0ff;
-  background: radial-gradient(circle at top, rgba(92, 110, 255, 0.18), transparent 28%),
-              radial-gradient(circle at 20% 12%, rgba(180, 86, 228, 0.14), transparent 20%),
-              linear-gradient(180deg, #070a1a 0%, #090d22 35%, #070a1a 100%);
+  background: radial-gradient(ellipse 80% 50% at 20% 0%, rgba(124,58,237,0.14) 0%, transparent 55%),
+              radial-gradient(ellipse 60% 40% at 80% 10%, rgba(14,165,233,0.09) 0%, transparent 50%),
+              linear-gradient(180deg, #0f172a 0%, #0b1020 50%, #0f172a 100%);
 }
 
 .booking-header {
@@ -17,13 +17,13 @@
 
 .booking-breadcrumb-bar {
   width: 100%;
-  background: rgba(10, 14, 32, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.13);
   border-radius: 14px;
   padding: 0.7rem 1rem;
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   margin-bottom: 1rem;
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(12px);
 }
 
 .booking-breadcrumb {
@@ -93,12 +93,12 @@
 
 .booking-seat-panel,
 .booking-sidebar {
-  background: rgba(8, 10, 30, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 28px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: 24px;
   padding: 2rem;
-  box-shadow: 0 24px 60px rgba(3, 7, 20, 0.35);
-  backdrop-filter: blur(18px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
 }
 
 .screen-label {
@@ -360,9 +360,9 @@
 }
 
 .dropdown {
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.12);
   background: rgba(255, 255, 255, 0.03);
   margin-bottom: 1rem;
 }
@@ -378,11 +378,11 @@
 }
 
 .dropdown-header:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(124, 58, 237, 0.08);
 }
 
 .dropdown-caret {
-  color: #c7d1ff;
+  color: #a78bfa;
   font-weight: 700;
 }
 
@@ -398,10 +398,16 @@
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.95rem 1rem;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(148, 163, 184, 0.09);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.combo-card:hover {
+  border-color: rgba(124, 58, 237, 0.25);
+  background: rgba(124, 58, 237, 0.05);
 }
 
 .combo-info {
@@ -416,20 +422,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(124, 58, 237, 0.12);
   font-size: 1.2rem;
 }
 
 .combo-info h4 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.92rem;
+  color: #e2e8f0;
 }
 
 .combo-info p {
-  margin: 0.3rem 0 0;
-  color: #afb6fd;
-  font-size: 0.88rem;
+  margin: 0.2rem 0 0;
+  color: #64748b;
+  font-size: 0.82rem;
 }
 
 .combo-control {
@@ -439,34 +446,35 @@
 }
 
 .combo-button {
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #f7f8ff;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
   font-size: 1.05rem;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s;
 }
 
 .combo-button:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(124, 58, 237, 0.2);
+  border-color: rgba(124, 58, 237, 0.4);
 }
 
 .combo-count {
   min-width: 2rem;
   text-align: center;
   font-weight: 700;
-  color: #f5f7ff;
+  color: #f1f5f9;
 }
 
 .summary-card {
   margin-top: 1.4rem;
   padding: 1.3rem;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .summary-row,
@@ -475,28 +483,41 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1rem;
-  color: #c9d1ff;
+  margin-bottom: 0.9rem;
+  color: #94a3b8;
 }
 
 .summary-row:last-child {
   margin-bottom: 0;
 }
 
+.summary-row strong {
+  color: #e2e8f0;
+}
+
 .summary-total {
-  font-size: 1.04rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: #f4f6ff;
+  color: #f1f5f9;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  margin-top: 0.5rem;
+}
+
+.summary-total strong {
+  color: #a78bfa;
+  font-size: 1.2rem;
 }
 
 .checkout-button {
   width: 100%;
   padding: 1rem 1.2rem;
   border: none;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #6f57ff 0%, #a17bff 100%);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
   color: #ffffff;
   font-weight: 700;
+  font-size: 0.95rem;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -504,24 +525,25 @@
 .btn-book {
   display: inline-flex;
   width: auto;
-  padding: 0.85rem 1.2rem;
-  border: none;
-  border-radius: 18px;
-  background: rgba(111, 87, 255, 0.22);
-  color: #ffffff;
+  padding: 0.75rem 1.2rem;
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  border-radius: 14px;
+  background: rgba(124, 58, 237, 0.15);
+  color: #c4b5fd;
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .checkout-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 18px 42px rgba(98, 78, 255, 0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 32px rgba(124, 58, 237, 0.45);
 }
 
 .btn-book:hover {
   transform: translateY(-1px);
-  background: rgba(111, 87, 255, 0.34);
+  background: rgba(124, 58, 237, 0.28);
+  color: #e9d5ff;
 }
 
 .checkout-button:disabled {
