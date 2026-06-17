@@ -629,3 +629,217 @@ export const verifyBookingCode = async (req, res) => {
     res.status(500).json({ valid: false, message: 'Verification error' });
   }
 };
+
+// ─── Showtime Management ──────────────────────────────────────────────────────
+
+/** GET /api/admin/showtimes/cinemas — danh sách rạp */
+export const getShowtimeCinemas = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT cinemas_id AS id, cinema_name AS name, city FROM Cinemas ORDER BY cinema_name'
+    );
+    res.json({ cinemas: rows });
+  } catch (err) {
+    console.error('getShowtimeCinemas error:', err);
+    res.json({ cinemas: [] });
+  }
+};
+
+/** GET /api/admin/showtimes/rooms?cinemaId=1 — phòng chiếu */
+export const getShowtimeRooms = async (req, res) => {
+  try {
+    const { cinemaId } = req.query;
+    const where = cinemaId ? 'WHERE cinema_id = ?' : '';
+    const params = cinemaId ? [cinemaId] : [];
+    const [rows] = await db.query(
+      `SELECT room_id AS id, cinema_id AS cinemaId, room_name AS name,
+              room_type AS type, total_seat AS totalSeats
+       FROM Rooms ${where} ORDER BY room_name`,
+      params
+    );
+    res.json({ rooms: rows });
+  } catch (err) {
+    console.error('getShowtimeRooms error:', err);
+    res.json({ rooms: [] });
+  }
+};
+
+/** GET /api/admin/showtimes */
+export const getShowtimes = async (req, res) => {
+  try {
+    const { cinemaId, date, status, search } = req.query;
+    let where = 'WHERE 1=1';
+    const params = [];
+
+    if (cinemaId) { where += ' AND c.cinemas_id = ?'; params.push(cinemaId); }
+    if (status && status !== 'all') { where += ' AND s.status = ?'; params.push(status); }
+    if (date)   { where += ' AND DATE(s.start_time) = ?'; params.push(date); }
+    if (search) {
+      where += ' AND (m.title LIKE ? OR c.cinema_name LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    const [rows] = await db.query(
+      `SELECT
+        s.showtime_id   AS id,
+        s.movie_id      AS movieId,
+        s.room_id       AS roomId,
+        r.cinema_id     AS cinemaId,
+        s.start_time    AS startTime,
+        s.end_time      AS endTime,
+        s.price,
+        s.available_seats AS availableSeats,
+        s.status,
+        m.title         AS movieTitle,
+        m.duration,
+        r.room_name     AS roomName,
+        r.room_type     AS roomType,
+        r.total_seat    AS totalSeats,
+        c.cinemas_id    AS cinemaDbId,
+        c.cinema_name   AS cinemaName
+       FROM Showtimes s
+       JOIN Movies m  ON m.movie_id   = s.movie_id
+       JOIN Rooms r   ON r.room_id    = s.room_id
+       JOIN Cinemas c ON c.cinemas_id = r.cinema_id
+       ${where}
+       ORDER BY s.start_time DESC`,
+      params
+    );
+    res.json({ showtimes: rows });
+  } catch (err) {
+    console.error('getShowtimes error:', err);
+    res.json({ showtimes: [] });
+  }
+};
+
+/** GET /api/admin/showtimes/:id */
+export const getShowtimeById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [[row]] = await db.query(
+      `SELECT s.*, m.title AS movieTitle, m.duration,
+              r.room_name AS roomName, r.room_type AS roomType, r.total_seat AS totalSeats,
+              c.cinema_name AS cinemaName
+       FROM Showtimes s
+       JOIN Movies m  ON m.movie_id   = s.movie_id
+       JOIN Rooms r   ON r.room_id    = s.room_id
+       JOIN Cinemas c ON c.cinemas_id = r.cinema_id
+       WHERE s.showtime_id = ?`,
+      [id]
+    );
+    if (!row) return res.status(404).json({ message: 'Showtime not found' });
+    res.json({ showtime: row });
+  } catch (err) {
+    console.error('getShowtimeById error:', err);
+    res.status(500).json({ message: 'Error fetching showtime' });
+  }
+};
+
+/** POST /api/admin/showtimes */
+export const createShowtime = async (req, res) => {
+  try {
+    const { movieId, roomId, startTime, endTime, price, availableSeats, status = 'active' } = req.body;
+    if (!movieId || !roomId || !startTime || !endTime || !price) {
+      return res.status(400).json({ message: 'Thiếu thông tin bắt buộc' });
+    }
+
+    // Kiểm tra conflict
+    const [conflicts] = await db.query(
+      `SELECT showtime_id FROM Showtimes
+       WHERE room_id = ? AND status != 'cancelled'
+         AND start_time < ? AND end_time > ?`,
+      [roomId, endTime, startTime]
+    );
+    if (conflicts.length) {
+      return res.status(409).json({ message: 'Phòng đã có suất chiếu trùng giờ', conflicts });
+    }
+
+    // Lấy total seats từ phòng nếu không truyền
+    let seats = availableSeats;
+    if (!seats) {
+      const [[room]] = await db.query('SELECT total_seat FROM Rooms WHERE room_id = ?', [roomId]);
+      seats = room?.total_seat || 0;
+    }
+
+    const [result] = await db.query(
+      `INSERT INTO Showtimes (movie_id, room_id, start_time, end_time, price, available_seats, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [movieId, roomId, startTime, endTime, price, seats, status]
+    );
+    res.status(201).json({ message: 'Showtime created', showtimeId: result.insertId });
+  } catch (err) {
+    console.error('createShowtime error:', err);
+    res.status(500).json({ message: 'Error creating showtime' });
+  }
+};
+
+/** PUT /api/admin/showtimes/:id */
+export const updateShowtime = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { movieId, roomId, startTime, endTime, price, availableSeats, status } = req.body;
+
+    // Kiểm tra conflict (loại trừ chính nó)
+    if (roomId && startTime && endTime) {
+      const [conflicts] = await db.query(
+        `SELECT showtime_id FROM Showtimes
+         WHERE room_id = ? AND showtime_id != ? AND status != 'cancelled'
+           AND start_time < ? AND end_time > ?`,
+        [roomId, id, endTime, startTime]
+      );
+      if (conflicts.length) {
+        return res.status(409).json({ message: 'Phòng đã có suất chiếu trùng giờ', conflicts });
+      }
+    }
+
+    await db.query(
+      `UPDATE Showtimes SET
+        movie_id = COALESCE(?, movie_id),
+        room_id  = COALESCE(?, room_id),
+        start_time = COALESCE(?, start_time),
+        end_time   = COALESCE(?, end_time),
+        price      = COALESCE(?, price),
+        available_seats = COALESCE(?, available_seats),
+        status     = COALESCE(?, status)
+       WHERE showtime_id = ?`,
+      [movieId || null, roomId || null, startTime || null, endTime || null,
+       price || null, availableSeats ?? null, status || null, id]
+    );
+    res.json({ message: 'Showtime updated' });
+  } catch (err) {
+    console.error('updateShowtime error:', err);
+    res.status(500).json({ message: 'Error updating showtime' });
+  }
+};
+
+/** DELETE /api/admin/showtimes/:id */
+export const deleteShowtime = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Kiểm tra có vé đã đặt chưa
+    const [[{ cnt }]] = await db.query(
+      "SELECT COUNT(*) AS cnt FROM Tickets WHERE showtime_id = ? AND ticket_status != 'cancelled'",
+      [id]
+    );
+    if (cnt > 0) {
+      return res.status(400).json({ message: `Không thể xóa: có ${cnt} vé đã đặt cho suất chiếu này.` });
+    }
+    await db.query('DELETE FROM Showtimes WHERE showtime_id = ?', [id]);
+    res.json({ message: 'Showtime deleted' });
+  } catch (err) {
+    console.error('deleteShowtime error:', err);
+    res.status(500).json({ message: 'Error deleting showtime' });
+  }
+};
+
+/** PUT /api/admin/showtimes/:id/cancel */
+export const cancelShowtime = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.query("UPDATE Showtimes SET status='cancelled' WHERE showtime_id = ?", [id]);
+    res.json({ message: 'Showtime cancelled' });
+  } catch (err) {
+    console.error('cancelShowtime error:', err);
+    res.status(500).json({ message: 'Error cancelling showtime' });
+  }
+};

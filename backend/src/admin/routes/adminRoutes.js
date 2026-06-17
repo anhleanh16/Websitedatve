@@ -15,10 +15,22 @@ import {
   permanentDeleteMovie,
   toggleHideMovie,
   deactivateAdminUser,
+<<<<<<< HEAD
   getAdminCategories,
   createCategory,
   updateCategory,
   deleteCategory,
+=======
+  // Showtimes
+  getShowtimes,
+  getShowtimeById,
+  createShowtime,
+  updateShowtime,
+  deleteShowtime,
+  cancelShowtime,
+  getShowtimeCinemas,
+  getShowtimeRooms,
+>>>>>>> 80e30472beaab19cf725875782abf0e9184a882e
 } from '../controllers/adminController.js';
 import { uploadMovieFiles } from '../../../config/upload.js';
 
@@ -62,5 +74,15 @@ router.get('/categories', getAdminCategories);
 router.post('/categories', createCategory);
 router.put('/categories/:id', updateCategory);
 router.delete('/categories/:id', deleteCategory);
+
+// ─── Showtime Management ──────────────────────────────────────────────────────
+router.get('/showtimes/cinemas',         getShowtimeCinemas);
+router.get('/showtimes/rooms',           getShowtimeRooms);
+router.get('/showtimes',                 getShowtimes);
+router.get('/showtimes/:id',             getShowtimeById);
+router.post('/showtimes',                createShowtime);
+router.put('/showtimes/:id',             updateShowtime);
+router.delete('/showtimes/:id',          deleteShowtime);
+router.put('/showtimes/:id/cancel',      cancelShowtime);
 
 export default router;

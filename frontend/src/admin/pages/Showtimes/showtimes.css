@@ -105,3 +105,32 @@
 .sh-toast button { background: transparent; border: none; color: inherit; cursor: pointer; opacity: 0.6; }
 @keyframes sh-toast-in { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
 @media (max-width: 900px) { .sh-form-grid { grid-template-columns: 1fr; } }
+
+/* Loading */
+.sh-loading {
+  display: flex; align-items: center; gap: 12px;
+  padding: 40px; color: #8fa6ff; font-size: 14px;
+  justify-content: center;
+}
+.sh-spinner {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid rgba(124,97,255,0.2);
+  border-top-color: #7c61ff;
+  animation: sh-spin 0.7s linear infinite;
+}
+@keyframes sh-spin { to { transform: rotate(360deg); } }
+
+/* Error banner */
+.sh-error-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; border-radius: 14px;
+  background: rgba(248,113,113,0.1);
+  border: 1px solid rgba(248,113,113,0.25);
+  color: #fca5a5; font-size: 14px;
+}
+.sh-error-banner button {
+  margin-left: auto; padding: 7px 14px; border-radius: 9px;
+  background: rgba(248,113,113,0.18); border: 1px solid rgba(248,113,113,0.3);
+  color: #fca5a5; cursor: pointer; font-size: 13px; white-space: nowrap;
+}
+.sh-error-banner button:hover { background: rgba(248,113,113,0.3); }

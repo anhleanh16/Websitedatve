@@ -77,3 +77,69 @@
 .bk-toast-error   { background: rgba(248,113,113,0.18); border: 1px solid rgba(248,113,113,0.3); color: #fca5a5; }
 @keyframes bk-toast-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 900px) { .bk-detail-grid { grid-template-columns: 1fr; } .bk-stats-row { gap: 10px; } }
+
+/* ── Status pills (self-contained, không phụ thuộc admin.css) ── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.status-pill.confirmed  { background: rgba(74,222,128,0.18);  color: #86efac; }
+.status-pill.completed  { background: rgba(34,211,238,0.18);  color: #67e8f9; }
+.status-pill.pending    { background: rgba(251,191,36,0.18);  color: #fde68a; }
+.status-pill.cancelled  { background: rgba(248,113,113,0.18); color: #fca5a5; }
+.status-pill.refunded   { background: rgba(147,197,253,0.18); color: #bfdbfe; }
+.status-pill.pay-paid   { background: rgba(74,222,128,0.18);  color: #86efac; }
+.status-pill.pay-pending{ background: rgba(251,191,36,0.18);  color: #fde68a; }
+.status-pill.pay-failed { background: rgba(248,113,113,0.18); color: #fca5a5; }
+
+/* ── Table overrides bên trong bookings ── */
+.admin-bookings .table-card {
+  background: #080d1a;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  overflow-x: auto;
+}
+.admin-bookings .table-card table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+.admin-bookings .table-card th,
+.admin-bookings .table-card td {
+  padding: 13px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 13px;
+  color: #d4deff;
+  text-align: left;
+}
+.admin-bookings .table-card th {
+  color: #8fa6ff;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(255,255,255,0.02);
+}
+.admin-bookings .table-card tbody tr:hover {
+  background: rgba(255,255,255,0.04);
+}
+.admin-bookings .table-card tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── field-group inside bookings ── */
+.admin-bookings .field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.admin-bookings .field-group label {
+  font-size: 12px;
+  color: #9db0ff;
+}
