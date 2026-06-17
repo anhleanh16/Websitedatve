@@ -1,4 +1,4 @@
-﻿create database Lunexa;
+create database Lunexa;
 Use Lunexa;
 
 CREATE TABLE Roles (
@@ -84,7 +84,7 @@ CREATE TABLE Movies (
     age_limit INT,
     director VARCHAR(255),
     actors TEXT,
-    trailer_url VARCHAR(255),
+    trailer VARCHAR(255),
     poster VARCHAR(255),
     release_date DATE,
     status ENUM('coming_soon','now_showing','ended'),

@@ -12,10 +12,36 @@ async function apiFetch(path, options = {}) {
 
 // ─── Movies ───────────────────────────────────────────────────────────────────
 export const adminMovieService = {
-  getAllMovies:  ()         => apiFetch('/admin/movies'),
-  createMovie:  (data)     => apiFetch('/admin/movies', { method: 'POST', body: JSON.stringify(data) }),
-  updateMovie:  (id, data) => apiFetch(`/admin/movies/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getAllMovies:  (trash = false)         => apiFetch(`/admin/movies?trash=${trash}`),
+  createMovie:  (formData) => {
+    return fetch(`${BASE}/admin/movies`, {
+      method: 'POST',
+      body: formData
+    }).then(res => {
+      if (!res.ok) throw new Error('API error');
+      return res.json();
+    });
+  },
+  updateMovie:  (id, formData) => {
+    return fetch(`${BASE}/admin/movies/${id}`, {
+      method: 'PUT',
+      body: formData
+    }).then(res => {
+      if (!res.ok) throw new Error('API error');
+      return res.json();
+    });
+  },
   deleteMovie:  (id)       => apiFetch(`/admin/movies/${id}`, { method: 'DELETE' }),
+  restoreMovie: (id)       => apiFetch(`/admin/movies/${id}/restore`, { method: 'PUT' }),
+  toggleHideMovie: (id) => apiFetch(`/admin/movies/${id}/toggle-hide`, { method: 'PUT' }),
+};
+
+// ─── Movie Categories ───────────────────────────────────────────────────────────
+export const adminCategoryService = {
+  getAllCategories:  ()         => apiFetch('/admin/categories'),
+  createCategory:  (data)     => apiFetch('/admin/categories', { method: 'POST', body: JSON.stringify(data) }),
+  updateCategory:  (id, data) => apiFetch(`/admin/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCategory:  (id)       => apiFetch(`/admin/categories/${id}`, { method: 'DELETE' }),
 };
 
 // ─── Users ────────────────────────────────────────────────────────────────────

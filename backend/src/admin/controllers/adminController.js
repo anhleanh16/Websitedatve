@@ -65,45 +65,281 @@ export const deactivateAdminUser = async (req, res) => {
 // ─── Movies ───────────────────────────────────────────────────────────────────
 export const getAdminMovies = async (req, res) => {
   try {
-    const [movies] = await db.query('SELECT * FROM Movies ORDER BY release_date DESC');
-    res.json({ movies });
-  } catch {
+    const { trash = 'false' } = req.query;
+    const isTrash = trash === 'true';
+    
+    const [movies] = await db.query(
+      'SELECT * FROM Movies WHERE is_deleted = ? ORDER BY release_date DESC',
+      [isTrash ? 1 : 0]
+    );
+    
+    // Lấy danh mục cho từng phim
+    const moviesWithCategories = await Promise.all(
+      movies.map(async (movie) => {
+        const [categories] = await db.query(`
+          SELECT mc.category_id, mc.category_name
+          FROM Movie_Categories mc
+          JOIN Movie_Category_Detail mcd ON mc.category_id = mcd.category_id
+          WHERE mcd.movie_id = ?
+        `, [movie.movie_id]);
+        
+        return {
+          ...movie,
+          posters: movie.posters ? JSON.parse(movie.posters) : [],
+          categories: categories
+        };
+      })
+    );
+    
+    res.json({ movies: moviesWithCategories });
+  } catch (err) {
+    console.error(err);
     res.json({ movies: [] });
   }
 };
 
 export const createMovie = async (req, res) => {
+  const conn = await db.getConnection();
   try {
-    const { title, description, duration, age_limit, director, actors, trailer_url, poster, release_date, status, language, country } = req.body;
-    const [result] = await db.query(
-      'INSERT INTO Movies (title,description,duration,age_limit,director,actors,trailer_url,poster,release_date,status,language,country) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-      [title, description, duration, age_limit, director, actors, trailer_url, poster, release_date, status, language, country]
+    await conn.beginTransaction();
+    
+    const { title, description, duration, age_limit, director, actors, release_date, status, language, country, categories } = req.body;
+    
+    // Xử lý poster: file đầu tiên là poster chính, các file sau là poster phụ
+    let poster = null;
+    let posters = [];
+    if (req.files && req.files.posters) {
+      const posterFiles = Array.isArray(req.files.posters) ? req.files.posters : [req.files.posters];
+      if (posterFiles.length > 0) {
+        poster = `/uploads/movies/${posterFiles[0].filename}`;
+        posters = posterFiles.slice(1).map(file => `/uploads/movies/${file.filename}`);
+      }
+    }
+
+    // Xử lý trailer
+    let trailer = null;
+    if (req.files && req.files.trailer) {
+      const trailerFiles = Array.isArray(req.files.trailer) ? req.files.trailer : [req.files.trailer];
+      if (trailerFiles.length > 0) {
+        trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
+      }
+    }
+
+    const [result] = await conn.query(
+      'INSERT INTO Movies (title,description,duration,age_limit,director,actors,trailer,poster,posters,release_date,status,language,country) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [title, description, duration, age_limit, director, actors, trailer, poster, JSON.stringify(posters), release_date, status, language, country]
     );
-    res.status(201).json({ message: 'Movie created', movieId: result.insertId });
-  } catch {
+    const movieId = result.insertId;
+    
+    // Thêm danh mục cho phim
+    if (categories && categories.length > 0) {
+      const categoryIds = Array.isArray(categories) ? categories : [categories];
+      for (const categoryId of categoryIds) {
+        await conn.query(
+          'INSERT INTO Movie_Category_Detail (movie_id, category_id) VALUES (?, ?)',
+          [movieId, categoryId]
+        );
+      }
+    }
+    
+    await conn.commit();
+    res.status(201).json({ message: 'Movie created', movieId: movieId });
+  } catch (err) {
+    await conn.rollback();
+    console.error('Error creating movie:', err);
     res.status(500).json({ message: 'Error creating movie' });
+  } finally {
+    conn.release();
   }
 };
 
 export const updateMovie = async (req, res) => {
+  const conn = await db.getConnection();
   try {
+    await conn.beginTransaction();
+    
     const { id } = req.params;
-    const fields = req.body;
-    const keys = Object.keys(fields).map(k => `${k}=?`).join(',');
-    await db.query(`UPDATE Movies SET ${keys} WHERE movie_id=?`, [...Object.values(fields), id]);
+    const { title, description, duration, age_limit, director, actors, release_date, status, language, country, existing_main_poster, existing_posters, categories } = req.body;
+    
+    // Lấy thông tin phim hiện tại
+    const [existingMovie] = await conn.query('SELECT * FROM Movies WHERE movie_id = ?', [id]);
+    if (!existingMovie.length) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'Movie not found' });
+    }
+    const movie = existingMovie[0];
+    
+    // Xử lý poster
+    let poster = existing_main_poster || movie.poster;
+    let posters = existing_posters ? JSON.parse(existing_posters) : (movie.posters ? JSON.parse(movie.posters) : []);
+    
+    // Thêm các poster mới nếu có
+    if (req.files && req.files.posters) {
+      const posterFiles = Array.isArray(req.files.posters) ? req.files.posters : [req.files.posters];
+      for (const file of posterFiles) {
+        const filePath = `/uploads/movies/${file.filename}`;
+        if (!poster) {
+          poster = filePath;
+        } else {
+          posters.push(filePath);
+        }
+      }
+    }
+    
+    // Xử lý trailer: nếu có trailer mới, thay thế hoàn toàn
+    let trailer = movie.trailer;
+    if (req.files && req.files.trailer) {
+      const trailerFiles = Array.isArray(req.files.trailer) ? req.files.trailer : [req.files.trailer];
+      if (trailerFiles.length > 0) {
+        trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
+      }
+    }
+
+    await conn.query(
+      'UPDATE Movies SET title=?, description=?, duration=?, age_limit=?, director=?, actors=?, trailer=?, poster=?, posters=?, release_date=?, status=?, language=?, country=? WHERE movie_id=?',
+      [title, description, duration, age_limit, director, actors, trailer, poster, JSON.stringify(posters), release_date, status, language, country, id]
+    );
+    
+    // Cập nhật danh mục cho phim: xóa cũ, thêm mới
+    await conn.query('DELETE FROM Movie_Category_Detail WHERE movie_id = ?', [id]);
+    if (categories && categories.length > 0) {
+      const categoryIds = Array.isArray(categories) ? categories : [categories];
+      for (const categoryId of categoryIds) {
+        await conn.query(
+          'INSERT INTO Movie_Category_Detail (movie_id, category_id) VALUES (?, ?)',
+          [id, categoryId]
+        );
+      }
+    }
+    
+    await conn.commit();
     res.json({ message: 'Movie updated' });
-  } catch {
+  } catch (err) {
+    await conn.rollback();
+    console.error('Error updating movie:', err);
     res.status(500).json({ message: 'Error updating movie' });
+  } finally {
+    conn.release();
   }
 };
 
 export const deleteMovie = async (req, res) => {
   try {
     const { id } = req.params;
-    await db.query('DELETE FROM Movies WHERE movie_id=?', [id]);
-    res.json({ message: 'Movie deleted' });
+    await db.query('UPDATE Movies SET is_deleted = 1 WHERE movie_id=?', [id]);
+    res.json({ message: 'Movie moved to trash' });
   } catch {
     res.status(500).json({ message: 'Error deleting movie' });
+  }
+};
+
+export const restoreMovie = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.query('UPDATE Movies SET is_deleted = 0 WHERE movie_id=?', [id]);
+    res.json({ message: 'Movie restored' });
+  } catch {
+    res.status(500).json({ message: 'Error restoring movie' });
+  }
+};
+
+export const permanentDeleteMovie = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.query('DELETE FROM Movies WHERE movie_id=?', [id]);
+    res.json({ message: 'Movie permanently deleted' });
+  } catch {
+    res.status(500).json({ message: 'Error permanently deleting movie' });
+  }
+};
+
+export const toggleHideMovie = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [[movie]] = await db.query('SELECT is_hidden FROM Movies WHERE movie_id=?', [id]);
+    if (!movie) return res.status(404).json({ message: 'Movie not found' });
+    await db.query('UPDATE Movies SET is_hidden = ? WHERE movie_id=?', [!movie.is_hidden ? 1 : 0, [id]]);
+    res.json({ message: 'Movie visibility updated', is_hidden: !movie.is_hidden ? 1 : 0 });
+  } catch {
+    res.status(500).json({ message: 'Error updating movie visibility' });
+  }
+};
+
+// ─── Movie Categories ───────────────────────────────────────────────────────────
+export const getAdminCategories = async (req, res) => {
+  try {
+    // Get categories with movie count
+    const [categories] = await db.query(`
+      SELECT 
+        mc.*, 
+        COUNT(mcd.movie_id) as movieCount 
+      FROM Movie_Categories mc 
+      LEFT JOIN Movie_Category_Detail mcd ON mc.category_id = mcd.category_id 
+      GROUP BY mc.category_id 
+      ORDER BY mc.category_name
+    `);
+    res.json({ categories });
+  } catch (err) {
+    console.error('getAdminCategories error:', err);
+    res.json({ categories: [] });
+  }
+};
+
+export const createCategory = async (req, res) => {
+  try {
+    const { category_name } = req.body;
+    const [result] = await db.query(
+      'INSERT INTO Movie_Categories (category_name) VALUES (?)',
+      [category_name]
+    );
+    res.status(201).json({ message: 'Category created', categoryId: result.insertId });
+  } catch {
+    res.status(500).json({ message: 'Error creating category' });
+  }
+};
+
+export const updateCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category_name } = req.body;
+    await db.query(
+      'UPDATE Movie_Categories SET category_name=? WHERE category_id=?',
+      [category_name, id]
+    );
+    res.json({ message: 'Category updated' });
+  } catch {
+    res.status(500).json({ message: 'Error updating category' });
+  }
+};
+
+export const deleteCategory = async (req, res) => {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const { id } = req.params;
+    
+    // Kiểm tra xem còn phim thuộc danh mục này không
+    const [[{ movieCount }]] = await conn.query(
+      'SELECT COUNT(*) AS movieCount FROM Movie_Category_Detail WHERE category_id = ?',
+      [id]
+    );
+    
+    if (movieCount > 0) {
+      await conn.rollback();
+      return res.status(400).json({ message: `Không thể xóa danh mục vì còn ${movieCount} phim thuộc danh mục này.` });
+    }
+    
+    // Delete category
+    await conn.query('DELETE FROM Movie_Categories WHERE category_id=?', [id]);
+    
+    await conn.commit();
+    res.json({ message: 'Category deleted' });
+  } catch (err) {
+    await conn.rollback();
+    console.error('deleteCategory error:', err);
+    res.status(500).json({ message: 'Error deleting category' });
+  } finally {
+    conn.release();
   }
 };
 

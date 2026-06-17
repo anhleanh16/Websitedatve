@@ -16,7 +16,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve static files
 
 app.get('/api/trailer', (req, res, next) => {
   const trailerPath = path.join(__dirname, 'uploads', 'trailers', 'DORAEMON_ NOBITA VÀ CUỘC CHIẾN VŨ TRỤ TÍ HON.mp4');

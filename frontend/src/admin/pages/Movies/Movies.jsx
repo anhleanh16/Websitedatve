@@ -1,124 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { adminMovieService, adminCategoryService } from '../../services/adminApi.js';
 import './movies.css';
 
-// ─── Sample Data ──────────────────────────────────────────────────────────────
-const SAMPLE_CATEGORIES = [
-  { id: 1, name: "Hành động",           movieCount: 8  },
-  { id: 2, name: "Tình cảm",            movieCount: 5  },
-  { id: 3, name: "Kinh dị",             movieCount: 4  },
-  { id: 4, name: "Hài hước",            movieCount: 6  },
-  { id: 5, name: "Khoa học viễn tưởng", movieCount: 3  },
-  { id: 6, name: "Hoạt hình",           movieCount: 7  },
-  { id: 7, name: "Tâm lý",              movieCount: 4  },
-  { id: 8, name: "Phiêu lưu",           movieCount: 5  },
-];
-
-const SAMPLE_MOVIES = [
-  {
-    id: 1,
-    title: "Đêm Thiên Cầu",
-    description: "Một hành trình khoa học viễn tưởng đưa con người đến ranh giới của vũ trụ. Phi hành đoàn phải đối mặt với những bí ẩn chưa từng được khám phá trong không gian sâu thẳm.",
-    duration: 128,
-    ageLimit: 13,
-    director: "Nguyễn Minh Tuấn",
-    actors: "Trần Nghĩa, Lê Thu Hà, Phạm Đức Anh",
-    trailerUrl: "",
-    poster: "",
-    releaseDate: "2026-06-01",
-    status: "now_showing",
-    language: "Tiếng Việt",
-    country: "Việt Nam",
-    categories: [1, 5],
-    rating: 8.2,
-  },
-  {
-    id: 2,
-    title: "Tiếng Vọng Im Lặng",
-    description: "Câu chuyện tâm lý sâu sắc về một người phụ nữ cố gắng tìm lại chính mình sau biến cố cuộc đời. Bộ phim khai thác nội tâm con người một cách tinh tế và chân thực.",
-    duration: 105,
-    ageLimit: 16,
-    director: "Lê Hoàng",
-    actors: "Ngô Thanh Vân, Trương Thế Vinh",
-    trailerUrl: "",
-    poster: "",
-    releaseDate: "2026-05-20",
-    status: "now_showing",
-    language: "Tiếng Việt",
-    country: "Việt Nam",
-    categories: [2, 7],
-    rating: 7.8,
-  },
-  {
-    id: 3,
-    title: "Hỗn Loạn Tokyo",
-    description: "Bộ phim hành động bùng nổ lấy bối cảnh thành phố Tokyo trong cơn hỗn loạn chưa từng có. Những pha hành động mãn nhãn và cốt truyện gay cấn đến phút cuối.",
-    duration: 135,
-    ageLimit: 18,
-    director: "Yamada Kenji",
-    actors: "Tanaka Hiroshi, Suzuki Yuki, Park Ji-ho",
-    trailerUrl: "",
-    poster: "",
-    releaseDate: "2026-06-10",
-    status: "now_showing",
-    language: "Tiếng Nhật",
-    country: "Nhật Bản",
-    categories: [1, 8],
-    rating: 8.5,
-  },
-  {
-    id: 4,
-    title: "Ánh Sao Cuối Trời",
-    description: "Câu chuyện tình yêu lãng mạn giữa hai tâm hồn cô đơn tìm thấy nhau trong đêm đông lạnh giá. Bộ phim sẽ khiến bạn tin tưởng vào tình yêu đích thực.",
-    duration: 110,
-    ageLimit: 0,
-    director: "Kim Soo-yeon",
-    actors: "Lee Min-ho, Park Shin-hye",
-    trailerUrl: "",
-    poster: "",
-    releaseDate: "2026-07-01",
-    status: "coming_soon",
-    language: "Tiếng Hàn",
-    country: "Hàn Quốc",
-    categories: [2],
+// ─── Helpers chuyển đổi dữ liệu camelCase ↔ snake_case ───────────────────────────────
+const snakeToCamelMovie = (obj) => {
+  return {
+    id: obj.movie_id,
+    title: obj.title,
+    description: obj.description,
+    duration: obj.duration,
+    ageLimit: obj.age_limit,
+    director: obj.director,
+    actors: obj.actors,
+    trailer: obj.trailer,
+    poster: obj.poster,
+    posters: obj.posters || [],
+    releaseDate: obj.release_date,
+    status: obj.status,
+    language: obj.language,
+    country: obj.country,
+    categories: obj.categories?.map(cat => ({ id: cat.category_id, name: cat.category_name })) || [],
+    isDeleted: !!obj.is_deleted,
+    isHidden: !!obj.is_hidden,
     rating: null,
-  },
-  {
-    id: 5,
-    title: "Vương Quốc Bóng Tối",
-    description: "Phim kinh dị tâm lý đưa khán giả vào thế giới bí ẩn của một vương quốc cổ đại bị nguyền rủa. Hành trình tìm kiếm sự thật ẩn chứa vô vàn hiểm nguy.",
-    duration: 118,
-    ageLimit: 18,
-    director: "James Wong",
-    actors: "Marcus Chen, Sarah Lin",
-    trailerUrl: "",
-    poster: "",
-    releaseDate: "2026-04-15",
-    status: "ended",
-    language: "Tiếng Anh",
-    country: "Mỹ",
-    categories: [3],
-    rating: 7.1,
-  },
-  {
-    id: 6,
-    title: "Doraemon: Đại Chiến Vũ Trụ",
-    description: "Nobita và những người bạn bước vào cuộc phiêu lưu vũ trụ kỳ thú nhất từ trước đến nay. Doraemon sẽ dùng tất cả bảo bối để giải cứu các hành tinh khỏi nguy cơ diệt vong.",
-    duration: 95,
-    ageLimit: 0,
-    director: "Fujiko F. Fujio",
-    actors: "Mizuta Wasabi, Ōhara Megumi",
-    trailerUrl: "",
-    poster: "",
-    releaseDate: "2026-05-03",
-    status: "now_showing",
-    language: "Tiếng Nhật",
-    country: "Nhật Bản",
-    categories: [6, 8],
-    rating: 8.9,
-  },
-];
+  };
+};
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const snakeToCamelCategory = (obj) => {
+  return {
+    id: obj.category_id,
+    name: obj.category_name,
+    movieCount: obj.movieCount,
+  };
+};
+
+const camelToSnakeCategory = (obj) => {
+  return {
+    category_name: obj.name,
+  };
+};
+
+// ─── Status Options ─────────────────────────────────────────────────────────────
 const STATUS_OPTS = [
   { value: "now_showing", label: "Đang chiếu",  cls: "mv-status-showing"  },
   { value: "coming_soon", label: "Sắp chiếu",   cls: "mv-status-coming"   },
@@ -128,24 +50,25 @@ const statusInfo = (v) => STATUS_OPTS.find((s) => s.value === v) || STATUS_OPTS[
 
 const EMPTY_MOVIE = {
   title: "", description: "", duration: "", ageLimit: 0,
-  director: "", actors: "", trailerUrl: "", poster: "",
-  releaseDate: "", status: "coming_soon", language: "Tiếng Việt",
-  country: "Việt Nam", categories: [], rating: null,
+  director: "", actors: "", trailer: "", poster: "",
+  posters: [], releaseDate: "", status: "coming_soon",
+  language: "Tiếng Việt", country: "Việt Nam",
+  categories: [], rating: null,
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** 1. Danh sách phim */
-function MovieList({ movies, categories, onView, onEdit, onDelete }) {
+function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, onToggleHide, isTrashMode }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
 
   const filtered = movies.filter((m) => {
     const q = search.toLowerCase();
-    const matchSearch = m.title.toLowerCase().includes(q) || m.director.toLowerCase().includes(q);
+    const matchSearch = m.title?.toLowerCase().includes(q) || m.director?.toLowerCase().includes(q);
     const matchStatus = filterStatus === "all" || m.status === filterStatus;
-    const matchCat = filterCat === "all" || m.categories.includes(Number(filterCat));
+    const matchCat = filterCat === "all" || m.categories.some((cat) => cat.id === Number(filterCat));
     return matchSearch && matchStatus && matchCat;
   });
 
@@ -163,11 +86,13 @@ function MovieList({ movies, categories, onView, onEdit, onDelete }) {
           <option value="all">Tất cả trạng thái</option>
           {STATUS_OPTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
-        <select className="mv-select" value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
-          <option value="all">Tất cả danh mục</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <button className="mv-btn mv-btn-add" onClick={() => onEdit(null)}>+ Thêm phim</button>
+        {!isTrashMode && (
+          <select className="mv-select" value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
+            <option value="all">Tất cả danh mục</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
+        {!isTrashMode && <button className="mv-btn mv-btn-add" onClick={() => onEdit(null)}>+ Thêm phim</button>}
       </div>
 
       {/* Grid */}
@@ -177,16 +102,18 @@ function MovieList({ movies, categories, onView, onEdit, onDelete }) {
         ) : (
           filtered.map((m) => {
             const st = statusInfo(m.status);
-            const cats = m.categories.map((cid) => categories.find((c) => c.id === cid)?.name).filter(Boolean);
+            const cats = m.categories.map((cat) => cat.name).filter(Boolean);
             return (
               <div className="mv-card" key={m.id}>
                 {/* Poster */}
                 <div className="mv-poster">
-                  {m.poster
-                    ? <img src={m.poster} alt={m.title} />
-                    : <div className="mv-poster-placeholder">🎬</div>
-                  }
+                  {m.poster ? (
+                    <img src={m.poster} alt={m.title} />
+                  ) : (
+                    <div className="mv-poster-placeholder">🎬</div>
+                  )}
                   <span className={`mv-status-badge ${st.cls}`}>{st.label}</span>
+                  {m.isHidden && <span className="mv-status-badge mv-status-hidden">🔒 Ẩn</span>}
                 </div>
                 {/* Info */}
                 <div className="mv-card-body">
@@ -194,15 +121,28 @@ function MovieList({ movies, categories, onView, onEdit, onDelete }) {
                   <div className="mv-card-meta">
                     <span>🎬 {m.director}</span>
                     <span>⏱ {m.duration} phút</span>
-                    {m.rating && <span>⭐ {m.rating}</span>}
                   </div>
-                  <div className="mv-cat-list">
-                    {cats.map((c) => <span className="mv-cat-tag" key={c}>{c}</span>)}
-                  </div>
+                  {!isTrashMode && (
+                    <div className="mv-cat-list">
+                      {cats.map((c) => <span className="mv-cat-tag" key={c}>{c}</span>)}
+                    </div>
+                  )}
                   <div className="mv-card-actions">
-                    <button className="mv-btn mv-btn-view"   onClick={() => onView(m)}>Xem</button>
-                    <button className="mv-btn mv-btn-edit"   onClick={() => onEdit(m)}>Sửa</button>
-                    <button className="mv-btn mv-btn-delete" onClick={() => onDelete(m)}>Xóa</button>
+                    {!isTrashMode && (
+                      <>
+                        <button className="mv-btn mv-btn-view" onClick={() => onView(m)}>Xem</button>
+                        <button className="mv-btn mv-btn-edit" onClick={() => onEdit(m)}>Sửa</button>
+                        <button className={`mv-btn ${m.isHidden ? "mv-btn-show" : "mv-btn-hide"}`} onClick={() => onToggleHide(m)}>
+                          {m.isHidden ? "🔓 Hiện" : "🔒 Ẩn"}
+                        </button>
+                        <button className="mv-btn mv-btn-delete" onClick={() => onDelete(m)}>🗑️</button>
+                      </>
+                    )}
+                    {isTrashMode && (
+                      <>
+                        <button className="mv-btn mv-btn-restore" onClick={() => onRestore(m)}>🔄 Khôi phục</button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -220,7 +160,7 @@ function MovieList({ movies, categories, onView, onEdit, onDelete }) {
 function MovieDetail({ movie, categories, onClose, onEdit }) {
   if (!movie) return null;
   const st = statusInfo(movie.status);
-  const cats = movie.categories.map((cid) => categories.find((c) => c.id === cid)?.name).filter(Boolean);
+  const cats = (movie.categories || []).map((cat) => cat.name).filter(Boolean);
 
   return (
     <div className="mv-modal-overlay" onClick={onClose}>
@@ -234,15 +174,13 @@ function MovieDetail({ movie, categories, onClose, onEdit }) {
             {/* Poster col */}
             <div className="mv-detail-poster-col">
               <div className="mv-detail-poster">
-                {movie.poster
-                  ? <img src={movie.poster} alt={movie.title} />
-                  : <div className="mv-poster-placeholder mv-poster-lg">🎬</div>
-                }
+                {movie.poster ? (
+                  <img src={movie.poster} alt={movie.title} />
+                ) : (
+                  <div className="mv-poster-placeholder mv-poster-lg">🎬</div>
+                )}
               </div>
               <span className={`mv-status-badge ${st.cls}`} style={{ alignSelf: "center", marginTop: 12 }}>{st.label}</span>
-              {movie.rating && (
-                <div className="mv-rating-big">⭐ {movie.rating}<span>/10</span></div>
-              )}
             </div>
 
             {/* Info col */}
@@ -267,8 +205,8 @@ function MovieDetail({ movie, categories, onClose, onEdit }) {
                 <p>{movie.description || "Chưa có mô tả."}</p>
               </div>
 
-              {movie.trailerUrl && (
-                <a className="mv-trailer-btn" href={movie.trailerUrl} target="_blank" rel="noreferrer">
+              {movie.trailer && (
+                <a className="mv-trailer-btn" href={movie.trailer} target="_blank" rel="noreferrer">
                   ▶ Xem trailer
                 </a>
               )}
@@ -289,31 +227,90 @@ function MovieForm({ movie, categories, onClose, onSave }) {
   const isEdit = !!movie;
   const [form, setForm] = useState(movie ? { ...movie } : { ...EMPTY_MOVIE });
   const [errors, setErrors] = useState({});
-  const [posterPreview, setPosterPreview] = useState(movie?.poster || "");
+  const [newPosterFiles, setNewPosterFiles] = useState([]);
+  const [trailerFile, setTrailerFile] = useState(null);
+  const [allPosters, setAllPosters] = useState([]);
   const [posterDrag, setPosterDrag] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Tính toán giới hạn ngày (min: hôm nay +10, max: hôm nay +50)
+  const today = new Date();
+  const minDate = new Date(today);
+  minDate.setDate(today.getDate() + 10);
+  const maxDate = new Date(today);
+  maxDate.setDate(today.getDate() + 50);
+  
+  const formatDate = (date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  
+  const minDateStr = formatDate(minDate);
+  const maxDateStr = formatDate(maxDate);
+
+  useEffect(() => {
+    if (movie) {
+      // Hiển thị tất cả poster hiện tại (chính + phụ)
+      const posters = [movie.poster, ...(movie.posters || [])].filter(Boolean);
+      setAllPosters(posters.map(url => ({ url, isNew: false })));
+      // Chuyển danh mục từ array object thành array id để dùng trong form
+      setForm(prev => ({
+        ...prev,
+        categories: movie.categories?.map(cat => cat.id) || []
+      }));
+    }
+  }, [movie]);
 
   const set = (field, val) => {
     setForm((f) => ({ ...f, [field]: val }));
     setErrors((e) => ({ ...e, [field]: undefined }));
   };
 
-  // Đọc file ảnh → base64 preview
-  const handlePosterFile = (file) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target.result;
-      setPosterPreview(dataUrl);
-      set("poster", dataUrl);
-    };
-    reader.readAsDataURL(file);
+  // Xử lý chọn nhiều poster mới
+  const handlePosterFiles = (files) => {
+    const newFiles = Array.from(files).filter(file => file.type.startsWith("image/"));
+    const newPreviews = newFiles.map(file => ({
+      url: URL.createObjectURL(file),
+      isNew: true,
+      file
+    }));
+    setNewPosterFiles(prev => [...prev, ...newFiles]);
+    setAllPosters(prev => [...prev, ...newPreviews]);
   };
 
   const handlePosterDrop = (e) => {
     e.preventDefault();
     setPosterDrag(false);
-    const file = e.dataTransfer.files?.[0];
-    handlePosterFile(file);
+    handlePosterFiles(e.dataTransfer.files);
+  };
+
+  // Xử lý chọn trailer
+  const handleTrailerFile = (file) => {
+    if (!file || !file.type.startsWith("video/")) return;
+    setTrailerFile(file);
+  };
+
+  // Xóa poster (cả cũ và mới)
+  const removePoster = (index) => {
+    const removed = allPosters[index];
+    if (removed.isNew) {
+      // Xóa khỏi file mới
+      const fileIndex = newPosterFiles.findIndex(f => 
+        URL.createObjectURL(f) === removed.url
+      );
+      if (fileIndex !== -1) {
+        setNewPosterFiles(prev => prev.filter((_, i) => i !== fileIndex));
+      }
+    }
+    // Cập nhật danh sách tất cả poster
+    setAllPosters(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Xóa trailer
+  const removeTrailer = () => {
+    setTrailerFile(null);
   };
 
   const toggleCat = (id) => {
@@ -327,18 +324,63 @@ function MovieForm({ movie, categories, onClose, onSave }) {
 
   const validate = () => {
     const e = {};
-    if (!form.title.trim())       e.title       = "Vui lòng nhập tên phim.";
-    if (!form.director.trim())    e.director    = "Vui lòng nhập đạo diễn.";
+    if (!form.title?.trim()) e.title = "Vui lòng nhập tên phim.";
+    if (!form.director?.trim()) e.director = "Vui lòng nhập đạo diễn.";
     if (!form.duration || form.duration <= 0) e.duration = "Thời lượng phải > 0.";
-    if (!form.releaseDate)        e.releaseDate = "Vui lòng chọn ngày khởi chiếu.";
-    if (form.categories.length === 0) e.categories = "Chọn ít nhất một danh mục.";
+    if (!form.releaseDate) e.releaseDate = "Vui lòng chọn ngày khởi chiếu.";
+    if (allPosters.length < 6) e.posters = "Phải có ít nhất 6 poster.";
+    if (allPosters.length > 12) e.posters = "Tối đa 12 poster.";
     return e;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-    onSave({ ...form, id: movie?.id || Date.now() });
+    setIsSaving(true);
+    try {
+      // Tạo FormData
+      const formData = new FormData();
+      formData.append('title', form.title);
+      formData.append('description', form.description);
+      formData.append('duration', form.duration);
+      formData.append('age_limit', form.ageLimit);
+      formData.append('director', form.director);
+      formData.append('actors', form.actors);
+      formData.append('release_date', form.releaseDate);
+      formData.append('status', form.status);
+      formData.append('language', form.language);
+      formData.append('country', form.country);
+      
+      // Gửi danh mục
+      if (form.categories && form.categories.length > 0) {
+        form.categories.forEach(categoryId => {
+          formData.append('categories', categoryId);
+        });
+      }
+      
+      // Phân loại poster cũ còn lại
+      const oldPostersRemaining = allPosters.filter(p => !p.isNew).map(p => p.url);
+      const posterMain = oldPostersRemaining[0] || '';
+      const postersExtra = oldPostersRemaining.slice(1);
+      
+      // Gửi danh sách poster cũ còn lại
+      formData.append('existing_main_poster', posterMain);
+      formData.append('existing_posters', JSON.stringify(postersExtra));
+      
+      // Thêm các poster mới
+      newPosterFiles.forEach(file => {
+        formData.append('posters', file);
+      });
+      
+      // Thêm trailer mới nếu có
+      if (trailerFile) {
+        formData.append('trailer', trailerFile);
+      }
+
+      await onSave({ ...form, id: movie?.id, formData });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -408,7 +450,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
               <div className="mv-field-row">
                 <div className="mv-field">
                   <label>Ngày khởi chiếu *</label>
-                  <input type="date" className={errors.releaseDate ? "error" : ""} value={form.releaseDate} onChange={(e) => set("releaseDate", e.target.value)} />
+                  <input type="date" className={errors.releaseDate ? "error" : ""} value={form.releaseDate} onChange={(e) => set("releaseDate", e.target.value)} min={minDateStr} max={maxDateStr} />
                   {errors.releaseDate && <span className="mv-error">{errors.releaseDate}</span>}
                 </div>
                 <div className="mv-field">
@@ -420,52 +462,96 @@ function MovieForm({ movie, categories, onClose, onSave }) {
               </div>
 
               <div className="mv-field">
-                <label>Link Trailer</label>
-                <input value={form.trailerUrl} onChange={(e) => set("trailerUrl", e.target.value)} placeholder="https://youtube.com/…" />
+                <label>Trailer phim</label>
+                <div
+                  className="img-upload-zone trailer-upload-zone"
+                  onClick={() => document.getElementById("trailer-file-input").click()}
+                >
+                  {trailerFile ? (
+                    <>
+                      <div className="img-upload-placeholder">
+                        <span className="img-upload-icon">🎬</span>
+                        <span>{trailerFile.name}</span>
+                      </div>
+                      <button
+                        className="img-upload-remove"
+                        onClick={(e) => { e.stopPropagation(); removeTrailer(); }}
+                      >✕</button>
+                    </>
+                  ) : movie?.trailer ? (
+                    <>
+                      <div className="img-upload-placeholder">
+                        <span className="img-upload-icon">🎬</span>
+                        <span>Trailer đã chọn</span>
+                      </div>
+                      <button
+                        className="img-upload-remove"
+                        onClick={(e) => { e.stopPropagation(); removeTrailer(); }}
+                      >✕</button>
+                    </>
+                  ) : (
+                    <div className="img-upload-placeholder">
+                      <span className="img-upload-icon">🎬</span>
+                      <span>Chọn trailer từ máy</span>
+                      <span className="img-upload-hint">MP4, WEBM, OGG – tối đa 100MB</span>
+                    </div>
+                  )}
+                </div>
+                <input
+                  id="trailer-file-input"
+                  type="file"
+                  accept="video/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => handleTrailerFile(e.target.files?.[0])}
+                />
               </div>
 
               <div className="mv-field">
-                <label>Poster phim</label>
+                <label>Poster phim (6-12 ảnh) *</label>
+                {errors.posters && <span className="mv-error">{errors.posters}</span>}
                 <div
-                  className={`img-upload-zone${posterDrag ? " drag-over" : ""}${posterPreview ? " has-image" : ""}`}
+                  className={`img-upload-zone${posterDrag ? " drag-over" : ""}`}
                   onDragOver={(e) => { e.preventDefault(); setPosterDrag(true); }}
                   onDragLeave={() => setPosterDrag(false)}
                   onDrop={handlePosterDrop}
                   onClick={() => document.getElementById("poster-file-input").click()}
                 >
-                  {posterPreview ? (
-                    <>
-                      <img src={posterPreview} alt="poster preview" className="img-upload-preview" />
-                      <button
-                        className="img-upload-remove"
-                        onClick={(e) => { e.stopPropagation(); setPosterPreview(""); set("poster", ""); }}
-                      >✕</button>
-                    </>
-                  ) : (
-                    <div className="img-upload-placeholder">
-                      <span className="img-upload-icon">🖼</span>
-                      <span>Kéo thả hoặc <strong>chọn ảnh</strong> từ máy</span>
-                      <span className="img-upload-hint">JPG, PNG, WEBP – tối đa 5MB</span>
-                    </div>
-                  )}
+                  <div className="img-upload-placeholder">
+                    <span className="img-upload-icon">🖼</span>
+                    <span>Kéo thả hoặc <strong>chọn ảnh</strong> từ máy</span>
+                    <span className="img-upload-hint">JPG, PNG, WEBP – tối đa 5MB mỗi ảnh</span>
+                  </div>
                 </div>
                 <input
                   id="poster-file-input"
                   type="file"
                   accept="image/*"
+                  multiple
                   style={{ display: "none" }}
-                  onChange={(e) => handlePosterFile(e.target.files?.[0])}
+                  onChange={(e) => handlePosterFiles(e.target.files)}
                 />
+                
+                {/* Hiển thị tất cả poster (cũ + mới) */}
+                {allPosters.length > 0 && (
+                  <div className="mv-posters-grid">
+                    {allPosters.map((poster, index) => (
+                      <div key={index} className="mv-poster-item">
+                        <img src={poster.url} alt={`poster-${index}`} />
+                        <button
+                          className="img-upload-remove"
+                          onClick={() => removePoster(index)}
+                        >✕</button>
+                        {index === 0 && (
+                          <span className="mv-poster-main-badge">Chính</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="mv-field">
-                <label>Đánh giá (tùy chọn)</label>
-                <input type="number" step="0.1" min="0" max="10" value={form.rating || ""} onChange={(e) => set("rating", e.target.value ? Number(e.target.value) : null)} placeholder="0.0 – 10.0" />
-              </div>
-
-              <div className="mv-field">
-                <label>Danh mục *</label>
-                {errors.categories && <span className="mv-error">{errors.categories}</span>}
+                <label>Danh mục</label>
                 <div className="mv-cat-check-grid">
                   {categories.map((c) => (
                     <label key={c.id} className={`mv-cat-check${form.categories.includes(c.id) ? " checked" : ""}`}>
@@ -483,10 +569,10 @@ function MovieForm({ movie, categories, onClose, onSave }) {
           </div>
         </div>
         <div className="mv-modal-footer">
-          <button className="mv-btn mv-btn-add mv-btn-lg" onClick={handleSave}>
-            {isEdit ? "Lưu thay đổi" : "Thêm phim"}
+          <button className="mv-btn mv-btn-add mv-btn-lg" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "Đang lưu..." : isEdit ? "Lưu thay đổi" : "Thêm phim"}
           </button>
-          <button className="mv-btn mv-btn-secondary mv-btn-lg" onClick={onClose}>Hủy</button>
+          <button className="mv-btn mv-btn-secondary mv-btn-lg" onClick={onClose} disabled={isSaving}>Hủy</button>
         </div>
       </div>
     </div>
@@ -569,7 +655,18 @@ function CategoryManager({ categories, onAdd, onEdit, onDelete }) {
 
 /** Confirm xóa */
 function DeleteConfirm({ target, type, onClose, onConfirm }) {
+  const [isDeleting, setIsDeleting] = useState(false);
   if (!target) return null;
+
+  const handleConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      await onConfirm(target);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="mv-modal-overlay" onClick={onClose}>
       <div className="mv-modal mv-modal-sm" onClick={(e) => e.stopPropagation()}>
@@ -579,14 +676,17 @@ function DeleteConfirm({ target, type, onClose, onConfirm }) {
         </div>
         <div className="mv-modal-body">
           <div className="mv-delete-warn">
-            ⚠️ Bạn có chắc muốn xóa {type === "movie" ? "phim" : "danh mục"}
+            ⚠️ Bạn có chắc muốn {type === "movie" ? "di chuyển vào thùng rác" : "xóa"} {type === "movie" ? "phim" : "danh mục"}
             &nbsp;<strong>"{target.title || target.name}"</strong>?
-            <br />Hành động này không thể hoàn tác.
+            <br />
+            {type === "movie" ? "Bạn có thể khôi phục lại từ thùng rác." : ""}
           </div>
         </div>
         <div className="mv-modal-footer">
-          <button className="mv-btn mv-btn-delete mv-btn-lg" onClick={() => onConfirm(target)}>Xóa</button>
-          <button className="mv-btn mv-btn-secondary mv-btn-lg" onClick={onClose}>Hủy</button>
+          <button className={`mv-btn ${type === "movie" ? "mv-btn-delete" : "mv-btn-delete"} mv-btn-lg`} onClick={handleConfirm} disabled={isDeleting}>
+            {isDeleting ? "Đang xóa..." : "Xóa"}
+          </button>
+          <button className="mv-btn mv-btn-secondary mv-btn-lg" onClick={onClose} disabled={isDeleting}>Hủy</button>
         </div>
       </div>
     </div>
@@ -606,15 +706,19 @@ function Toast({ message, type, onClose }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminMovies() {
-  const [movies,     setMovies]     = useState(SAMPLE_MOVIES);
-  const [categories, setCategories] = useState(SAMPLE_CATEGORIES);
-  const [activeTab,  setActiveTab]  = useState("list");
+  const [movies, setMovies] = useState([]);
+  const [trashMovies, setTrashMovies] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [activeTab, setActiveTab] = useState("list");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Modal states
-  const [viewMovie,    setViewMovie]    = useState(null);
-  const [editMovie,    setEditMovie]    = useState(undefined); // undefined = closed, null = new
+  const [viewMovie, setViewMovie] = useState(null);
+  const [editMovie, setEditMovie] = useState(undefined);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleteType,   setDeleteType]   = useState("movie");
+  const [deleteType, setDeleteType] = useState("movie");
+  const [deleteIsPermanent, setDeleteIsPermanent] = useState(false);
 
   const [toast, setToast] = useState(null);
   const showToast = (message, type = "success") => {
@@ -622,54 +726,159 @@ export default function AdminMovies() {
     setTimeout(() => setToast(null), 3500);
   };
 
+  // Fetch movies and categories
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [moviesData, trashData, categoriesData] = await Promise.all([
+        adminMovieService.getAllMovies(false),
+        adminMovieService.getAllMovies(true),
+        adminCategoryService.getAllCategories()
+      ]);
+      setMovies((moviesData.movies || []).map(snakeToCamelMovie));
+      setTrashMovies((trashData.movies || []).map(snakeToCamelMovie));
+      setCategories((categoriesData.categories || []).map(snakeToCamelCategory));
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Không thể tải dữ liệu.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   // Stats
   const stats = [
-    { label: "Tổng phim",    value: movies.length,                                              color: "#7c61ff" },
-    { label: "Đang chiếu",   value: movies.filter((m) => m.status === "now_showing").length,    color: "#4ade80" },
-    { label: "Sắp chiếu",    value: movies.filter((m) => m.status === "coming_soon").length,    color: "#fbbf24" },
-    { label: "Danh mục",     value: categories.length,                                          color: "#60a5fa" },
+    { label: "Tổng phim", value: movies.length, color: "#7c61ff" },
+    { label: "Đang chiếu", value: movies.filter((m) => m.status === "now_showing").length, color: "#4ade80" },
+    { label: "Sắp chiếu", value: movies.filter((m) => m.status === "coming_soon").length, color: "#fbbf24" },
+    { label: "Thùng rác", value: trashMovies.length, color: "#ef4444" },
+    { label: "Danh mục", value: categories.length, color: "#60a5fa" },
   ];
 
   const TABS = [
-    { key: "list",     label: "Danh sách phim" },
-    { key: "category", label: "Danh mục phim"  },
+    { key: "list", label: "Danh sách phim" },
+    { key: "trash", label: "Thùng rác" },
+    { key: "category", label: "Danh mục phim" },
   ];
 
   // Handlers
-  const handleView = (m) => setViewMovie(m);
+  const handleView = (m) => {
+    setViewMovie(m);
+  };
 
   const handleEdit = (m) => {
     setViewMovie(null);
-    setEditMovie(m); // null = new movie, object = edit
+    setEditMovie(m);
   };
 
-  const handleSaveMovie = (data) => {
-    if (data.id && movies.find((m) => m.id === data.id)) {
-      setMovies((prev) => prev.map((m) => (m.id === data.id ? data : m)));
-      showToast(`Đã cập nhật phim "${data.title}".`);
-    } else {
-      setMovies((prev) => [data, ...prev]);
-      showToast(`Đã thêm phim "${data.title}".`);
+  const handleSaveMovie = async (data) => {
+    try {
+      if (data.id) {
+        // Update existing
+        await adminMovieService.updateMovie(data.id, data.formData);
+        showToast(`Đã cập nhật phim "${data.title}".`);
+      } else {
+        // Create new
+        await adminMovieService.createMovie(data.formData);
+        showToast(`Đã thêm phim "${data.title}".`);
+      }
+      setEditMovie(undefined);
+      // Refresh danh sách phim
+      fetchData();
+    } catch (err) {
+      console.error("Error saving movie:", err);
+      showToast(data.id ? "Không thể cập nhật phim." : "Không thể thêm phim.", "error");
     }
-    setEditMovie(undefined);
   };
 
-  const handleDeleteMovie = (m) => { setDeleteTarget(m); setDeleteType("movie"); };
-  const handleDeleteCat   = (c) => { setDeleteTarget(c); setDeleteType("category"); };
+  const handleDeleteMovie = (m) => { setDeleteTarget(m); setDeleteType("movie"); setDeleteIsPermanent(false); };
+  const handleDeleteCat = (c) => { setDeleteTarget(c); setDeleteType("category"); setDeleteIsPermanent(false); };
 
-  const handleConfirmDelete = (target) => {
-    if (deleteType === "movie") {
-      setMovies((prev) => prev.filter((m) => m.id !== target.id));
-      showToast(`Đã xóa phim "${target.title}".`, "success");
-    } else {
-      setCategories((prev) => prev.filter((c) => c.id !== target.id));
-      showToast(`Đã xóa danh mục "${target.name}".`, "success");
+  const handleConfirmDelete = async (target) => {
+    try {
+      if (deleteType === "movie") {
+        await adminMovieService.deleteMovie(target.id);
+        setMovies((prev) => prev.filter((m) => m.id !== target.id));
+        showToast(`Đã di chuyển phim "${target.title}" vào thùng rác.`, "success");
+      } else {
+        await adminCategoryService.deleteCategory(target.id);
+        setCategories((prev) => prev.filter((c) => c.id !== target.id));
+        showToast(`Đã xóa danh mục "${target.name}".`, "success");
+      }
+      setDeleteTarget(null);
+      fetchData();
+    } catch (err) {
+      console.error("Error deleting:", err);
+      showToast(deleteType === "movie" ? "Không thể xóa phim." : "Không thể xóa danh mục.", "error");
     }
-    setDeleteTarget(null);
   };
 
-  const handleAddCat  = (c) => { setCategories((prev) => [...prev, c]); showToast(`Đã thêm danh mục "${c.name}".`); };
-  const handleEditCat = (c) => { setCategories((prev) => prev.map((x) => (x.id === c.id ? c : x))); showToast(`Đã cập nhật danh mục "${c.name}".`); };
+  const handleRestoreMovie = async (m) => {
+    try {
+      await adminMovieService.restoreMovie(m.id);
+      showToast(`Đã khôi phục phim "${m.title}".`);
+      fetchData();
+    } catch (err) {
+      console.error("Error restoring movie:", err);
+      showToast("Không thể khôi phục phim.", "error");
+    }
+  };
+
+  const handleToggleHideMovie = async (m) => {
+    try {
+      await adminMovieService.toggleHideMovie(m.id);
+      showToast(`Đã ${m.isHidden ? "hiện" : "ẩn"} phim "${m.title}".`);
+      fetchData();
+    } catch (err) {
+      console.error("Error toggling hide movie:", err);
+      showToast("Không thể cập nhật trạng thái ẩn/hiện phim.", "error");
+    }
+  };
+
+  const handleAddCat = async (c) => { 
+    try {
+      const result = await adminCategoryService.createCategory(camelToSnakeCategory(c));
+      const newCategory = { ...c, id: result.categoryId, movieCount: 0 };
+      setCategories((prev) => [...prev, newCategory]); 
+      showToast(`Đã thêm danh mục "${c.name}".`); 
+    } catch (err) {
+      console.error("Error adding category:", err);
+      showToast("Không thể thêm danh mục.", "error");
+    }
+  };
+  const handleEditCat = async (c) => { 
+    try {
+      await adminCategoryService.updateCategory(c.id, camelToSnakeCategory(c));
+      setCategories((prev) => prev.map((x) => (x.id === c.id ? c : x))); 
+      showToast(`Đã cập nhật danh mục "${c.name}".`); 
+    } catch (err) {
+      console.error("Error updating category:", err);
+      showToast("Không thể cập nhật danh mục.", "error");
+    }
+  };
+
+  // Nếu loading, hiển thị spinner
+  if (loading) {
+    return (
+      <div className="admin-movies-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <div style={{ fontSize: 24, color: '#fff' }}>Đang tải...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-movies-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh', flexDirection: 'column' }}>
+        <div style={{ fontSize: 24, color: '#ef4444' }}>{error}</div>
+        <button className="mv-btn mv-btn-add" style={{ marginTop: 20 }} onClick={fetchData}>Thử lại</button>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-movies-page">
@@ -709,6 +918,16 @@ export default function AdminMovies() {
           onView={handleView}
           onEdit={handleEdit}
           onDelete={handleDeleteMovie}
+          onToggleHide={handleToggleHideMovie}
+          isTrashMode={false}
+        />
+      )}
+      {activeTab === "trash" && (
+        <MovieList
+          movies={trashMovies}
+          categories={categories}
+          onRestore={handleRestoreMovie}
+          isTrashMode={true}
         />
       )}
       {activeTab === "category" && (

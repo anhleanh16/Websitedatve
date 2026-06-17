@@ -11,8 +11,16 @@ import {
   createMovie,
   updateMovie,
   deleteMovie,
+  restoreMovie,
+  permanentDeleteMovie,
+  toggleHideMovie,
   deactivateAdminUser,
+  getAdminCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 } from '../controllers/adminController.js';
+import { uploadMovieFiles } from '../../../config/upload.js';
 
 const router = express.Router();
 
@@ -41,8 +49,18 @@ router.put('/bookings/:orderId/check-in', checkInBooking);
 
 // ─── Movie Management ─────────────────────────────────────────────────────────
 router.get('/movies', getAdminMovies);
-router.post('/movies', createMovie);
-router.put('/movies/:id', updateMovie);
+// Upload nhiều poster (từ 6-12 file) và 1 trailer
+router.post('/movies', uploadMovieFiles.fields([{ name: 'posters', maxCount: 12 }, { name: 'trailer', maxCount: 1 }]), createMovie);
+router.put('/movies/:id', uploadMovieFiles.fields([{ name: 'posters', maxCount: 12 }, { name: 'trailer', maxCount: 1 }]), updateMovie);
 router.delete('/movies/:id', deleteMovie);
+router.put('/movies/:id/restore', restoreMovie);
+router.delete('/movies/:id/permanent', permanentDeleteMovie);
+router.put('/movies/:id/toggle-hide', toggleHideMovie);
+
+// ─── Movie Category Management ─────────────────────────────────────────────────
+router.get('/categories', getAdminCategories);
+router.post('/categories', createCategory);
+router.put('/categories/:id', updateCategory);
+router.delete('/categories/:id', deleteCategory);
 
 export default router;
