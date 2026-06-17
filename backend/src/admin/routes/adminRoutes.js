@@ -12,6 +12,15 @@ import {
   updateMovie,
   deleteMovie,
   deactivateAdminUser,
+  // Showtimes
+  getShowtimes,
+  getShowtimeById,
+  createShowtime,
+  updateShowtime,
+  deleteShowtime,
+  cancelShowtime,
+  getShowtimeCinemas,
+  getShowtimeRooms,
 } from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -44,5 +53,15 @@ router.get('/movies', getAdminMovies);
 router.post('/movies', createMovie);
 router.put('/movies/:id', updateMovie);
 router.delete('/movies/:id', deleteMovie);
+
+// ─── Showtime Management ──────────────────────────────────────────────────────
+router.get('/showtimes/cinemas',         getShowtimeCinemas);
+router.get('/showtimes/rooms',           getShowtimeRooms);
+router.get('/showtimes',                 getShowtimes);
+router.get('/showtimes/:id',             getShowtimeById);
+router.post('/showtimes',                createShowtime);
+router.put('/showtimes/:id',             updateShowtime);
+router.delete('/showtimes/:id',          deleteShowtime);
+router.put('/showtimes/:id/cancel',      cancelShowtime);
 
 export default router;

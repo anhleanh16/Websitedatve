@@ -62,3 +62,42 @@ export const adminBookingService = {
 export const adminDashboardService = {
   getDashboardStats: () => apiFetch('/admin/dashboard'),
 };
+
+// ─── Showtimes ────────────────────────────────────────────────────────────────
+export const adminShowtimeService = {
+  /** Lấy danh sách rạp */
+  getCinemas: () => apiFetch('/admin/showtimes/cinemas'),
+
+  /** Lấy phòng chiếu (có thể lọc theo cinemaId) */
+  getRooms: (cinemaId) =>
+    apiFetch(`/admin/showtimes/rooms${cinemaId ? `?cinemaId=${cinemaId}` : ''}`),
+
+  /** Danh sách suất chiếu */
+  getAll: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''))
+    ).toString();
+    return apiFetch(`/admin/showtimes${q ? `?${q}` : ''}`);
+  },
+
+  /** Chi tiết suất chiếu */
+  getById: (id) => apiFetch(`/admin/showtimes/${id}`),
+
+  /** Tạo mới */
+  create: (data) => apiFetch('/admin/showtimes', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  /** Cập nhật */
+  update: (id, data) => apiFetch(`/admin/showtimes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  /** Xóa */
+  delete: (id) => apiFetch(`/admin/showtimes/${id}`, { method: 'DELETE' }),
+
+  /** Hủy */
+  cancel: (id) => apiFetch(`/admin/showtimes/${id}/cancel`, { method: 'PUT' }),
+};

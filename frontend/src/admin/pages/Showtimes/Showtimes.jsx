@@ -1,45 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { adminShowtimeService } from "../../services/adminApi";
 import './showtimes.css';
-
-// ─── Sample Data ──────────────────────────────────────────────────────────────
-const CINEMAS = [
-  { id: 1, name: "Lunexa CGV Hà Nội",    city: "Hà Nội"   },
-  { id: 2, name: "Lunexa Lotte TP.HCM",  city: "TP.HCM"   },
-  { id: 3, name: "Lunexa CGV Đà Nẵng",   city: "Đà Nẵng"  },
-  { id: 4, name: "Lunexa BHD TP.HCM",    city: "TP.HCM"   },
-];
-
-const ROOMS = [
-  { id: 1, cinemaId: 1, name: "P01 – IMAX",    type: "IMAX",     totalSeats: 200 },
-  { id: 2, cinemaId: 1, name: "P02 – 3D",      type: "3D",       totalSeats: 120 },
-  { id: 3, cinemaId: 1, name: "P03 – 2D",      type: "2D",       totalSeats: 100 },
-  { id: 4, cinemaId: 1, name: "P04 – VIP",     type: "VIP",      totalSeats: 60  },
-  { id: 5, cinemaId: 2, name: "P01 – IMAX",    type: "IMAX",     totalSeats: 180 },
-  { id: 6, cinemaId: 2, name: "P02 – 3D",      type: "3D",       totalSeats: 100 },
-  { id: 7, cinemaId: 3, name: "P01 – 2D",      type: "2D",       totalSeats: 90  },
-  { id: 8, cinemaId: 3, name: "P02 – 3D",      type: "3D",       totalSeats: 110 },
-  { id: 9, cinemaId: 4, name: "P01 – VIP",     type: "VIP",      totalSeats: 50  },
-  { id: 10, cinemaId: 4, name: "P02 – 2D",     type: "2D",       totalSeats: 95  },
-];
-
-const MOVIES = [
-  { id: 1, title: "Đêm Thiên Cầu",           duration: 128 },
-  { id: 2, title: "Tiếng Vọng Im Lặng",      duration: 105 },
-  { id: 3, title: "Hỗn Loạn Tokyo",          duration: 135 },
-  { id: 4, title: "Ánh Sao Cuối Trời",       duration: 110 },
-  { id: 6, title: "Doraemon: Đại Chiến Vũ Trụ", duration: 95 },
-];
-
-const SAMPLE_SHOWTIMES = [
-  { id: 1,  movieId: 1, roomId: 1, cinemaId: 1, startTime: "2026-06-10T14:00", endTime: "2026-06-10T16:08", price: 150000, availableSeats: 180, status: "active"    },
-  { id: 2,  movieId: 1, roomId: 2, cinemaId: 1, startTime: "2026-06-10T19:30", endTime: "2026-06-10T21:38", price: 120000, availableSeats: 95,  status: "active"    },
-  { id: 3,  movieId: 2, roomId: 5, cinemaId: 2, startTime: "2026-06-10T17:00", endTime: "2026-06-10T18:45", price: 130000, availableSeats: 140, status: "active"    },
-  { id: 4,  movieId: 3, roomId: 7, cinemaId: 3, startTime: "2026-06-10T20:00", endTime: "2026-06-10T22:15", price: 110000, availableSeats: 60,  status: "active"    },
-  { id: 5,  movieId: 6, roomId: 3, cinemaId: 1, startTime: "2026-06-11T10:00", endTime: "2026-06-11T11:35", price: 90000,  availableSeats: 100, status: "active"    },
-  { id: 6,  movieId: 1, roomId: 4, cinemaId: 1, startTime: "2026-06-11T19:00", endTime: "2026-06-11T21:08", price: 200000, availableSeats: 0,   status: "active"    },
-  { id: 7,  movieId: 4, roomId: 9, cinemaId: 4, startTime: "2026-06-12T15:30", endTime: "2026-06-12T17:20", price: 180000, availableSeats: 50,  status: "active"    },
-  { id: 8,  movieId: 2, roomId: 6, cinemaId: 2, startTime: "2026-06-09T21:00", endTime: "2026-06-09T22:45", price: 120000, availableSeats: 30,  status: "cancelled" },
-];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const STATUS_SHOW = {
@@ -549,55 +510,142 @@ function Toast({ message, onClose }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminShowtimes() {
-  const [showtimes, setShowtimes] = useState(SAMPLE_SHOWTIMES);
-  const [activeTab, setActiveTab] = useState("manager");
+  // ── State ──
+  const [showtimes,  setShowtimes]  = useState([]);
+  const [movies,     setMovies]     = useState([]);
+  const [cinemas,    setCinemas]    = useState([]);
+  const [rooms,      setRooms]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState("");
 
-  const [editSt,   setEditSt]   = useState(undefined); // undefined=closed, null=new, obj=edit
-  const [confirmTarget, setConfirmTarget] = useState(null); // {type, data}
-  const [toast, setToast] = useState("");
+  const [activeTab,       setActiveTab]       = useState("manager");
+  const [editSt,          setEditSt]          = useState(undefined);
+  const [confirmTarget,   setConfirmTarget]   = useState(null);
+  const [toast,           setToast]           = useState("");
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3200); };
 
-  const handleSave = (data) => {
-    if (showtimes.find(s => s.id === data.id)) {
-      setShowtimes(p => p.map(s => s.id === data.id ? data : s));
-      showToast("Đã cập nhật suất chiếu.");
-    } else {
-      setShowtimes(p => [data, ...p]);
-      showToast("Đã tạo suất chiếu mới.");
+  // ── Fetch dữ liệu từ API ──
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [stRes, cinRes, roomRes, mvRes] = await Promise.all([
+        adminShowtimeService.getAll(),
+        adminShowtimeService.getCinemas(),
+        adminShowtimeService.getRooms(),
+        fetch('/api/admin/movies').then(r => r.json()),
+      ]);
+
+      // Chuẩn hoá dữ liệu từ DB sang format component cần
+      const normalizedSt = (stRes.showtimes || []).map(s => ({
+        id:             s.id,
+        movieId:        s.movieId,
+        roomId:         s.roomId,
+        cinemaId:       s.cinemaId,
+        startTime:      s.startTime ? new Date(s.startTime).toISOString().slice(0, 16) : "",
+        endTime:        s.endTime   ? new Date(s.endTime).toISOString().slice(0, 16)   : "",
+        price:          Number(s.price),
+        availableSeats: Number(s.availableSeats),
+        status:         s.status,
+        // join fields (dùng cho display nhanh)
+        movieTitle:  s.movieTitle,
+        duration:    s.duration,
+        roomName:    s.roomName,
+        roomType:    s.roomType,
+        totalSeats:  s.totalSeats,
+        cinemaName:  s.cinemaName,
+      }));
+
+      const normalizedMovies = (mvRes.movies || []).map(m => ({
+        id:       m.movie_id,
+        title:    m.title,
+        duration: m.duration,
+      }));
+
+      setShowtimes(normalizedSt);
+      setCinemas(cinRes.cinemas  || []);
+      setRooms(roomRes.rooms     || []);
+      setMovies(normalizedMovies);
+    } catch (err) {
+      console.error(err);
+      setError("Không thể tải dữ liệu. Vui lòng kiểm tra kết nối server.");
+    } finally {
+      setLoading(false);
     }
-    setEditSt(undefined);
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // ── Handlers ──
+  const handleSave = async (data) => {
+    try {
+      const payload = {
+        movieId:        data.movieId,
+        roomId:         data.roomId,
+        startTime:      data.startTime,
+        endTime:        data.endTime,
+        price:          data.price,
+        availableSeats: data.availableSeats,
+        status:         data.status,
+      };
+
+      if (data.id && showtimes.find(s => s.id === data.id)) {
+        await adminShowtimeService.update(data.id, payload);
+        showToast("Đã cập nhật suất chiếu.");
+      } else {
+        await adminShowtimeService.create(payload);
+        showToast("Đã tạo suất chiếu mới.");
+      }
+      await fetchAll();
+      setEditSt(undefined);
+    } catch (err) {
+      const msg = err.message?.includes('409') || err.message?.includes('conflict')
+        ? "Phòng đã có suất chiếu trùng giờ."
+        : "Lỗi lưu suất chiếu. Vui lòng thử lại.";
+      showToast(msg);
+    }
   };
 
   const handleCancel = (s) => setConfirmTarget({ type: "cancel", data: s });
   const handleDelete = (s) => setConfirmTarget({ type: "delete", data: s });
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const { type, data } = confirmTarget;
-    if (type === "cancel") {
-      setShowtimes(p => p.map(s => s.id === data.id ? { ...s, status: "cancelled" } : s));
-      showToast(`Đã hủy suất chiếu phim "${MOVIES.find(m => m.id === data.movieId)?.title}".`);
-    } else {
-      setShowtimes(p => p.filter(s => s.id !== data.id));
-      showToast("Đã xóa suất chiếu.");
+    try {
+      if (type === "cancel") {
+        await adminShowtimeService.cancel(data.id);
+        showToast(`Đã hủy suất chiếu phim "${data.movieTitle || movies.find(m => m.id === data.movieId)?.title}".`);
+      } else {
+        await adminShowtimeService.delete(data.id);
+        showToast("Đã xóa suất chiếu.");
+      }
+      await fetchAll();
+    } catch (err) {
+      const msg = err.message?.includes('400')
+        ? "Không thể xóa: suất chiếu đã có vé đặt."
+        : "Lỗi thực hiện. Vui lòng thử lại.";
+      showToast(msg);
     }
     setConfirmTarget(null);
   };
 
+  // ── Stats ──
   const stats = [
-    { label: "Tổng suất chiếu", value: showtimes.length,                                            color: "#7c61ff" },
-    { label: "Đang hoạt động",  value: showtimes.filter(s => s.status === "active").length,         color: "#4ade80" },
+    { label: "Tổng suất chiếu", value: showtimes.length,                                                          color: "#7c61ff" },
+    { label: "Đang hoạt động",  value: showtimes.filter(s => s.status === "active").length,                       color: "#4ade80" },
     { label: "Hết chỗ",        value: showtimes.filter(s => s.availableSeats === 0 && s.status === "active").length, color: "#fbbf24" },
-    { label: "Đã hủy",         value: showtimes.filter(s => s.status === "cancelled").length,       color: "#f87171" },
+    { label: "Đã hủy",         value: showtimes.filter(s => s.status === "cancelled").length,                     color: "#f87171" },
   ];
 
   const TABS = [
     { key: "manager",    label: "Quản lý suất chiếu" },
     { key: "allocation", label: "Phân bổ phòng chiếu" },
     { key: "schedule",   label: "Danh sách lịch chiếu" },
-    { key: "create",     label: "+ Tạo lịch chiếu",    highlight: true },
+    { key: "create",     label: "+ Tạo lịch chiếu", highlight: true },
   ];
 
+  // ── Render ──
   return (
     <div className="admin-showtimes-page">
       <div className="sh-page-header">
@@ -628,15 +676,38 @@ export default function AdminShowtimes() {
         ))}
       </div>
 
+      {/* Loading / Error */}
+      {loading && (
+        <div className="sh-loading">
+          <div className="sh-spinner" />
+          <span>Đang tải dữ liệu…</span>
+        </div>
+      )}
+      {!loading && error && (
+        <div className="sh-error-banner">
+          ⚠️ {error}
+          <button onClick={fetchAll}>Thử lại</button>
+        </div>
+      )}
+
       {/* Content */}
-      {activeTab === "manager" && (
-        <ShowtimeManager showtimes={showtimes} rooms={ROOMS} movies={MOVIES} cinemas={CINEMAS} onEdit={s => setEditSt(s)} onDelete={handleDelete} onCancel={handleCancel} />
-      )}
-      {activeTab === "allocation" && (
-        <RoomAllocation showtimes={showtimes} rooms={ROOMS} movies={MOVIES} cinemas={CINEMAS} />
-      )}
-      {activeTab === "schedule" && (
-        <ShowtimeSchedule showtimes={showtimes} rooms={ROOMS} movies={MOVIES} cinemas={CINEMAS} />
+      {!loading && !error && (
+        <>
+          {activeTab === "manager" && (
+            <ShowtimeManager
+              showtimes={showtimes} rooms={rooms} movies={movies} cinemas={cinemas}
+              onEdit={s => setEditSt(s)}
+              onDelete={handleDelete}
+              onCancel={handleCancel}
+            />
+          )}
+          {activeTab === "allocation" && (
+            <RoomAllocation showtimes={showtimes} rooms={rooms} movies={movies} cinemas={cinemas} />
+          )}
+          {activeTab === "schedule" && (
+            <ShowtimeSchedule showtimes={showtimes} rooms={rooms} movies={movies} cinemas={cinemas} />
+          )}
+        </>
       )}
 
       {/* Modals */}
@@ -644,7 +715,9 @@ export default function AdminShowtimes() {
         <ShowtimeForm
           showtime={editSt}
           showtimes={showtimes}
-          rooms={ROOMS} movies={MOVIES} cinemas={CINEMAS}
+          rooms={rooms}
+          movies={movies}
+          cinemas={cinemas}
           onClose={() => setEditSt(undefined)}
           onSave={handleSave}
         />
@@ -653,8 +726,8 @@ export default function AdminShowtimes() {
         <Confirm
           title={confirmTarget.type === "cancel" ? "Xác nhận hủy suất chiếu" : "Xác nhận xóa"}
           message={confirmTarget.type === "cancel"
-            ? `Hủy suất chiếu phim "${MOVIES.find(m => m.id === confirmTarget.data.movieId)?.title}" lúc ${fmtTime(confirmTarget.data.startTime)}? Hành động này không thể hoàn tác.`
-            : `Xóa suất chiếu này? Toàn bộ dữ liệu liên quan sẽ bị xóa vĩnh viễn.`
+            ? `Hủy suất chiếu phim "${confirmTarget.data.movieTitle || movies.find(m => m.id === confirmTarget.data.movieId)?.title}" lúc ${fmtTime(confirmTarget.data.startTime)}? Hành động này không thể hoàn tác.`
+            : `Xóa suất chiếu này? Dữ liệu sẽ bị xóa vĩnh viễn.`
           }
           danger={confirmTarget.type === "delete"}
           onClose={() => setConfirmTarget(null)}
