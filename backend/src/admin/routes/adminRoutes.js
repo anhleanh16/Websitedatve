@@ -15,12 +15,10 @@ import {
   permanentDeleteMovie,
   toggleHideMovie,
   deactivateAdminUser,
-<<<<<<< HEAD
   getAdminCategories,
   createCategory,
   updateCategory,
   deleteCategory,
-=======
   // Showtimes
   getShowtimes,
   getShowtimeById,
@@ -30,7 +28,6 @@ import {
   cancelShowtime,
   getShowtimeCinemas,
   getShowtimeRooms,
->>>>>>> 80e30472beaab19cf725875782abf0e9184a882e
 } from '../controllers/adminController.js';
 import { uploadMovieFiles } from '../../../config/upload.js';
 
