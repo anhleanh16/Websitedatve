@@ -33,6 +33,7 @@ export const adminMovieService = {
   },
   deleteMovie:  (id)       => apiFetch(`/admin/movies/${id}`, { method: 'DELETE' }),
   restoreMovie: (id)       => apiFetch(`/admin/movies/${id}/restore`, { method: 'PUT' }),
+  permanentDeleteMovie: (id) => apiFetch(`/admin/movies/${id}/permanent`, { method: 'DELETE' }),
   toggleHideMovie: (id) => apiFetch(`/admin/movies/${id}/toggle-hide`, { method: 'PUT' }),
 };
 

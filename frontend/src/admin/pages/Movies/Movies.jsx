@@ -59,7 +59,7 @@ const EMPTY_MOVIE = {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** 1. Danh sách phim */
-function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, onToggleHide, isTrashMode }) {
+function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, onToggleHide, onPermanentDelete, isTrashMode }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
@@ -141,6 +141,7 @@ function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, on
                     {isTrashMode && (
                       <>
                         <button className="mv-btn mv-btn-restore" onClick={() => onRestore(m)}>🔄 Khôi phục</button>
+                        <button className="mv-btn mv-btn-permanent-delete" onClick={() => onPermanentDelete(m)}>🗑️ Xóa vĩnh viễn</button>
                       </>
                     )}
                   </div>
@@ -654,7 +655,7 @@ function CategoryManager({ categories, onAdd, onEdit, onDelete }) {
 }
 
 /** Confirm xóa */
-function DeleteConfirm({ target, type, onClose, onConfirm }) {
+function DeleteConfirm({ target, type, isPermanent, onClose, onConfirm }) {
   const [isDeleting, setIsDeleting] = useState(false);
   if (!target) return null;
 
@@ -671,20 +672,20 @@ function DeleteConfirm({ target, type, onClose, onConfirm }) {
     <div className="mv-modal-overlay" onClick={onClose}>
       <div className="mv-modal mv-modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="mv-modal-header">
-          <h2>Xác nhận xóa</h2>
+          <h2>{isPermanent ? "Xác nhận xóa vĩnh viễn" : "Xác nhận xóa"}</h2>
           <button className="mv-modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="mv-modal-body">
           <div className="mv-delete-warn">
-            ⚠️ Bạn có chắc muốn {type === "movie" ? "di chuyển vào thùng rác" : "xóa"} {type === "movie" ? "phim" : "danh mục"}
+            ⚠️ Bạn có chắc muốn {isPermanent ? "xóa vĩnh viễn" : type === "movie" ? "di chuyển vào thùng rác" : "xóa"} {type === "movie" ? "phim" : "danh mục"}
             &nbsp;<strong>"{target.title || target.name}"</strong>?
             <br />
-            {type === "movie" ? "Bạn có thể khôi phục lại từ thùng rác." : ""}
+            {isPermanent ? "Hành động này không thể hoàn tác!" : type === "movie" ? "Bạn có thể khôi phục lại từ thùng rác." : ""}
           </div>
         </div>
         <div className="mv-modal-footer">
-          <button className={`mv-btn ${type === "movie" ? "mv-btn-delete" : "mv-btn-delete"} mv-btn-lg`} onClick={handleConfirm} disabled={isDeleting}>
-            {isDeleting ? "Đang xóa..." : "Xóa"}
+          <button className={`mv-btn ${isPermanent ? "mv-btn-delete" : "mv-btn-delete"} mv-btn-lg`} onClick={handleConfirm} disabled={isDeleting}>
+            {isDeleting ? "Đang xóa..." : isPermanent ? "Xóa vĩnh viễn" : "Xóa"}
           </button>
           <button className="mv-btn mv-btn-secondary mv-btn-lg" onClick={onClose} disabled={isDeleting}>Hủy</button>
         </div>
@@ -797,14 +798,19 @@ export default function AdminMovies() {
   };
 
   const handleDeleteMovie = (m) => { setDeleteTarget(m); setDeleteType("movie"); setDeleteIsPermanent(false); };
+  const handlePermanentDeleteMovie = (m) => { setDeleteTarget(m); setDeleteType("movie"); setDeleteIsPermanent(true); };
   const handleDeleteCat = (c) => { setDeleteTarget(c); setDeleteType("category"); setDeleteIsPermanent(false); };
 
   const handleConfirmDelete = async (target) => {
     try {
       if (deleteType === "movie") {
-        await adminMovieService.deleteMovie(target.id);
-        setMovies((prev) => prev.filter((m) => m.id !== target.id));
-        showToast(`Đã di chuyển phim "${target.title}" vào thùng rác.`, "success");
+        if (deleteIsPermanent) {
+          await adminMovieService.permanentDeleteMovie(target.id);
+          showToast(`Đã xóa vĩnh viễn phim "${target.title}".`, "success");
+        } else {
+          await adminMovieService.deleteMovie(target.id);
+          showToast(`Đã di chuyển phim "${target.title}" vào thùng rác.`, "success");
+        }
       } else {
         await adminCategoryService.deleteCategory(target.id);
         setCategories((prev) => prev.filter((c) => c.id !== target.id));
@@ -927,6 +933,7 @@ export default function AdminMovies() {
           movies={trashMovies}
           categories={categories}
           onRestore={handleRestoreMovie}
+          onPermanentDelete={handlePermanentDeleteMovie}
           isTrashMode={true}
         />
       )}
@@ -960,6 +967,7 @@ export default function AdminMovies() {
         <DeleteConfirm
           target={deleteTarget}
           type={deleteType}
+          isPermanent={deleteIsPermanent}
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
         />
