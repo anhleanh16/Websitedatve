@@ -40,8 +40,12 @@ export default function Login() {
       // Dispatch vào Redux
       dispatch(setUser({ token: data.token, user: data.user }))
 
-      // Điều hướng về trang chủ sau khi đăng nhập
-      navigate('/')
+      // Điều hướng dựa trên vai trò
+      if (data.user?.role === 'admin') {
+        navigate('/admin')
+      } else {
+        navigate('/')
+      }
     } catch {
       setMessage('Không thể kết nối máy chủ, vui lòng thử lại.')
     } finally {
