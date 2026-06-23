@@ -248,29 +248,13 @@ CREATE TABLE Employees (
 );
 
 
--- =============================================
--- SEED DATA
--- =============================================
+USE lunexa;
+UPDATE User
+SET password='$2a$10$1G256nBgUCxFdjKLXlVLg.zDbl5oBm1pPvN6oNcMj2M1EWmLrLfqG'
+WHERE email='anhanhle1997@gmail.com';
 
--- Roles
-INSERT IGNORE INTO Roles (role_id, role_name, description) VALUES
-(1, 'admin', 'Quản trị viên hệ thống'),
-(2, 'user',  'Khách hàng thông thường');
-
--- Tài khoản admin mặc định  (id = 1, role_id = 1, password: Admin@123)
-INSERT INTO User (id, role_id, full_name, email, password, status)
-VALUES (1, 1, 'Quản trị viên', 'admin@lunexa.vn', '<hashed_password_placeholder>', 'active')
-ON DUPLICATE KEY UPDATE
-  role_id = VALUES(role_id),
-  full_name = VALUES(full_name),
-  email = VALUES(email),
-  status = VALUES(status);
--- bcrypt hash của 'Admin@123'
-INSERT IGNORE INTO User (id, role_id, full_name, email, password, status) VALUES
-(1, 1, 'Quản trị viên', 'admin@lunexa.vn',
- '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi', 'active');
-
--- Tài khoản user test (password: User@123)
-INSERT IGNORE INTO User (id, role_id, full_name, email, password, phone, status) VALUES
-(2, 2, 'Nguyễn Văn Test', 'user@lunexa.vn',
- '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi', '0901234567', 'active');
+USE lunexa;
+ALTER TABLE `Movies`
+ADD COLUMN `posters` JSON NULL AFTER `poster`,
+ADD COLUMN `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE AFTER `country`,
+ADD COLUMN `is_hidden` BOOLEAN NOT NULL DEFAULT FALSE AFTER `is_deleted`;

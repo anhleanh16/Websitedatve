@@ -1,12 +1,20 @@
 import express from "express";
 import {
-  adminDashboard,
-  getAdminUsers,
   getAdminBookings,
   getAdminBookingDetail,
   refundBooking,
   checkInBooking,
   verifyBookingCode,
+} from "../controllers/bookingController.js";
+import {
+  getAllCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  getCategoryById,
+} from "../controllers/categoryController.js";
+import { getDashboardStats } from "../controllers/dashboardController.js";
+import {
   getAdminMovies,
   createMovie,
   updateMovie,
@@ -14,12 +22,8 @@ import {
   restoreMovie,
   permanentDeleteMovie,
   toggleHideMovie,
-  deactivateAdminUser,
-  getAdminCategories,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-  // Showtimes
+} from "../controllers/movieController.js";
+import {
   getShowtimes,
   getShowtimeById,
   createShowtime,
@@ -28,37 +32,31 @@ import {
   cancelShowtime,
   getShowtimeCinemas,
   getShowtimeRooms,
-} from "../controllers/adminController.js";
+} from "../controllers/showtimeController.js";
+import {
+  getAdminUsers,
+  deactivateAdminUser,
+} from "../controllers/userController.js";
 import { uploadMovieFiles } from "../../../config/upload.js";
 
 const router = express.Router();
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-router.get("/dashboard", adminDashboard);
+router.get("/dashboard", getDashboardStats);
 
 // ─── User Management ─────────────────────────────────────────────────────────
 router.get("/users", getAdminUsers);
 router.put("/users/:userId/deactivate", deactivateAdminUser);
 
 // ─── Booking Management ──────────────────────────────────────────────────────
-// Danh sách vé (có filter & search)
 router.get("/bookings", getAdminBookings);
-
-// Xác minh mã vé / QR (đặt trước :orderId để tránh conflict)
 router.get("/bookings/verify/:code", verifyBookingCode);
-
-// Chi tiết vé
 router.get("/bookings/:orderId", getAdminBookingDetail);
-
-// Hoàn vé
 router.put("/bookings/:orderId/refund", refundBooking);
-
-// Kiểm tra & check-in vé
 router.put("/bookings/:orderId/check-in", checkInBooking);
 
 // ─── Movie Management ─────────────────────────────────────────────────────────
 router.get("/movies", getAdminMovies);
-// Upload nhiều poster (từ 6-12 file) và 1 trailer
 router.post(
   "/movies",
   uploadMovieFiles.fields([
@@ -81,8 +79,9 @@ router.delete("/movies/:id/permanent", permanentDeleteMovie);
 router.put("/movies/:id/toggle-hide", toggleHideMovie);
 
 // ─── Movie Category Management ─────────────────────────────────────────────────
-router.get("/categories", getAdminCategories);
+router.get("/categories", getAllCategories);
 router.post("/categories", createCategory);
+router.get("/categories/:id", getCategoryById);
 router.put("/categories/:id", updateCategory);
 router.delete("/categories/:id", deleteCategory);
 
