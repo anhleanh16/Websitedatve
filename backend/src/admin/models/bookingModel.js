@@ -6,28 +6,36 @@ export const BookingModel = {
    */
   async findAll(filters = {}) {
     let query = `
-      SELECT 
-        b.booking_id, b.booking_code, b.total_price, b.status, b.created_at,
-        u.full_name, u.email,
-        m.title AS movie_title,
-        s.start_time
-      FROM Bookings b
-      JOIN Users u ON b.user_id = u.user_id
-      JOIN Showtimes s ON b.showtime_id = s.showtime_id
-      JOIN Movies m ON s.movie_id = m.movie_id
+      SELECT
+        o.order_id AS booking_id,
+        o.booking_code,
+        o.total_amount AS total_price,
+        o.payment_method,
+        o.payment_status,
+        o.status,
+        o.created_at,
+        u.full_name,
+        u.email,
+        MIN(m.title) AS movie_title,
+        MIN(s.start_time) AS start_time
+      FROM Orders o
+      JOIN User u ON o.user_id = u.id
+      LEFT JOIN Tickets t ON t.order_id = o.order_id
+      LEFT JOIN Showtimes s ON t.showtime_id = s.showtime_id
+      LEFT JOIN Movies m ON s.movie_id = m.movie_id
     `;
 
     const queryParams = [];
     const whereClauses = [];
 
     if (filters.status) {
-      whereClauses.push("b.status = ?");
+      whereClauses.push("o.status = ?");
       queryParams.push(filters.status);
     }
 
     if (filters.search) {
       whereClauses.push(
-        "(u.full_name LIKE ? OR u.email LIKE ? OR m.title LIKE ? OR b.booking_code LIKE ?)",
+        "(u.full_name LIKE ? OR u.email LIKE ? OR m.title LIKE ? OR o.booking_code LIKE ?)",
       );
       const searchTerm = `%${filters.search}%`;
       queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
@@ -37,7 +45,19 @@ export const BookingModel = {
       query += " WHERE " + whereClauses.join(" AND ");
     }
 
-    query += " ORDER BY b.created_at DESC";
+    query += `
+      GROUP BY
+        o.order_id,
+        o.booking_code,
+        o.total_amount,
+        o.payment_method,
+        o.payment_status,
+        o.status,
+        o.created_at,
+        u.full_name,
+        u.email
+      ORDER BY o.created_at DESC
+    `;
 
     const [bookings] = await db.query(query, queryParams);
     return bookings;
@@ -49,20 +69,44 @@ export const BookingModel = {
   async findById(id) {
     const [bookingDetails] = await db.query(
       `
-      SELECT 
-        b.*, 
-        u.full_name, u.email, u.phone_number,
-        s.start_time, s.end_time,
-        m.title AS movie_title, m.poster,
-        c.cinema_name,
-        cr.room_name
-      FROM Bookings b
-      JOIN Users u ON b.user_id = u.user_id
-      JOIN Showtimes s ON b.showtime_id = s.showtime_id
-      JOIN Movies m ON s.movie_id = m.movie_id
-      JOIN Cinema_Rooms cr ON s.room_id = cr.room_id
-      JOIN Cinemas c ON cr.cinema_id = c.cinema_id
-      WHERE b.booking_id = ?
+      SELECT
+        o.order_id AS booking_id,
+        o.booking_code,
+        o.total_amount AS total_price,
+        o.payment_method,
+        o.payment_status,
+        o.status,
+        o.created_at,
+        u.id AS user_id,
+        u.full_name,
+        u.email,
+        u.phone AS phone_number,
+        MIN(s.start_time) AS start_time,
+        MIN(s.end_time) AS end_time,
+        MIN(m.title) AS movie_title,
+        MIN(m.poster) AS poster,
+        MIN(c.cinema_name) AS cinema_name,
+        MIN(r.room_name) AS room_name
+      FROM Orders o
+      JOIN User u ON o.user_id = u.id
+      LEFT JOIN Tickets t ON t.order_id = o.order_id
+      LEFT JOIN Showtimes s ON t.showtime_id = s.showtime_id
+      LEFT JOIN Movies m ON s.movie_id = m.movie_id
+      LEFT JOIN Rooms r ON s.room_id = r.room_id
+      LEFT JOIN Cinemas c ON r.cinema_id = c.cinemas_id
+      WHERE o.order_id = ?
+      GROUP BY
+        o.order_id,
+        o.booking_code,
+        o.total_amount,
+        o.payment_method,
+        o.payment_status,
+        o.status,
+        o.created_at,
+        u.id,
+        u.full_name,
+        u.email,
+        u.phone
     `,
       [id],
     );
@@ -71,13 +115,24 @@ export const BookingModel = {
     const booking = bookingDetails[0];
 
     const [seats] = await db.query(
-      "SELECT seat_number FROM Booking_Seats WHERE booking_id = ?",
+      `
+      SELECT s.seat_code
+      FROM Tickets t
+      JOIN Seats s ON s.seat_id = t.seat_id
+      WHERE t.order_id = ?
+      ORDER BY s.seat_code
+    `,
       [id],
     );
-    booking.seats = seats.map((s) => s.seat_number);
+    booking.seats = seats.map((s) => s.seat_code);
 
     const [combos] = await db.query(
-      "SELECT combo_name, quantity, price FROM Booking_Combos WHERE booking_id = ?",
+      `
+      SELECT c.combo_name, oc.quantity, c.price
+      FROM Order_Combos oc
+      JOIN Combos c ON c.combo_id = oc.combo_id
+      WHERE oc.order_id = ?
+    `,
       [id],
     );
     booking.combos = combos;
@@ -92,15 +147,19 @@ export const BookingModel = {
     const [bookingDetails] = await db.query(
       `
       SELECT 
-        b.booking_id, b.booking_code, b.status,
+        o.order_id AS booking_id,
+        o.booking_code,
+        o.status,
         u.full_name,
-        m.title AS movie_title,
-        s.start_time
-      FROM Bookings b
-      JOIN Users u ON b.user_id = u.user_id
-      JOIN Showtimes s ON b.showtime_id = s.showtime_id
-      JOIN Movies m ON s.movie_id = m.movie_id
-      WHERE b.booking_code = ?
+        MIN(m.title) AS movie_title,
+        MIN(s.start_time) AS start_time
+      FROM Orders o
+      JOIN User u ON o.user_id = u.id
+      LEFT JOIN Tickets t ON t.order_id = o.order_id
+      LEFT JOIN Showtimes s ON t.showtime_id = s.showtime_id
+      LEFT JOIN Movies m ON s.movie_id = m.movie_id
+      WHERE o.booking_code = ?
+      GROUP BY o.order_id, o.booking_code, o.status, u.full_name
     `,
       [code],
     );
@@ -112,7 +171,7 @@ export const BookingModel = {
    */
   async updateStatus(id, status) {
     const [result] = await db.query(
-      "UPDATE Bookings SET status = ? WHERE booking_id = ?",
+      "UPDATE Orders SET status = ? WHERE order_id = ?",
       [status, id],
     );
     return result.affectedRows > 0;

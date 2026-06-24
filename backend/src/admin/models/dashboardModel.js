@@ -9,8 +9,18 @@ export const DashboardModel = {
     // Thống kê người dùng
     const [userStats] = await db.query(`
       SELECT
-        (SELECT COUNT(*) FROM Users WHERE role = 'customer') AS total_customers,
-        (SELECT COUNT(*) FROM Users WHERE role IN ('admin', 'staff')) AS total_staff
+        (
+          SELECT COUNT(*)
+          FROM User u
+          JOIN Roles r ON r.role_id = u.role_id
+          WHERE r.role_name = 'user'
+        ) AS total_customers,
+        (
+          SELECT COUNT(*)
+          FROM User u
+          JOIN Roles r ON r.role_id = u.role_id
+          WHERE r.role_name IN ('admin', 'staff')
+        ) AS total_staff
     `);
 
     // Thống kê phim
@@ -24,20 +34,28 @@ export const DashboardModel = {
     // Thống kê doanh thu (ví dụ: trong 30 ngày qua)
     const [revenueStats] = await db.query(`
       SELECT
-        SUM(total_price) AS total_revenue,
+        SUM(total_amount) AS total_revenue,
         COUNT(*) AS total_bookings
-      FROM Bookings
+      FROM Orders
       WHERE status = 'completed' AND created_at >= NOW() - INTERVAL 30 DAY
     `);
 
     // Lấy các booking gần đây
     const [recentBookings] = await db.query(`
-      SELECT b.booking_id, u.full_name, m.title, b.total_price, b.created_at
-      FROM Bookings b
-      JOIN Users u ON b.user_id = u.user_id
-      JOIN Showtimes s ON b.showtime_id = s.showtime_id
-      JOIN Movies m ON s.movie_id = m.movie_id
-      ORDER BY b.created_at DESC
+      SELECT
+        o.order_id AS booking_id,
+        o.booking_code,
+        u.full_name,
+        MIN(m.title) AS title,
+        o.total_amount AS total_price,
+        o.created_at
+      FROM Orders o
+      JOIN User u ON o.user_id = u.id
+      LEFT JOIN Tickets t ON t.order_id = o.order_id
+      LEFT JOIN Showtimes s ON t.showtime_id = s.showtime_id
+      LEFT JOIN Movies m ON s.movie_id = m.movie_id
+      GROUP BY o.order_id, o.booking_code, u.full_name, o.total_amount, o.created_at
+      ORDER BY o.created_at DESC
       LIMIT 5
     `);
 

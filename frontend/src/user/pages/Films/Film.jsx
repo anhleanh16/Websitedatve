@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import "./Film.css";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
-const sampleMovies = Array.from({ length: 16 }).map((_, i) => ({
-  id: i + 1,
-  title: `Phim ${i + 1}`,
-  poster: "",
-  rating: Math.floor(Math.random() * 3) + 3, // 3..5
-}));
+const sampleMovies = [
+  { id: 1, title: "Doraemon: Nobita và cuộc chiến vũ trụ tí hon", rating: 5 },
+  { id: 2, title: "Oppenheimer", rating: 5 },
+  { id: 3, title: "Dune: Part Two", rating: 5 },
+  { id: 4, title: "Inside Out 2", rating: 4 },
+  { id: 5, title: "Barbie", rating: 4 },
+  { id: 6, title: "The Batman", rating: 5 },
+  { id: 7, title: "Wicked", rating: 4 },
+  { id: 8, title: "Gladiator II", rating: 4 },
+];
 
 const banners = [
   "/uploads/banners/banner1.jpg",
@@ -16,8 +20,20 @@ const banners = [
 ];
 
 export default function Film() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const bookingContext = location.state?.bookingContext || null;
+
+  const bookingSummary = useMemo(() => {
+    if (!bookingContext) return null;
+    const roomParts = [bookingContext.roomName, bookingContext.roomType].filter(Boolean);
+    return {
+      cinemaName: bookingContext.cinema || "Rạp đã chọn",
+      roomLabel: roomParts.length > 0 ? roomParts.join(" • ") : "Chưa chọn phòng",
+    };
+  }, [bookingContext]);
 
   const handleBannerChange = (newIndex) => {
     setIsTransitioning(true);
@@ -61,6 +77,25 @@ export default function Film() {
         <main className="film-main">
           <section className="film-left">
             <div className="hero">
+              {bookingSummary && (
+                <div className="booking-intent-banner">
+                  <div>
+                    <strong>Chọn phim trước khi đặt vé</strong>
+                    <p>
+                      Bạn đang đặt vé tại {bookingSummary.cinemaName}
+                      {bookingSummary.roomLabel ? ` • ${bookingSummary.roomLabel}` : ""}.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn secondary booking-intent-back"
+                    onClick={() => navigate("/cinemas")}
+                  >
+                    Đổi rạp
+                  </button>
+                </div>
+              )}
+
               <div
                 className={`hero-carousel ${isTransitioning ? "transition" : ""}`}
                 style={{
@@ -96,7 +131,15 @@ export default function Film() {
 
             <div className="movie-grid">
               {sampleMovies.map((m) => (
-                <Link to={`/movie/${m.id}`} className="movie-card" key={m.id}>
+                <Link
+                  to={`/movie/${m.id}`}
+                  state={{
+                    bookingContext,
+                    movieTitle: m.title,
+                  }}
+                  className="movie-card"
+                  key={m.id}
+                >
                   <div className="poster" />
 
                   <div className="card-actions">
@@ -116,7 +159,9 @@ export default function Film() {
                     </div>
 
                     <div className="action-btns">
-                      <button className="btn primary">Mua vé</button>
+                      <button className="btn primary" type="button">
+                        {bookingContext ? "Chọn phim này" : "Mua vé"}
+                      </button>
                       <button className="btn secondary">Chi tiết</button>
                     </div>
                   </div>
@@ -134,10 +179,14 @@ export default function Film() {
           <aside className="film-right">
             <div className="quick-book">
               <h4>Đặt vé nhanh</h4>
-              <button>Chọn phim</button>
-              <button>Chọn rạp</button>
-              <button>Chọn ngày</button>
-              <button>Chọn suất chiếu</button>
+              <button type="button">
+                {bookingSummary ? bookingSummary.cinemaName : "Chọn rạp"}
+              </button>
+              <button type="button">
+                {bookingSummary ? bookingSummary.roomLabel : "Chọn phòng"}
+              </button>
+              <button type="button">Chọn phim</button>
+              <button type="button">Chọn suất chiếu</button>
             </div>
 
             <div className="suggest">Gợi ý cho bạn</div>

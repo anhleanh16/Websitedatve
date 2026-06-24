@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import './MovieDetail.css';
 
 export default function MovieDetail() {
+  const location = useLocation();
   const selectedRegion = useSelector((state) => state.region.selectedRegion);
+  const bookingContext = location.state?.bookingContext || null;
+  const movieTitle =
+    location.state?.movieTitle || 'Doraemon: Nobita và cuộc chiến vũ trụ tí hon';
   const vietnameseWeekdays = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
   const today = new Date();
   const todayIndex = today.getDay(); // 0=CN, 1=T2...6=T7
@@ -310,7 +314,12 @@ export default function MovieDetail() {
       },
     },
   ];
-  const [activeCinema, setActiveCinema] = useState(cinemas[0].id);
+  const matchedCinema =
+    bookingContext?.cinema &&
+    cinemas.find((cinema) => cinema.name === bookingContext.cinema);
+  const [activeCinema, setActiveCinema] = useState(
+    matchedCinema?.id || cinemas[0].id,
+  );
   const [selectedTime, setSelectedTime] = useState(null);
   const currentCinema = cinemas.find((cinema) => cinema.id === activeCinema);
   const showTimes = currentCinema?.schedule[activeDay] ?? [];
@@ -359,7 +368,9 @@ export default function MovieDetail() {
   const handleBookNow = () => {
     navigate('/booking', {
       state: {
-        cinema: currentCinema?.name ?? 'Lunexa Movix',
+        ...(bookingContext || {}),
+        movieTitle,
+        cinema: bookingContext?.cinema || currentCinema?.name || 'Lunexa Movix',
         day: scheduleLabel(activeDay),
         time: selectedTime,
       },
@@ -428,9 +439,9 @@ export default function MovieDetail() {
               <nav className="breadcrumb">
                 <button className="breadcrumb-link" type="button" onClick={() => navigate('/')}>Trang chủ</button>
                 <span className="breadcrumb-sep">›</span>
-                <button className="breadcrumb-link" type="button" onClick={() => navigate('/films')}>Phim</button>
+                <button className="breadcrumb-link" type="button" onClick={() => navigate('/Films/Film', { state: bookingContext ? { bookingContext } : undefined })}>Phim</button>
                 <span className="breadcrumb-sep">›</span>
-                <span className="breadcrumb-current">Doraemon: Nobita và cuộc chiến vũ trụ tí hon</span>
+                <span className="breadcrumb-current">{movieTitle}</span>
               </nav>
             </div>
           </div>
@@ -446,7 +457,7 @@ export default function MovieDetail() {
 
               <div className="movie-detail-info">
                 <div className="movie-status"><span className="icon">🎬</span>Đang chiếu</div>
-                <h1 className="movie-title">Doraemon: Nobita và cuộc chiến vũ trụ tí hon</h1>
+                <h1 className="movie-title">{movieTitle}</h1>
 
                 <div className="movie-rating-row">
                   <span className="movie-score"><span className="icon">★</span>4.8/5.0</span>

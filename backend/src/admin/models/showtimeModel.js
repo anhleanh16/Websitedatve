@@ -13,12 +13,12 @@ export const ShowtimeModel = {
         s.status,
         m.title AS movie_title,
         c.cinema_name,
-        cr.room_name,
-        cr.room_type
+        r.room_name,
+        r.room_type
       FROM Showtimes s
       JOIN Movies m ON s.movie_id = m.movie_id
-      JOIN Cinema_Rooms cr ON s.room_id = cr.room_id
-      JOIN Cinemas c ON cr.cinema_id = c.cinema_id
+      JOIN Rooms r ON s.room_id = r.room_id
+      JOIN Cinemas c ON r.cinema_id = c.cinemas_id
       ORDER BY s.start_time DESC
     `);
     return showtimes;
@@ -34,11 +34,11 @@ export const ShowtimeModel = {
         s.*,
         m.title AS movie_title,
         c.cinema_name,
-        cr.room_name
+        r.room_name
       FROM Showtimes s
       JOIN Movies m ON s.movie_id = m.movie_id
-      JOIN Cinema_Rooms cr ON s.room_id = cr.room_id
-      JOIN Cinemas c ON cr.cinema_id = c.cinema_id
+      JOIN Rooms r ON s.room_id = r.room_id
+      JOIN Cinemas c ON r.cinema_id = c.cinemas_id
       WHERE s.showtime_id = ?
     `,
       [id],
@@ -55,7 +55,7 @@ export const ShowtimeModel = {
       room_id,
       start_time,
       end_time,
-      status = "scheduled",
+      status = "active",
     } = showtimeData;
     const [result] = await db.query(
       "INSERT INTO Showtimes (movie_id, room_id, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)",
@@ -104,7 +104,7 @@ export const ShowtimeModel = {
    */
   async getCinemas() {
     const [cinemas] = await db.query(
-      "SELECT cinema_id, cinema_name FROM Cinemas",
+      "SELECT cinemas_id AS cinema_id, cinema_name FROM Cinemas",
     );
     return cinemas;
   },
@@ -114,7 +114,7 @@ export const ShowtimeModel = {
    */
   async getRoomsByCinema(cinemaId) {
     const [rooms] = await db.query(
-      "SELECT room_id, room_name FROM Cinema_Rooms WHERE cinema_id = ?",
+      "SELECT room_id, room_name FROM Rooms WHERE cinema_id = ?",
       [cinemaId],
     );
     return rooms;

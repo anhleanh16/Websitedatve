@@ -1,3 +1,13 @@
+import {
+  getAllCinemas,
+  getCinemaById,
+  createCinema,
+  updateCinema,
+  deleteCinema,
+  getRoomsByCinema,
+  getSeatsByRoom,
+  bulkUpdateSeats,
+} from "../controllers/cinemaController.js";
 import express from "express";
 import {
   getAdminBookings,
@@ -36,7 +46,7 @@ import {
   getAdminUsers,
   deactivateAdminUser,
 } from "../controllers/userController.js";
-import { uploadMovieFiles } from "../../../config/upload.js";
+import { uploadMovieFiles, uploadCinemaImage } from "../../../config/upload.js";
 
 const router = express.Router();
 
@@ -92,5 +102,17 @@ router.post("/showtimes", createShowtime);
 router.put("/showtimes/:id", updateShowtime);
 router.delete("/showtimes/:id", deleteShowtime);
 router.put("/showtimes/:id/cancel", cancelShowtime);
+
+// ─── Cinema Management ────────────────────────────────────────────────────────
+router.get("/cinemas", getAllCinemas);
+router.get("/cinemas/:id", getCinemaById);
+router.post("/cinemas", uploadCinemaImage.single("image"), createCinema);
+router.put("/cinemas/:id", uploadCinemaImage.single("image"), updateCinema);
+router.delete("/cinemas/:id", deleteCinema);
+
+// ─── Rooms / Seats Management ─────────────────────────────────────────────────
+router.get("/rooms", getRoomsByCinema);
+router.get("/seats", getSeatsByRoom);
+router.put("/seats/bulk", bulkUpdateSeats);
 
 export default router;

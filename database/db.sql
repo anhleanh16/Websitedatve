@@ -1,5 +1,5 @@
-create database Lunexa;
-Use Lunexa;
+CREATE DATABASE IF NOT EXISTS Lunexa;
+USE Lunexa;
 
 CREATE TABLE Roles (
     role_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -148,6 +148,16 @@ CREATE TABLE Seats (
     FOREIGN KEY (room_id) REFERENCES Rooms(room_id)
 );
 
+CREATE TABLE RoomSeatGaps (
+    seat_gap_id INT AUTO_INCREMENT PRIMARY KEY,
+    room_id INT NOT NULL,
+    gap_from INT NOT NULL,
+    gap_to INT NOT NULL,
+    sort_order INT DEFAULT 0,
+
+    FOREIGN KEY (room_id) REFERENCES Rooms(room_id) ON DELETE CASCADE
+);
+
 CREATE TABLE Showtimes (
     showtime_id INT AUTO_INCREMENT PRIMARY KEY,
     movie_id INT,
@@ -248,12 +258,12 @@ CREATE TABLE Employees (
 );
 
 
-USE lunexa;
+USE Lunexa;
 UPDATE User
 SET password='$2a$10$1G256nBgUCxFdjKLXlVLg.zDbl5oBm1pPvN6oNcMj2M1EWmLrLfqG'
 WHERE email='anhanhle1997@gmail.com';
 
-USE lunexa;
+USE Lunexa;
 ALTER TABLE `Movies`
 ADD COLUMN `posters` JSON NULL AFTER `poster`,
 ADD COLUMN `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE AFTER `country`,

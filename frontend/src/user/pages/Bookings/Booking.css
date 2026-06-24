@@ -1,4 +1,4 @@
-﻿.booking-page {
+.booking-page {
   min-height: 100vh;
   padding: 2.4rem;
   color: #edf0ff;
@@ -99,6 +99,70 @@
   padding: 2rem;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(12px);
+}
+
+.booking-room-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+
+.booking-room-meta {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.booking-room-meta strong {
+  font-size: 1.05rem;
+  color: #fff;
+}
+
+.booking-room-label,
+.booking-room-select-wrap span {
+  color: #9aa7d8;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.booking-room-select-wrap {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.booking-room-select-wrap select {
+  min-width: 220px;
+  padding: 0.75rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #eef2ff;
+  outline: none;
+}
+
+.booking-room-select-wrap select option {
+  background: #0f172a;
+  color: #eef2ff;
+}
+
+.booking-seat-feedback {
+  margin-top: 1rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  color: #dbe4ff;
+  display: grid;
+  gap: 0.8rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.booking-seat-feedback.error {
+  border-color: rgba(255, 107, 107, 0.24);
 }
 
 .screen-label {
@@ -217,6 +281,26 @@
   width: 100%;
 }
 
+.booking-seat-grid-map {
+  --booking-seat-size: 36px;
+  --booking-seat-gap: 8px;
+  --booking-grid-columns: 12;
+}
+
+.booking-seat-grid-row {
+  display: grid;
+  grid-template-columns: repeat(
+    var(--booking-grid-columns),
+    var(--booking-seat-size)
+  );
+  column-gap: var(--booking-seat-gap);
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
 .seat-section {
   display: flex;
   flex-wrap: nowrap;
@@ -251,6 +335,12 @@
   box-sizing: border-box;
 }
 
+.booking-seat-grid-map .booking-seat {
+  width: auto;
+  min-width: 0;
+  height: var(--booking-seat-size);
+}
+
 .booking-seat:hover {
   transform: translateY(-2px);
   background: rgba(113, 111, 255, 0.14);
@@ -273,6 +363,17 @@
   font-size: 0.7rem;
   font-weight: 700;
   flex-shrink: 0;
+}
+
+.booking-seat-grid-map .booking-seat.booking-seat-couple {
+  width: auto;
+}
+
+.booking-seat-text {
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .booking-seat.booking-seat-couple:hover {

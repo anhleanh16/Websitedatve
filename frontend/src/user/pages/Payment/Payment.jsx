@@ -40,6 +40,7 @@ export default function Payment() {
   const navigate = useNavigate()
 
   const {
+    movieTitle = 'Doraemon: Nobita và Cuộc Chiến Vũ Trụ Tí Hon',
     cinema = 'Lunexa Movix Đà Nẵng',
     day = 'Hôm nay',
     time = '10:00 - 2D',
@@ -96,7 +97,7 @@ export default function Payment() {
           <div className="success-ticket">
             <div className="success-ticket-row">
               <span>Phim</span>
-              <strong>Doraemon: Cuộc chiến vũ trụ tí hon</strong>
+              <strong>{movieTitle}</strong>
             </div>
             <div className="success-ticket-row">
               <span>Rạp</span>
@@ -396,7 +397,7 @@ export default function Payment() {
                 <div className="order-movie">
                   <div className="order-poster">🎬</div>
                   <div className="order-movie-info">
-                    <h3>Doraemon: Nobita và Cuộc Chiến Vũ Trụ Tí Hon</h3>
+                    <h3>{movieTitle}</h3>
                     <p>2D • Phụ đề Tiếng Việt</p>
                   </div>
                 </div>

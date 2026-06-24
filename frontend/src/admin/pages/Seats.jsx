@@ -1,59 +1,17 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { adminCinemaService, adminRoomService, adminSeatService } from "../services/adminApi";
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
-const CINEMAS = [
-  { id: 1, name: "Lunexa CGV Hà Nội" },
-  { id: 2, name: "Lunexa Lotte TP.HCM" },
-  { id: 3, name: "Lunexa CGV Đà Nẵng" },
-  { id: 4, name: "Lunexa BHD TP.HCM" },
-];
-
-const ROOMS = [
-  { id: 1, cinemaId: 1, name: "P01 – IMAX",  type: "IMAX", rows: 10, cols: 20 },
-  { id: 2, cinemaId: 1, name: "P02 – 3D",    type: "3D",   rows: 8,  cols: 15 },
-  { id: 3, cinemaId: 1, name: "P03 – 2D",    type: "2D",   rows: 8,  cols: 13 },
-  { id: 4, cinemaId: 1, name: "P04 – VIP",   type: "VIP",  rows: 5,  cols: 12 },
-  { id: 5, cinemaId: 2, name: "P01 – IMAX",  type: "IMAX", rows: 9,  cols: 20 },
-  { id: 6, cinemaId: 2, name: "P02 – 3D",    type: "3D",   rows: 7,  cols: 14 },
-  { id: 7, cinemaId: 3, name: "P01 – 2D",    type: "2D",   rows: 7,  cols: 13 },
-  { id: 8, cinemaId: 3, name: "P02 – 3D",    type: "3D",   rows: 8,  cols: 14 },
-];
-
-// Tạo ghế mặc định cho một phòng
-function generateSeats(room) {
-  const seats = [];
-  const ROWS = "ABCDEFGHIJKLMNOPQRST".split("").slice(0, room.rows);
-  for (let r = 0; r < ROWS.length; r++) {
-    for (let c = 1; c <= room.cols; c++) {
-      const row = ROWS[r];
-      const isVip    = r >= Math.floor(room.rows * 0.35) && r < Math.floor(room.rows * 0.7);
-      const isCouple = r >= Math.floor(room.rows * 0.7) && c % 2 === 0 && c <= room.cols - 1;
-      const type = room.type === "VIP" ? "VIP"
-        : isCouple ? "Couple"
-        : isVip    ? "VIP"
-        : "Standard";
-      // Một số ghế inactive / occupied ngẫu nhiên dựa trên hash
-      const hash = (row.charCodeAt(0) * 31 + c * 17) % 20;
-      const status = hash === 0 ? "inactive" : hash < 3 ? "occupied" : "active";
-      seats.push({
-        id: `${room.id}-${row}${c}`,
-        code: `${row}${c}`,
-        row, col: c, type, status,
-        roomId: room.id,
-      });
-    }
-  }
-  return seats;
+function parseSeatCode(code) {
+  const m = String(code || "").trim().match(/^([A-Za-z]+)(\d+)$/);
+  if (!m) return { row: "?", col: 0 };
+  return { row: m[1].toUpperCase(), col: Number(m[2]) };
 }
 
-// Cache ghế theo roomId
-const seatCache = {};
-function getSeats(roomId) {
-  if (!seatCache[roomId]) {
-    const room = ROOMS.find(r => r.id === roomId);
-    seatCache[roomId] = room ? generateSeats(room) : [];
-  }
-  return [...seatCache[roomId]];
+function computeRoomGridFromSeats(seats) {
+  const parsed = seats.map((s) => parseSeatCode(s.code));
+  const rows = new Set(parsed.map((p) => p.row));
+  const cols = parsed.reduce((max, p) => (p.col > max ? p.col : max), 0);
+  return { rows: rows.size || 0, cols: cols || 0 };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -257,7 +215,12 @@ function SeatEditPanel({ seats, selectedIds, onClose, onSave }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminSeats() {
-  const [selectedCinema, setSC] = useState(String(CINEMAS[0].id));
+  const [cinemas, setCinemas] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [loadingRooms, setLoadingRooms] = useState(false);
+  const [loadingSeats, setLoadingSeats] = useState(false);
+
+  const [selectedCinema, setSC] = useState("");
   const [selectedRoom,   setSR] = useState("");
   const [seats,  setSeats]      = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -267,13 +230,97 @@ export default function AdminSeats() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2800); };
 
-  const cinemaRooms = ROOMS.filter(r => String(r.cinemaId) === selectedCinema);
-  const currentRoom = ROOMS.find(r => String(r.id) === String(selectedRoom));
+  useEffect(() => {
+    let mounted = true;
+    adminCinemaService
+      .getAllCinemas()
+      .then((data) => {
+        const list = data?.cinemas || [];
+        if (!mounted) return;
+        setCinemas(list);
+        if (list.length > 0) setSC(String(list[0].cinemas_id));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setCinemas([]);
+        setSC("");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCinema) return;
+    let mounted = true;
+    setLoadingRooms(true);
+    setRooms([]);
+    setSR("");
+    setSeats([]);
+    setSelectedIds([]);
+    adminRoomService
+      .getRoomsByCinema(selectedCinema)
+      .then((data) => {
+        if (!mounted) return;
+        setRooms(data?.rooms || []);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setRooms([]);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLoadingRooms(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [selectedCinema]);
+
+  const currentRoom = useMemo(
+    () => rooms.find((r) => String(r.room_id) === String(selectedRoom)),
+    [rooms, selectedRoom],
+  );
+
+  const currentRoomView = useMemo(() => {
+    if (!currentRoom) return null;
+    const grid = computeRoomGridFromSeats(seats);
+    return {
+      id: currentRoom.room_id,
+      name: currentRoom.room_name,
+      type: currentRoom.room_type,
+      rows: grid.rows,
+      cols: grid.cols,
+    };
+  }, [currentRoom, seats]);
 
   const handleSelectRoom = (roomId) => {
     setSR(roomId);
-    setSeats(getSeats(Number(roomId)));
+    setLoadingSeats(true);
+    setSeats([]);
     setSelectedIds([]);
+    adminSeatService
+      .getSeatsByRoom(roomId)
+      .then((data) => {
+        const list = data?.seats || [];
+        const mapped = list.map((s) => {
+          const parsed = parseSeatCode(s.seat_code);
+          return {
+            id: s.seat_id,
+            code: s.seat_code,
+            row: parsed.row,
+            col: parsed.col,
+            type: s.seat_type,
+            status: s.status,
+            roomId: s.room_id,
+          };
+        });
+        setSeats(mapped);
+      })
+      .catch(() => {
+        setSeats([]);
+      })
+      .finally(() => setLoadingSeats(false));
   };
 
   // Filter ghế để highlight
@@ -298,21 +345,35 @@ export default function AdminSeats() {
   const handleClearSelection = () => setSelectedIds([]);
 
   const handleSaveEdit = (ids, changes) => {
-    setSeats(prev => prev.map(s => {
-      if (!ids.includes(s.id)) return s;
-      return {
-        ...s,
-        ...(changes.type   ? { type: changes.type }     : {}),
-        ...(changes.status ? { status: changes.status } : {}),
-      };
-    }));
-    // Cập nhật cache
-    seatCache[currentRoom.id] = seats.map(s => {
-      if (!ids.includes(s.id)) return s;
-      return { ...s, ...(changes.type ? { type: changes.type } : {}), ...(changes.status ? { status: changes.status } : {}) };
-    });
-    showToast(`Đã cập nhật ${ids.length} ghế.`);
-    setSelectedIds([]);
+    const roomId = selectedRoom;
+    setLoadingSeats(true);
+    adminSeatService
+      .bulkUpdate(roomId, ids, changes)
+      .then((data) => {
+        showToast(`Đã cập nhật ${data?.affected ?? ids.length} ghế.`);
+        setSelectedIds([]);
+        return adminSeatService.getSeatsByRoom(roomId);
+      })
+      .then((data) => {
+        const list = data?.seats || [];
+        const mapped = list.map((s) => {
+          const parsed = parseSeatCode(s.seat_code);
+          return {
+            id: s.seat_id,
+            code: s.seat_code,
+            row: parsed.row,
+            col: parsed.col,
+            type: s.seat_type,
+            status: s.status,
+            roomId: s.room_id,
+          };
+        });
+        setSeats(mapped);
+      })
+      .catch(() => {
+        showToast("Cập nhật ghế thất bại.");
+      })
+      .finally(() => setLoadingSeats(false));
   };
 
   const totalStats = {
@@ -335,17 +396,20 @@ export default function AdminSeats() {
           <label>Rạp chiếu</label>
           <select className="seat-select"
             value={selectedCinema}
-            onChange={e => { setSC(e.target.value); setSR(""); setSeats([]); setSelectedIds([]); }}>
-            {CINEMAS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            onChange={e => { setSC(e.target.value); }}>
+            {cinemas.map(c => <option key={c.cinemas_id} value={c.cinemas_id}>{c.cinema_name}</option>)}
           </select>
         </div>
         <div className="seat-selector-group">
           <label>Phòng chiếu</label>
           <select className="seat-select" value={selectedRoom}
-            onChange={e => handleSelectRoom(e.target.value)}>
+            onChange={e => handleSelectRoom(e.target.value)}
+            disabled={loadingRooms || !selectedCinema}>
             <option value="">-- Chọn phòng --</option>
-            {cinemaRooms.map(r => (
-              <option key={r.id} value={r.id}>{r.name} ({r.rows * r.cols} ghế)</option>
+            {rooms.map(r => (
+              <option key={r.room_id} value={r.room_id}>
+                {r.room_name} ({r.total_seat ?? "?"} ghế)
+              </option>
             ))}
           </select>
         </div>
@@ -371,15 +435,15 @@ export default function AdminSeats() {
       </div>
 
       {/* Room info bar */}
-      {currentRoom && (
+      {currentRoomView && (
         <div className="seat-room-bar">
-          <span className="seat-room-name">{currentRoom.name}</span>
+          <span className="seat-room-name">{currentRoomView.name}</span>
           <span className="seat-room-type-badge"
-            style={{ color: ROOM_TYPE_COLOR[currentRoom.type], background: `${ROOM_TYPE_COLOR[currentRoom.type]}18`, borderColor: `${ROOM_TYPE_COLOR[currentRoom.type]}33` }}>
-            {currentRoom.type}
+            style={{ color: ROOM_TYPE_COLOR[currentRoomView.type], background: `${ROOM_TYPE_COLOR[currentRoomView.type]}18`, borderColor: `${ROOM_TYPE_COLOR[currentRoomView.type]}33` }}>
+            {currentRoomView.type}
           </span>
           <span className="seat-room-info">
-            {currentRoom.rows} hàng × {currentRoom.cols} cột = {totalStats.total} ghế
+            {currentRoomView.rows} hàng × {currentRoomView.cols} cột = {totalStats.total} ghế
           </span>
           <span style={{ color: "#4ade80", fontSize: 13 }}>✓ {totalStats.active} trống</span>
           <span style={{ color: "#f87171", fontSize: 13 }}>✕ {totalStats.occupied} đặt</span>
@@ -405,7 +469,7 @@ export default function AdminSeats() {
           <div className="seat-map-container">
             <SeatMap
               seats={displaySeats}
-              room={currentRoom}
+              room={currentRoomView}
               onSeatClick={handleSeatClick}
               selectedSeats={selectedIds}
             />
@@ -425,7 +489,11 @@ export default function AdminSeats() {
       ) : (
         <div className="seat-empty-state">
           <div className="seat-empty-icon">💺</div>
-          <p>Chọn rạp và phòng chiếu để xem sơ đồ ghế</p>
+          <p>
+            {loadingRooms || loadingSeats
+              ? "Đang tải dữ liệu..."
+              : "Chọn rạp và phòng chiếu để xem sơ đồ ghế"}
+          </p>
         </div>
       )}
 

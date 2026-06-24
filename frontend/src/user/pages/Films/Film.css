@@ -99,6 +99,38 @@
   box-shadow: 0 26px 60px rgba(0, 0, 0, 0.24);
 }
 
+.booking-intent-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: linear-gradient(
+    135deg,
+    rgba(124, 97, 255, 0.18),
+    rgba(59, 130, 246, 0.12)
+  );
+  border: 1px solid rgba(168, 85, 247, 0.22);
+}
+
+.booking-intent-banner strong {
+  display: block;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.booking-intent-banner p {
+  margin: 6px 0 0;
+  color: #c7d2fe;
+  font-size: 14px;
+}
+
+.booking-intent-back {
+  flex-shrink: 0;
+}
+
 .hero-carousel {
   background: linear-gradient(135deg, #31294a 0%, #121029 100%);
   background-size: cover;
@@ -444,5 +476,10 @@
   }
   .movie-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .booking-intent-banner {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

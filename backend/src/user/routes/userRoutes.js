@@ -1,5 +1,7 @@
 import express from 'express';
 import {
+  getPublicCinemas,
+  getPublicCinemaById,
   userGetProfile,
   userUpdateProfile,
   userGetBookings,
@@ -7,6 +9,10 @@ import {
 } from '../controllers/userController.js';
 
 const router = express.Router();
+
+// Public cinemas
+router.get('/cinemas', getPublicCinemas);
+router.get('/cinemas/:id', getPublicCinemaById);
 
 // Profile
 router.get('/:userId/profile', userGetProfile);
