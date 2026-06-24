@@ -1,4 +1,5 @@
 import * as CinemaModel from "../../admin/models/cinemaModel.js";
+import { MovieModel } from "../../admin/models/movieModel.js";
 import { db } from "../../../config/db.js";
 import { NotificationModel } from "../../admin/models/notificationModel.js";
 import { PromotionModel } from "../../admin/models/promotionModel.js";
@@ -15,6 +16,26 @@ const normalizeCinemaImagePath = (cinema) => {
     };
   }
   return cinema;
+};
+
+const mapMovieCategories = (movies, categoryRows) => {
+  const categoriesByMovie = new Map();
+
+  categoryRows.forEach((row) => {
+    const movieId = Number(row.movie_id);
+    if (!categoriesByMovie.has(movieId)) {
+      categoriesByMovie.set(movieId, []);
+    }
+    categoriesByMovie.get(movieId).push({
+      category_id: row.category_id,
+      category_name: row.category_name,
+    });
+  });
+
+  return movies.map((movie) => ({
+    ...movie,
+    categories: categoriesByMovie.get(Number(movie.movie_id)) || [],
+  }));
 };
 
 export const getPublicCinemas = async (req, res) => {
@@ -51,6 +72,7 @@ export const userGetProfile = async (req, res) => {
 
 export const userGetMovies = async (req, res) => {
   try {
+    await MovieModel.syncStatuses();
     const { status } = req.query;
 
     const params = [];
@@ -67,6 +89,7 @@ export const userGetMovies = async (req, res) => {
         m.movie_id,
         m.title,
         m.poster,
+        m.age_limit,
         m.status,
         m.release_date,
         m.duration,
@@ -82,6 +105,7 @@ export const userGetMovies = async (req, res) => {
       LEFT JOIN Movie_Categories mc ON mc.category_id = mcd.category_id
       LEFT JOIN Reviews r ON r.movie_id = m.movie_id
       ${whereSql}
+<<<<<<< HEAD
       GROUP BY
         m.movie_id,
         m.title,
@@ -91,11 +115,37 @@ export const userGetMovies = async (req, res) => {
         m.duration,
         m.age_limit
       ORDER BY m.release_date DESC, m.movie_id DESC
+=======
+      GROUP BY m.movie_id, m.title, m.poster, m.age_limit, m.status, m.release_date
+      ORDER BY
+        CASE WHEN m.status = 'ended' THEN 1 ELSE 0 END ASC,
+        m.release_date DESC,
+        m.movie_id DESC
+>>>>>>> 0319684ae2ed63187f483c3224a1aa4f97891817
     `,
       params,
     );
 
-    res.json({ movies });
+    if (movies.length === 0) {
+      return res.json({ movies: [] });
+    }
+
+    const movieIds = movies.map((movie) => movie.movie_id);
+    const [categoryRows] = await db.query(
+      `
+      SELECT
+        mcd.movie_id,
+        mc.category_id,
+        mc.category_name
+      FROM Movie_Category_Detail mcd
+      JOIN Movie_Categories mc ON mc.category_id = mcd.category_id
+      WHERE mcd.movie_id IN (${movieIds.map(() => "?").join(", ")})
+      ORDER BY mc.category_name ASC
+    `,
+      movieIds,
+    );
+
+    res.json({ movies: mapMovieCategories(movies, categoryRows) });
   } catch (error) {
     console.error("Error in userGetMovies:", error);
     res.status(500).json({ message: "Error getting movies", movies: [] });
@@ -163,6 +213,7 @@ export const userGetShowtimes = async (req, res) => {
 
 export const userGetMovieById = async (req, res) => {
   try {
+    await MovieModel.syncStatuses();
     const movieId = Number(req.params.id);
     if (!Number.isInteger(movieId) || movieId <= 0) {
       return res.status(400).json({ message: "Invalid movie id" });
@@ -215,6 +266,32 @@ export const userGetMovieById = async (req, res) => {
       [movieId],
     );
 
+    const [showtimeRows] = await db.query(
+      `
+      SELECT
+        s.showtime_id,
+        s.room_id,
+        s.start_time,
+        s.end_time,
+        COALESCE(s.price_standard, s.price) AS price_standard,
+        COALESCE(s.price_vip, s.price) AS price_vip,
+        COALESCE(s.price_couple, s.price) AS price_couple,
+        s.available_seats,
+        r.room_name,
+        r.room_type,
+        c.cinemas_id AS cinema_id,
+        c.cinema_name
+      FROM Showtimes s
+      JOIN Rooms r ON s.room_id = r.room_id
+      JOIN Cinemas c ON r.cinema_id = c.cinemas_id
+      WHERE s.movie_id = ?
+        AND s.status = 'active'
+        AND DATE(s.start_time) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 6 DAY)
+      ORDER BY c.cinema_name ASC, s.start_time ASC
+    `,
+      [movieId],
+    );
+
     const totalReviews = Number(reviewStats?.review_count || 0);
     const breakdownMap = new Map(
       reviewBreakdownRows.map((row) => [Number(row.star), Number(row.count)]),
@@ -237,6 +314,7 @@ export const userGetMovieById = async (req, res) => {
         review_count: totalReviews,
         recommended_percent: Number(reviewStats?.recommended_percent || 0),
         rating_breakdown,
+        showtimes: showtimeRows,
       },
     });
   } catch (error) {

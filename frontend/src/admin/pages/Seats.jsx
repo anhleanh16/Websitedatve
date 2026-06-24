@@ -29,9 +29,17 @@ const ROOM_TYPE_COLOR = { IMAX: "#7c61ff", "3D": "#5bcad4", "2D": "#4ade80", VIP
 
 // ─── Seat Map ─────────────────────────────────────────────────────────────────
 function SeatMap({ seats, room, onSeatClick, selectedSeats }) {
-  if (!room || seats.length === 0) return (
-    <div className="seat-empty">Chọn phòng chiếu để xem sơ đồ ghế</div>
-  );
+  if (!room) {
+    return <div className="seat-empty">Chọn phòng chiếu để xem sơ đồ ghế</div>;
+  }
+
+  if (seats.length === 0) {
+    return (
+      <div className="seat-empty">
+        Phòng này chưa có ghế. Hiện đang phù hợp để giữ ở trạng thái bảo trì.
+      </div>
+    );
+  }
 
   const rows = [...new Set(seats.map(s => s.row))];
 

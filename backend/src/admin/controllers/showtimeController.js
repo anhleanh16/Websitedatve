@@ -5,6 +5,9 @@ const normalizeShowtimePayload = (body = {}) => ({
   room_id: body.room_id ?? body.roomId,
   start_time: body.start_time ?? body.startTime,
   end_time: body.end_time ?? body.endTime,
+  price_standard: body.price_standard ?? body.priceStandard ?? body.price,
+  price_vip: body.price_vip ?? body.priceVip ?? body.price,
+  price_couple: body.price_couple ?? body.priceCouple ?? body.price,
   price: body.price,
   available_seats: body.available_seats ?? body.availableSeats,
   status: body.status,
@@ -37,7 +40,6 @@ export const getShowtimeById = async (req, res) => {
 
 export const createShowtime = async (req, res) => {
   try {
-    // Thêm logic kiểm tra xung đột lịch chiếu ở đây nếu cần
     const showtimeId = await ShowtimeModel.create(
       normalizeShowtimePayload(req.body),
     );
@@ -46,7 +48,10 @@ export const createShowtime = async (req, res) => {
       .json({ message: "Showtime created successfully", showtimeId });
   } catch (err) {
     console.error("Error in createShowtime:", err);
-    res.status(500).json({ message: "Failed to create showtime" });
+    const statusCode = Number(err?.statusCode) || 500;
+    res.status(statusCode).json({
+      message: statusCode >= 500 ? "Failed to create showtime" : err.message,
+    });
   }
 };
 
@@ -66,7 +71,10 @@ export const updateShowtime = async (req, res) => {
     }
   } catch (err) {
     console.error("Error in updateShowtime:", err);
-    res.status(500).json({ message: "Failed to update showtime" });
+    const statusCode = Number(err?.statusCode) || 500;
+    res.status(statusCode).json({
+      message: statusCode >= 500 ? "Failed to update showtime" : err.message,
+    });
   }
 };
 

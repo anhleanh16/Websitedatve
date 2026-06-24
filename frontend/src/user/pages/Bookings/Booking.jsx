@@ -133,6 +133,134 @@ const buildSeatLayout = (room) => {
   };
 };
 
+const buildSeatSelectionMeta = (seatLayout) => {
+  const rows = Array.isArray(seatLayout?.rows) ? seatLayout.rows : [];
+  const units = [];
+
+  rows.forEach((row, rowIndex) => {
+    const rowUnits = Array.isArray(row?.units)
+      ? [...row.units].sort(
+          (a, b) => a.columnStart - b.columnStart || a.span - b.span,
+        )
+      : [];
+
+    let sectionIndex = -1;
+    let previousEnd = 0;
+
+    rowUnits.forEach((unit, unitIndex) => {
+      const columnStart = Number(unit.columnStart || 1);
+      const span = Math.max(1, Number(unit.span || 1));
+      const columnEnd = columnStart + span - 1;
+
+      if (unitIndex === 0 || columnStart > previousEnd + 1) {
+        sectionIndex += 1;
+      }
+
+      units.push({
+        ...unit,
+        row: row.row,
+        rowIndex,
+        unitIndex,
+        sectionIndex,
+      });
+
+      previousEnd = columnEnd;
+    });
+  });
+
+  const unitMap = new Map(units.map((unit) => [unit.id, unit]));
+  const availableBySectionRow = new Map();
+
+  units
+    .filter((unit) => !unit.sold)
+    .forEach((unit) => {
+      if (!availableBySectionRow.has(unit.sectionIndex)) {
+        availableBySectionRow.set(unit.sectionIndex, new Map());
+      }
+      const rowMap = availableBySectionRow.get(unit.sectionIndex);
+      if (!rowMap.has(unit.rowIndex)) rowMap.set(unit.rowIndex, []);
+      rowMap.get(unit.rowIndex).push(unit);
+    });
+
+  availableBySectionRow.forEach((rowMap) => {
+    rowMap.forEach((rowUnits) => {
+      rowUnits.sort((a, b) => a.unitIndex - b.unitIndex);
+    });
+  });
+
+  return {
+    unitMap,
+    availableBySectionRow,
+  };
+};
+
+const validateSeatSelectionRules = (selectedSeatIds, selectionMeta) => {
+  if (!Array.isArray(selectedSeatIds) || selectedSeatIds.length === 0) return "";
+
+  const { unitMap, availableBySectionRow } = selectionMeta || {};
+  const selectedUnits = selectedSeatIds
+    .map((seatId) => unitMap?.get(seatId))
+    .filter(Boolean)
+    .sort(
+      (a, b) =>
+        a.sectionIndex - b.sectionIndex ||
+        a.rowIndex - b.rowIndex ||
+        a.unitIndex - b.unitIndex,
+    );
+
+  if (selectedUnits.length !== selectedSeatIds.length) {
+    return "Không thể xác định đủ ghế đã chọn. Vui lòng chọn lại.";
+  }
+
+  const activeSectionIndex = selectedUnits[0]?.sectionIndex;
+  if (selectedUnits.some((unit) => unit.sectionIndex !== activeSectionIndex)) {
+    return "Chỉ được chọn ghế trong cùng một nhánh, không vượt qua khoảng cách giữa.";
+  }
+
+  const selectedByRow = new Map();
+  selectedUnits.forEach((unit) => {
+    if (!selectedByRow.has(unit.rowIndex)) selectedByRow.set(unit.rowIndex, []);
+    selectedByRow.get(unit.rowIndex).push(unit);
+  });
+
+  const rowIndexes = Array.from(selectedByRow.keys()).sort((a, b) => a - b);
+  for (let index = 1; index < rowIndexes.length; index += 1) {
+    if (rowIndexes[index] !== rowIndexes[index - 1] + 1) {
+      return "Chỉ được chọn thêm ghế ở hàng trên hoặc dưới liền kề.";
+    }
+  }
+
+  const partialRows = [];
+  for (const rowIndex of rowIndexes) {
+    const selectedRowUnits = selectedByRow.get(rowIndex);
+    const availableRowUnits =
+      availableBySectionRow?.get(activeSectionIndex)?.get(rowIndex) || [];
+
+    if (selectedRowUnits.length < availableRowUnits.length) {
+      partialRows.push(rowIndex);
+    }
+  }
+
+  if (partialRows.length > 1) {
+    return "Hàng ngang trong nhánh hiện tại phải kín trước khi chọn sang hàng trên hoặc dưới.";
+  }
+
+  if (partialRows.length === 1 && rowIndexes.length > 1) {
+    const partialRowIndex = partialRows[0];
+    const firstRowIndex = rowIndexes[0];
+    const lastRowIndex = rowIndexes[rowIndexes.length - 1];
+
+    if (
+      partialRowIndex !== firstRowIndex &&
+      partialRowIndex !== lastRowIndex
+    ) {
+      return "Chỉ được mở rộng sang hàng trên hoặc dưới khi các hàng ở giữa đã chọn kín.";
+    }
+  }
+
+  return "";
+};
+
 const comboItems = [
   {
     key: "couple",
@@ -166,7 +294,9 @@ export default function Booking() {
   const location = useLocation();
   const navigate = useNavigate();
   const {
+    movieId = null,
     movieTitle = "",
+    ageLimit = 0,
     cinema = "Lunexa Movix Đà Nẵng",
     cinemaId = null,
     roomId: initialRoomId = null,
@@ -198,14 +328,18 @@ export default function Booking() {
   const [selectedRoomId, setSelectedRoomId] = useState(initialRoomId);
   const [loadingSeats, setLoadingSeats] = useState(Boolean(cinemaId));
   const [seatError, setSeatError] = useState("");
-
-  const toggleSeat = (seat) => {
-    setSelectedSeats((prev) =>
-      prev.includes(seat)
-        ? prev.filter((item) => item !== seat)
-        : [...prev, seat],
-    );
-  };
+  const [seatRuleError, setSeatRuleError] = useState("");
+  const [showAgeNotice, setShowAgeNotice] = useState(Boolean(movieTitle));
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window === "undefined" ? 1280 : window.innerWidth,
+  );
+  const ageLimitValue = Number(ageLimit || 0);
+  const ageLimitLabel = ageLimitValue > 0 ? `${ageLimitValue}+` : "mọi lứa tuổi";
+  const hasMovieSelection = Boolean(movieTitle);
+  const breadcrumbSectionLabel = hasMovieSelection ? "Phim" : "Rạp chiếu phim";
+  const breadcrumbEntityLabel = hasMovieSelection
+    ? movieTitle
+    : cinema || "Suất chiếu đã chọn";
 
   useEffect(() => {
     if (!cinemaId) {
@@ -233,10 +367,14 @@ export default function Booking() {
         const rooms = Array.isArray(nextCinema?.rooms) ? nextCinema.rooms : [];
         setCinemaDetail(nextCinema);
         setSelectedRoomId((prev) => {
-          if (prev && rooms.some((room) => room.room_id === prev)) {
-            return prev;
+          const lockedRoomId = prev || initialRoomId;
+          if (
+            lockedRoomId &&
+            rooms.some((room) => room.room_id === lockedRoomId)
+          ) {
+            return lockedRoomId;
           }
-          return rooms[0]?.room_id || null;
+          return null;
         });
       } catch (error) {
         if (!ignore) {
@@ -256,7 +394,34 @@ export default function Booking() {
 
   useEffect(() => {
     setSelectedSeats([]);
+    setSeatRuleError("");
   }, [selectedRoomId]);
+
+  useEffect(() => {
+    if (!movieTitle) {
+      setShowAgeNotice(false);
+      return;
+    }
+    setShowAgeNotice(true);
+  }, [movieTitle]);
+
+  useEffect(() => {
+    if (!showAgeNotice) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showAgeNotice]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const updateCombo = (key, delta) => {
     setComboCounts((prev) => ({
@@ -290,18 +455,51 @@ export default function Booking() {
     () => buildSeatLayout(selectedRoom),
     [selectedRoom],
   );
+  const seatSelectionMeta = useMemo(
+    () => buildSeatSelectionMeta(seatLayout),
+    [seatLayout],
+  );
   const seatGridWeight = Math.max(
     1,
     seatLayout.totalVisualColumns +
       Math.max(0, seatLayout.totalVisualColumns - 1) * 0.18,
   );
-  const seatSize = Math.max(26, Math.min(36, Math.floor(620 / seatGridWeight)));
-  const seatGap = Math.max(6, Math.round(seatSize * 0.18));
+  const isMobileViewport = viewportWidth <= 640;
+  const targetSeatMapWidth = isMobileViewport
+    ? Math.max(240, viewportWidth - 110)
+    : 700;
+  const seatSize = isMobileViewport
+    ? Math.max(18, Math.min(32, Math.floor(targetSeatMapWidth / seatGridWeight)))
+    : Math.max(28, Math.min(42, Math.floor(targetSeatMapWidth / seatGridWeight)));
+  const seatGap = isMobileViewport
+    ? Math.max(2, Math.min(5, Math.round(seatSize * 0.14)))
+    : Math.max(6, Math.min(10, Math.round(seatSize * 0.16)));
 
   const seatPrices = {
     regular: 80000,
     vip: 100000,
     couple: 120000,
+  };
+
+  const toggleSeat = (seatId) => {
+    setSelectedSeats((prev) => {
+      const nextSelection = prev.includes(seatId)
+        ? prev.filter((item) => item !== seatId)
+        : [...prev, seatId];
+
+      const ruleMessage = validateSeatSelectionRules(
+        nextSelection,
+        seatSelectionMeta,
+      );
+
+      if (ruleMessage) {
+        setSeatRuleError(ruleMessage);
+        return prev;
+      }
+
+      setSeatRuleError("");
+      return nextSelection;
+    });
   };
 
   const getSelectedSeatType = (seatId) => {
@@ -332,9 +530,92 @@ export default function Booking() {
   );
   const total = seatTotal + comboTotal;
   const totalWithSnacks = seatTotal + comboTotal + snackTotal;
+  const handleBreadcrumbSectionClick = () => {
+    if (hasMovieSelection) {
+      navigate("/Films/Film", { state: movieSelectionState });
+      return;
+    }
+    navigate("/cinemas");
+  };
+
+  const handleBreadcrumbEntityClick = () => {
+    if (hasMovieSelection && movieId) {
+      navigate(`/movie/${movieId}`, {
+        state: movieSelectionState?.bookingContext
+          ? {
+              bookingContext: movieSelectionState.bookingContext,
+              movieTitle,
+            }
+          : { movieTitle },
+      });
+      return;
+    }
+    handleBreadcrumbSectionClick();
+  };
 
   return (
     <div className="booking-page">
+      {showAgeNotice && movieTitle && (
+        <div className="booking-age-overlay" role="presentation">
+          <div
+            className="booking-age-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="booking-age-title"
+            aria-describedby="booking-age-message"
+          >
+            <div className="booking-age-frame" aria-hidden="true" />
+            <div
+              className="booking-age-frame booking-age-frame-inner"
+              aria-hidden="true"
+            />
+            <div className="booking-age-badge" aria-hidden="true">
+              {ageLimitLabel}
+            </div>
+            <h2 id="booking-age-title">Lưu ý độ tuổi</h2>
+            <p id="booking-age-message">
+              {movieTitle} yêu cầu khán giả từ <strong>{ageLimitLabel}</strong>{" "}
+              trở lên. Vui lòng chỉ tiếp tục đặt vé khi bạn đã đủ tuổi theo quy
+              định của phim.
+            </p>
+            <button
+              type="button"
+              className="booking-age-confirm"
+              onClick={() => setShowAgeNotice(false)}
+            >
+              Xác nhận
+            </button>
+          </div>
+        </div>
+      )}
+
+      {seatRuleError && (
+        <div className="booking-alert-overlay" role="presentation">
+          <div
+            className="booking-alert-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="booking-alert-title"
+            aria-describedby="booking-alert-message"
+          >
+            <div className="booking-alert-frame" aria-hidden="true" />
+            <div className="booking-alert-frame booking-alert-frame-inner" aria-hidden="true" />
+            <div className="booking-alert-icon" aria-hidden="true">
+              !
+            </div>
+            <h2 id="booking-alert-title">Thông báo chọn ghế</h2>
+            <p id="booking-alert-message">{seatRuleError}</p>
+            <button
+              type="button"
+              className="booking-alert-confirm"
+              onClick={() => setSeatRuleError("")}
+            >
+              Xác nhận
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Breadcrumb (desktop only) ── */}
       <div className="booking-breadcrumb-bar">
         <nav className="booking-breadcrumb">
@@ -349,17 +630,17 @@ export default function Booking() {
           <button
             className="booking-breadcrumb-link"
             type="button"
-            onClick={() => navigate("/Films/Film", { state: movieSelectionState })}
+            onClick={handleBreadcrumbSectionClick}
           >
-            Phim
+            {breadcrumbSectionLabel}
           </button>
           <span className="booking-breadcrumb-sep">›</span>
           <button
-            className="booking-breadcrumb-link"
+            className="booking-breadcrumb-link booking-breadcrumb-entity"
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={handleBreadcrumbEntityClick}
           >
-            Rạp chiếu phim
+            {breadcrumbEntityLabel}
           </button>
           <span className="booking-breadcrumb-sep">›</span>
           <span className="booking-breadcrumb-current">Đặt vé</span>
@@ -437,23 +718,13 @@ export default function Booking() {
               <strong>{selectedRoomDisplayName}</strong>
             </div>
 
-            {roomOptions.length > 0 && (
-              <label className="booking-room-select-wrap">
-                <span>Đổi phòng</span>
-                <select
-                  value={selectedRoomId || ""}
-                  onChange={(e) =>
-                    setSelectedRoomId(Number(e.target.value) || null)
-                  }
-                >
-                  {roomOptions.map((room) => (
-                    <option key={room.room_id} value={room.room_id}>
-                      {room.room_name} - {room.room_type}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            <div className="booking-room-select-wrap">
+              <span>Phòng theo lịch chiếu</span>
+              <strong>
+                {selectedRoomDisplayName}
+                {selectedRoomDisplayType ? ` - ${selectedRoomDisplayType}` : ""}
+              </strong>
+            </div>
           </div>
 
           {!movieTitle && (
@@ -478,6 +749,12 @@ export default function Booking() {
             </div>
           )}
 
+          {movieTitle && !loadingSeats && !seatError && !selectedRoomId && (
+            <div className="booking-seat-feedback error">
+              Không tìm thấy phòng của lịch chiếu đã chọn. Vui lòng quay lại và chọn lại lịch chiếu.
+            </div>
+          )}
+
           {movieTitle && !loadingSeats && seatError && (
             <div className="booking-seat-feedback error">
               <p>{seatError}</p>
@@ -491,40 +768,48 @@ export default function Booking() {
             </div>
           )}
 
-          {movieTitle && !loadingSeats && !seatError && seatLayout.rows.length > 0 && (
-            <div
-              className="seat-map booking-seat-grid-map"
-              style={{
-                "--booking-grid-columns": seatLayout.totalVisualColumns,
-                "--booking-seat-size": `${seatSize}px`,
-                "--booking-seat-gap": `${seatGap}px`,
-              }}
-            >
-              {seatLayout.rows.map((row) => (
-                <div className="seat-row" key={row.row}>
-                  <span className="seat-row-label">{row.row}</span>
-                  <div className="seat-row-sections booking-seat-grid-row">
-                    {row.units.map((seat) => (
-                      <button
-                        key={seat.id}
-                        type="button"
-                        className={`booking-seat booking-seat-${seat.type} ${seat.sold ? "booking-seat-sold" : ""} ${selectedSeats.includes(seat.id) ? "selected" : ""}`}
-                        onClick={() => !seat.sold && toggleSeat(seat.id)}
-                        disabled={seat.sold}
-                        aria-label={`${seat.label} ${seat.sold ? "đã bán" : "còn trống"}`}
-                        title={seat.seatCodes.join(", ")}
-                        style={{
-                          gridColumn: `${seat.columnStart} / span ${seat.span}`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+          {movieTitle && !loadingSeats && !seatError && selectedRoomId && (
+            <div className="booking-seat-rule-note">
+              Chọn ghế trong cùng một nhánh và dừng ở khoảng cách giữa. Bạn có thể chọn vị trí bất kỳ trong hàng, nhưng khi một hàng ngang trong nhánh chưa kín thì chưa thể chọn sang hàng trên hoặc dưới.
             </div>
           )}
 
-          {movieTitle && !loadingSeats && !seatError && seatLayout.rows.length === 0 && (
+          {movieTitle && !loadingSeats && !seatError && selectedRoomId && seatLayout.rows.length > 0 && (
+            <div className="booking-seat-map-scroll">
+              <div
+                className="seat-map booking-seat-grid-map"
+                style={{
+                  "--booking-grid-columns": seatLayout.totalVisualColumns,
+                  "--booking-seat-size": `${seatSize}px`,
+                  "--booking-seat-gap": `${seatGap}px`,
+                }}
+              >
+                {seatLayout.rows.map((row) => (
+                  <div className="seat-row" key={row.row}>
+                    <span className="seat-row-label">{row.row}</span>
+                    <div className="seat-row-sections booking-seat-grid-row">
+                      {row.units.map((seat) => (
+                        <button
+                          key={seat.id}
+                          type="button"
+                          className={`booking-seat booking-seat-${seat.type} ${seat.sold ? "booking-seat-sold" : ""} ${selectedSeats.includes(seat.id) ? "selected" : ""}`}
+                          onClick={() => !seat.sold && toggleSeat(seat.id)}
+                          disabled={seat.sold}
+                          aria-label={`${seat.label} ${seat.sold ? "đã bán" : "còn trống"}`}
+                          title={seat.seatCodes.join(", ")}
+                          style={{
+                            gridColumn: `${seat.columnStart} / span ${seat.span}`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {movieTitle && !loadingSeats && !seatError && selectedRoomId && seatLayout.rows.length === 0 && (
             <div className="booking-seat-feedback">
               Chưa có dữ liệu ghế cho phòng này.
             </div>

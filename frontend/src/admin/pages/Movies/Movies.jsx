@@ -3,6 +3,32 @@ import { adminMovieService, adminCategoryService } from '../../services/adminApi
 import './movies.css';
 
 // ─── Helpers chuyển đổi dữ liệu camelCase ↔ snake_case ───────────────────────────────
+const normalizeDateInputValue = (value) => {
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === "string" ? value.slice(0, 10) : "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatDisplayDate = (value) => {
+  const normalized = normalizeDateInputValue(value);
+  if (!normalized) return "—";
+
+  const [year, month, day] = normalized.split("-");
+  if (!year || !month || !day) return normalized;
+  return `${day}/${month}/${year}`;
+};
+
 const snakeToCamelMovie = (obj) => {
   return {
     id: obj.movie_id,
@@ -15,7 +41,7 @@ const snakeToCamelMovie = (obj) => {
     trailer: obj.trailer,
     poster: obj.poster,
     posters: obj.posters || [],
-    releaseDate: obj.release_date,
+    releaseDate: normalizeDateInputValue(obj.release_date),
     status: obj.status,
     language: obj.language,
     country: obj.country,
@@ -30,7 +56,7 @@ const snakeToCamelCategory = (obj) => {
   return {
     id: obj.category_id,
     name: obj.category_name,
-    movieCount: obj.movieCount,
+    movieCount: Number(obj.movieCount ?? obj.movie_count ?? 0),
   };
 };
 
@@ -59,7 +85,7 @@ const EMPTY_MOVIE = {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** 1. Danh sách phim */
-function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, onToggleHide, onPermanentDelete, isTrashMode }) {
+function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, onToggleHide, isTrashMode }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
@@ -88,7 +114,7 @@ function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, on
         </select>
         {!isTrashMode && (
           <select className="mv-select" value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
-            <option value="all">Tất cả danh mục</option>
+            <option value="all">Tất cả Tags</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
@@ -141,7 +167,6 @@ function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, on
                     {isTrashMode && (
                       <>
                         <button className="mv-btn mv-btn-restore" onClick={() => onRestore(m)}>🔄 Khôi phục</button>
-                        <button className="mv-btn mv-btn-permanent-delete" onClick={() => onPermanentDelete(m)}>🗑️ Xóa vĩnh viễn</button>
                       </>
                     )}
                   </div>
@@ -198,7 +223,7 @@ function MovieDetail({ movie, categories, onClose, onEdit }) {
                 <div className="mv-detail-item"><span>Giới hạn tuổi</span><strong>{movie.ageLimit === 0 ? "Mọi lứa tuổi" : `${movie.ageLimit}+`}</strong></div>
                 <div className="mv-detail-item"><span>Ngôn ngữ</span><strong>{movie.language}</strong></div>
                 <div className="mv-detail-item"><span>Quốc gia</span><strong>{movie.country}</strong></div>
-                <div className="mv-detail-item"><span>Khởi chiếu</span><strong>{movie.releaseDate}</strong></div>
+                <div className="mv-detail-item"><span>Khởi chiếu</span><strong>{formatDisplayDate(movie.releaseDate)}</strong></div>
               </div>
 
               <div className="mv-detail-desc">
@@ -250,6 +275,12 @@ function MovieForm({ movie, categories, onClose, onSave }) {
   
   const minDateStr = formatDate(minDate);
   const maxDateStr = formatDate(maxDate);
+  const effectiveMinDateStr = isEdit && form.releaseDate && form.releaseDate < minDateStr
+    ? form.releaseDate
+    : minDateStr;
+  const effectiveMaxDateStr = isEdit && form.releaseDate && form.releaseDate > maxDateStr
+    ? form.releaseDate
+    : maxDateStr;
 
   useEffect(() => {
     if (movie) {
@@ -451,7 +482,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
               <div className="mv-field-row">
                 <div className="mv-field">
                   <label>Ngày khởi chiếu *</label>
-                  <input type="date" className={errors.releaseDate ? "error" : ""} value={form.releaseDate} onChange={(e) => set("releaseDate", e.target.value)} min={minDateStr} max={maxDateStr} />
+                  <input type="date" className={errors.releaseDate ? "error" : ""} value={form.releaseDate} onChange={(e) => set("releaseDate", e.target.value)} min={effectiveMinDateStr} max={effectiveMaxDateStr} />
                   {errors.releaseDate && <span className="mv-error">{errors.releaseDate}</span>}
                 </div>
                 <div className="mv-field">
@@ -552,7 +583,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
               </div>
 
               <div className="mv-field">
-                <label>Danh mục</label>
+                <label>Tags</label>
                 <div className="mv-cat-check-grid">
                   {categories.map((c) => (
                     <label key={c.id} className={`mv-cat-check${form.categories.includes(c.id) ? " checked" : ""}`}>
@@ -580,7 +611,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
   );
 }
 
-/** 4. Danh mục phim */
+/** 4. Tags phim */
 function CategoryManager({ categories, onAdd, onEdit, onDelete }) {
   const [showForm, setShowForm] = useState(false);
   const [editCat, setEditCat] = useState(null);
@@ -591,7 +622,7 @@ function CategoryManager({ categories, onAdd, onEdit, onDelete }) {
   const openEdit = (c) => { setEditCat(c); setName(c.name); setNameError(""); setShowForm(true); };
 
   const handleSave = () => {
-    if (!name.trim()) { setNameError("Vui lòng nhập tên danh mục."); return; }
+    if (!name.trim()) { setNameError("Vui lòng nhập tên Tag."); return; }
     if (editCat) { onEdit({ ...editCat, name: name.trim() }); }
     else         { onAdd({ id: Date.now(), name: name.trim(), movieCount: 0 }); }
     setShowForm(false);
@@ -600,8 +631,8 @@ function CategoryManager({ categories, onAdd, onEdit, onDelete }) {
   return (
     <div className="mv-section">
       <div className="mv-toolbar">
-        <h3 style={{ margin: 0, color: "#fff", fontSize: 18 }}>Quản lý danh mục phim</h3>
-        <button className="mv-btn mv-btn-add" onClick={openAdd}>+ Thêm danh mục</button>
+        <h3 style={{ margin: 0, color: "#fff", fontSize: 18 }}>Quản lý Tags phim</h3>
+        <button className="mv-btn mv-btn-add" onClick={openAdd}>+ Thêm Tag</button>
       </div>
 
       <div className="mv-cat-manager-grid">
@@ -624,17 +655,17 @@ function CategoryManager({ categories, onAdd, onEdit, onDelete }) {
         <div className="mv-modal-overlay" onClick={() => setShowForm(false)}>
           <div className="mv-modal mv-modal-sm" onClick={(e) => e.stopPropagation()}>
             <div className="mv-modal-header">
-              <h2>{editCat ? "Sửa danh mục" : "Thêm danh mục"}</h2>
+              <h2>{editCat ? "Sửa Tag" : "Thêm Tag"}</h2>
               <button className="mv-modal-close" onClick={() => setShowForm(false)}>✕</button>
             </div>
             <div className="mv-modal-body">
               <div className="mv-field">
-                <label>Tên danh mục *</label>
+                <label>Tên Tag *</label>
                 <input
                   className={nameError ? "error" : ""}
                   value={name}
                   onChange={(e) => { setName(e.target.value); setNameError(""); }}
-                  placeholder="Nhập tên danh mục…"
+                  placeholder="Nhập tên Tag…"
                   autoFocus
                   onKeyDown={(e) => e.key === "Enter" && handleSave()}
                 />
@@ -655,7 +686,7 @@ function CategoryManager({ categories, onAdd, onEdit, onDelete }) {
 }
 
 /** Confirm xóa */
-function DeleteConfirm({ target, type, isPermanent, onClose, onConfirm }) {
+function DeleteConfirm({ target, type, onClose, onConfirm }) {
   const [isDeleting, setIsDeleting] = useState(false);
   if (!target) return null;
 
@@ -672,20 +703,20 @@ function DeleteConfirm({ target, type, isPermanent, onClose, onConfirm }) {
     <div className="mv-modal-overlay" onClick={onClose}>
       <div className="mv-modal mv-modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="mv-modal-header">
-          <h2>{isPermanent ? "Xác nhận xóa vĩnh viễn" : "Xác nhận xóa"}</h2>
+          <h2>Xác nhận xóa</h2>
           <button className="mv-modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="mv-modal-body">
           <div className="mv-delete-warn">
-            ⚠️ Bạn có chắc muốn {isPermanent ? "xóa vĩnh viễn" : type === "movie" ? "di chuyển vào thùng rác" : "xóa"} {type === "movie" ? "phim" : "danh mục"}
+            ⚠️ Bạn có chắc muốn {type === "movie" ? "di chuyển vào thùng rác" : "xóa"} {type === "movie" ? "phim" : "Tag"}
             &nbsp;<strong>"{target.title || target.name}"</strong>?
             <br />
-            {isPermanent ? "Hành động này không thể hoàn tác!" : type === "movie" ? "Bạn có thể khôi phục lại từ thùng rác." : ""}
+            {type === "movie" ? "Bạn có thể khôi phục lại từ thùng rác." : ""}
           </div>
         </div>
         <div className="mv-modal-footer">
-          <button className={`mv-btn ${isPermanent ? "mv-btn-delete" : "mv-btn-delete"} mv-btn-lg`} onClick={handleConfirm} disabled={isDeleting}>
-            {isDeleting ? "Đang xóa..." : isPermanent ? "Xóa vĩnh viễn" : "Xóa"}
+          <button className="mv-btn mv-btn-delete mv-btn-lg" onClick={handleConfirm} disabled={isDeleting}>
+            {isDeleting ? "Đang xóa..." : "Xóa"}
           </button>
           <button className="mv-btn mv-btn-secondary mv-btn-lg" onClick={onClose} disabled={isDeleting}>Hủy</button>
         </div>
@@ -719,7 +750,6 @@ export default function AdminMovies() {
   const [editMovie, setEditMovie] = useState(undefined);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteType, setDeleteType] = useState("movie");
-  const [deleteIsPermanent, setDeleteIsPermanent] = useState(false);
 
   const [toast, setToast] = useState(null);
   const showToast = (message, type = "success") => {
@@ -758,13 +788,13 @@ export default function AdminMovies() {
     { label: "Đang chiếu", value: movies.filter((m) => m.status === "now_showing").length, color: "#4ade80" },
     { label: "Sắp chiếu", value: movies.filter((m) => m.status === "coming_soon").length, color: "#fbbf24" },
     { label: "Thùng rác", value: trashMovies.length, color: "#ef4444" },
-    { label: "Danh mục", value: categories.length, color: "#60a5fa" },
+    { label: "Tags", value: categories.length, color: "#60a5fa" },
   ];
 
   const TABS = [
     { key: "list", label: "Danh sách phim" },
     { key: "trash", label: "Thùng rác" },
-    { key: "category", label: "Danh mục phim" },
+    { key: "category", label: "Tags phim" },
   ];
 
   // Handlers
@@ -797,30 +827,24 @@ export default function AdminMovies() {
     }
   };
 
-  const handleDeleteMovie = (m) => { setDeleteTarget(m); setDeleteType("movie"); setDeleteIsPermanent(false); };
-  const handlePermanentDeleteMovie = (m) => { setDeleteTarget(m); setDeleteType("movie"); setDeleteIsPermanent(true); };
-  const handleDeleteCat = (c) => { setDeleteTarget(c); setDeleteType("category"); setDeleteIsPermanent(false); };
+  const handleDeleteMovie = (m) => { setDeleteTarget(m); setDeleteType("movie"); };
+  const handleDeleteCat = (c) => { setDeleteTarget(c); setDeleteType("category"); };
 
   const handleConfirmDelete = async (target) => {
     try {
       if (deleteType === "movie") {
-        if (deleteIsPermanent) {
-          await adminMovieService.permanentDeleteMovie(target.id);
-          showToast(`Đã xóa vĩnh viễn phim "${target.title}".`, "success");
-        } else {
-          await adminMovieService.deleteMovie(target.id);
-          showToast(`Đã di chuyển phim "${target.title}" vào thùng rác.`, "success");
-        }
+        await adminMovieService.deleteMovie(target.id);
+        showToast(`Đã di chuyển phim "${target.title}" vào thùng rác.`, "success");
       } else {
         await adminCategoryService.deleteCategory(target.id);
         setCategories((prev) => prev.filter((c) => c.id !== target.id));
-        showToast(`Đã xóa danh mục "${target.name}".`, "success");
+        showToast(`Đã xóa Tag "${target.name}".`, "success");
       }
       setDeleteTarget(null);
       fetchData();
     } catch (err) {
       console.error("Error deleting:", err);
-      showToast(deleteType === "movie" ? "Không thể xóa phim." : "Không thể xóa danh mục.", "error");
+      showToast(deleteType === "movie" ? "Không thể xóa phim." : "Không thể xóa Tag.", "error");
     }
   };
 
@@ -851,20 +875,20 @@ export default function AdminMovies() {
       const result = await adminCategoryService.createCategory(camelToSnakeCategory(c));
       const newCategory = { ...c, id: result.categoryId, movieCount: 0 };
       setCategories((prev) => [...prev, newCategory]); 
-      showToast(`Đã thêm danh mục "${c.name}".`); 
+      showToast(`Đã thêm Tag "${c.name}".`); 
     } catch (err) {
       console.error("Error adding category:", err);
-      showToast("Không thể thêm danh mục.", "error");
+      showToast("Không thể thêm Tag.", "error");
     }
   };
   const handleEditCat = async (c) => { 
     try {
       await adminCategoryService.updateCategory(c.id, camelToSnakeCategory(c));
       setCategories((prev) => prev.map((x) => (x.id === c.id ? c : x))); 
-      showToast(`Đã cập nhật danh mục "${c.name}".`); 
+      showToast(`Đã cập nhật Tag "${c.name}".`); 
     } catch (err) {
       console.error("Error updating category:", err);
-      showToast("Không thể cập nhật danh mục.", "error");
+      showToast("Không thể cập nhật Tag.", "error");
     }
   };
 
@@ -890,7 +914,7 @@ export default function AdminMovies() {
     <div className="admin-movies-page">
       <div className="mv-page-header">
         <h2>Quản lý phim</h2>
-        <p>Quản lý danh sách phim, thông tin chi tiết, chỉnh sửa và danh mục</p>
+        <p>Quản lý danh sách phim, thông tin chi tiết, chỉnh sửa và Tags</p>
       </div>
 
       {/* Stats */}
@@ -933,7 +957,6 @@ export default function AdminMovies() {
           movies={trashMovies}
           categories={categories}
           onRestore={handleRestoreMovie}
-          onPermanentDelete={handlePermanentDeleteMovie}
           isTrashMode={true}
         />
       )}
@@ -967,7 +990,6 @@ export default function AdminMovies() {
         <DeleteConfirm
           target={deleteTarget}
           type={deleteType}
-          isPermanent={deleteIsPermanent}
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
         />

@@ -2,6 +2,14 @@ import { db } from "../../../config/db.js";
 
 const DEFAULT_SEAT_STATUS = "active";
 let ensureRoomSeatGapsTablePromise;
+const ALLOWED_ROOM_STATUSES = new Set(["active", "inactive", "maintenance"]);
+const ALLOWED_CINEMA_STATUSES = new Set(["active", "inactive"]);
+
+const buildAppError = (message, statusCode = 400) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
 
 const calcTotalSeats = (seatRows = []) =>
   (seatRows || []).reduce(
@@ -13,6 +21,16 @@ const buildSeatCode = (rowName, seatNumber) =>
   `${String(rowName || "")
     .trim()
     .toUpperCase()}${seatNumber}`;
+
+const normalizeRoomStatus = (status, totalSeat) => {
+  if (Number(totalSeat || 0) <= 0) return "maintenance";
+  return ALLOWED_ROOM_STATUSES.has(status) ? status : "active";
+};
+
+const normalizeCinemaStatus = (status, roomCount) => {
+  if (Number(roomCount || 0) <= 0) return "inactive";
+  return ALLOWED_CINEMA_STATUSES.has(status) ? status : "active";
+};
 
 const ensureRoomSeatGapsTable = async () => {
   if (!ensureRoomSeatGapsTablePromise) {
@@ -227,7 +245,7 @@ const syncSeats = async (connection, roomId, roomData) => {
 
 const syncRooms = async (connection, cinemaId, rooms = []) => {
   const [existingRooms] = await connection.query(
-    "SELECT room_id FROM Rooms WHERE cinema_id = ?",
+    "SELECT room_id, room_name FROM Rooms WHERE cinema_id = ?",
     [cinemaId],
   );
   const existingRoomIds = new Set(existingRooms.map((room) => room.room_id));
@@ -243,18 +261,22 @@ const syncRooms = async (connection, cinemaId, rooms = []) => {
         (Array.isArray(room.seats) ? room.seats.length : 0) ||
         calcTotalSeats(room.seatRows),
     );
+    const roomStatus = normalizeRoomStatus(
+      room.status || room.room_status,
+      totalSeat,
+    );
 
     let currentRoomId = roomId;
 
     if (roomId && existingRoomIds.has(roomId)) {
       await connection.query(
-        "UPDATE Rooms SET room_name = ?, room_type = ?, total_seat = ? WHERE room_id = ? AND cinema_id = ?",
-        [roomName, roomType, totalSeat, roomId, cinemaId],
+        "UPDATE Rooms SET room_name = ?, room_type = ?, total_seat = ?, status = ? WHERE room_id = ? AND cinema_id = ?",
+        [roomName, roomType, totalSeat, roomStatus, roomId, cinemaId],
       );
     } else {
       const [result] = await connection.query(
-        "INSERT INTO Rooms (cinema_id, room_name, room_type, total_seat) VALUES (?, ?, ?, ?)",
-        [cinemaId, roomName, roomType, totalSeat],
+        "INSERT INTO Rooms (cinema_id, room_name, room_type, total_seat, status) VALUES (?, ?, ?, ?, ?)",
+        [cinemaId, roomName, roomType, totalSeat, roomStatus],
       );
       currentRoomId = result.insertId;
     }
@@ -267,6 +289,27 @@ const syncRooms = async (connection, cinemaId, rooms = []) => {
   const roomsToDelete = existingRooms.filter(
     (room) => !keptRoomIds.has(room.room_id),
   );
+
+  if (roomsToDelete.length > 0) {
+    const placeholders = roomsToDelete.map(() => "?").join(",");
+    const [referencedRooms] = await connection.query(
+      `SELECT DISTINCT room_id FROM Showtimes WHERE room_id IN (${placeholders})`,
+      roomsToDelete.map((room) => room.room_id),
+    );
+    const referencedRoomIds = new Set(
+      referencedRooms.map((room) => Number(room.room_id)),
+    );
+
+    if (referencedRoomIds.size > 0) {
+      const blockedRoomNames = roomsToDelete
+        .filter((room) => referencedRoomIds.has(Number(room.room_id)))
+        .map((room) => room.room_name || `ID ${room.room_id}`);
+
+      throw buildAppError(
+        `Không thể xóa phòng đã có suất chiếu: ${blockedRoomNames.join(", ")}.`,
+      );
+    }
+  }
 
   for (const room of roomsToDelete) {
     await connection.query("DELETE FROM RoomSeatGaps WHERE room_id = ?", [
@@ -307,10 +350,11 @@ export const create = async (cinemaData) => {
     await ensureRoomSeatGapsTable();
     await connection.beginTransaction();
 
-    const { cinema_name, address, city, phone, image, rooms = [] } = cinemaData;
+    const { cinema_name, address, city, phone, image, status, rooms = [] } = cinemaData;
+    const cinemaStatus = normalizeCinemaStatus(status, rooms.length);
     const [result] = await connection.query(
-      "INSERT INTO Cinemas (cinema_name, address, city, phone, image) VALUES (?, ?, ?, ?, ?)",
-      [cinema_name, address, city, phone, image],
+      "INSERT INTO Cinemas (cinema_name, address, city, phone, image, status) VALUES (?, ?, ?, ?, ?, ?)",
+      [cinema_name, address, city, phone, image, cinemaStatus],
     );
 
     await syncRooms(connection, result.insertId, rooms);
@@ -332,10 +376,11 @@ export const update = async (id, cinemaData) => {
     await ensureRoomSeatGapsTable();
     await connection.beginTransaction();
 
-    const { cinema_name, address, city, phone, image, rooms = [] } = cinemaData;
+    const { cinema_name, address, city, phone, image, status, rooms = [] } = cinemaData;
+    const cinemaStatus = normalizeCinemaStatus(status, rooms.length);
     const [result] = await connection.query(
-      "UPDATE Cinemas SET cinema_name = ?, address = ?, city = ?, phone = ?, image = ? WHERE cinemas_id = ?",
-      [cinema_name, address, city, phone, image, id],
+      "UPDATE Cinemas SET cinema_name = ?, address = ?, city = ?, phone = ?, image = ?, status = ? WHERE cinemas_id = ?",
+      [cinema_name, address, city, phone, image, cinemaStatus, id],
     );
 
     await syncRooms(connection, id, rooms);
@@ -387,7 +432,7 @@ export const remove = async (id) => {
 
 export const getRoomsByCinemaId = async (cinemaId) => {
   const [rooms] = await db.query(
-    "SELECT room_id, cinema_id, room_name, room_type, total_seat FROM Rooms WHERE cinema_id = ? ORDER BY room_id DESC",
+    "SELECT room_id, cinema_id, room_name, room_type, total_seat, status FROM Rooms WHERE cinema_id = ? ORDER BY room_id DESC",
     [cinemaId],
   );
   return rooms;

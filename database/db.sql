@@ -125,7 +125,8 @@ CREATE TABLE Cinemas (
     address VARCHAR(255),
     city VARCHAR(100),
     phone VARCHAR(20),
-    image VARCHAR(255)
+    image VARCHAR(255),
+    status ENUM('active','inactive') DEFAULT 'inactive'
 );
 
 CREATE TABLE Rooms (
@@ -134,6 +135,7 @@ CREATE TABLE Rooms (
     room_name VARCHAR(100),
     room_type ENUM('2D','3D','IMAX','VIP'),
     total_seat INT,
+    status ENUM('active','inactive','maintenance') DEFAULT 'maintenance',
 
     FOREIGN KEY (cinema_id) REFERENCES Cinemas(cinemas_id)
 );
@@ -165,6 +167,9 @@ CREATE TABLE Showtimes (
     start_time DATETIME,
     end_time DATETIME,
     price DECIMAL(12,2),
+    price_standard DECIMAL(12,2),
+    price_vip DECIMAL(12,2),
+    price_couple DECIMAL(12,2),
     available_seats INT,
     status ENUM('active','cancelled'),
 

@@ -107,7 +107,13 @@ export const updateCinema = async (req, res) => {
     });
   } catch (error) {
     console.error(`Error updating cinema ${req.params.id}:`, error);
-    res.status(500).json({ message: "Lỗi máy chủ khi cập nhật rạp phim" });
+    const statusCode = Number(error?.statusCode) || 500;
+    res.status(statusCode).json({
+      message:
+        statusCode >= 500
+          ? "Lỗi máy chủ khi cập nhật rạp phim"
+          : error.message || "Không thể cập nhật rạp phim",
+    });
   }
 };
 

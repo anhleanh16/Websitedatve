@@ -3,36 +3,61 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import './MovieDetail.css';
 
+const VISITED_TAG_STORAGE_KEY = 'lunexa_user_tag_preferences';
+
+const formatDateKey = (input) => {
+  const d = new Date(input);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDayDate = (input) => {
+  const d = new Date(input);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const formatWeekdayLabel = (input) => {
+  const d = new Date(input);
+  const weekday = d.getDay();
+  return weekday === 0 ? 'Chủ nhật' : `Thứ ${weekday + 1}`;
+};
+
+const formatTimeLabel = (input, roomType) => {
+  const d = new Date(input);
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}${roomType ? ` - ${roomType}` : ''}`;
+};
+
 export default function MovieDetail() {
   const location = useLocation();
   const { id } = useParams();
   const navigate = useNavigate();
   const selectedRegion = useSelector((state) => state.region.selectedRegion);
   const bookingContext = location.state?.bookingContext || null;
-  const vietnameseWeekdays = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
   const today = new Date();
-  const todayIndex = today.getDay(); // 0=CN, 1=T2...6=T7
 
   // Tạo 7 ngày từ hôm nay trở đi
   const scheduleDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    const dow = d.getDay(); // 0=CN
-    const label = dow === 0 ? 'Chủ nhật' : vietnameseWeekdays[dow - 1];
     return {
-      label,                          // "Thứ 2", "Chủ nhật"...
+      key: formatDateKey(d),
+      label: formatWeekdayLabel(d),
       date: d,
-      dateStr: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`, // "10/06"
+      dateStr: formatDayDate(d),
       isToday: i === 0,
     };
   });
 
-  const todayLabel = scheduleDays[0].label;
-  const [activeDay, setActiveDay] = useState(scheduleDays[0].label);
+  const [activeDay, setActiveDay] = useState(scheduleDays[0].key);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [showAllCinemas, setShowAllCinemas] = useState(false);
+  const [activeCinema, setActiveCinema] = useState(null);
+  const [selectedTime, setSelectedTime] = useState(null);
   const scheduleRef = useRef(null);
   const cinemaListRef = useRef(null);
   const videoRef = useRef(null); // For hero banner trailer
@@ -109,6 +134,29 @@ export default function MovieDetail() {
     loadMovie();
     return () => controller.abort();
   }, [id]);
+
+  useEffect(() => {
+    if (!movie?.movie_id || !Array.isArray(movie?.categories) || movie.categories.length === 0) {
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(VISITED_TAG_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const next = { ...(parsed && typeof parsed === 'object' ? parsed : {}) };
+
+      movie.categories.forEach((category) => {
+        const categoryId = Number(category?.category_id);
+        if (!categoryId) return;
+        const currentScore = Number(next[categoryId] || 0);
+        next[categoryId] = currentScore + 1;
+      });
+
+      window.localStorage.setItem(VISITED_TAG_STORAGE_KEY, JSON.stringify(next));
+    } catch (error) {
+      console.error('Không thể lưu thói quen xem tag của người dùng:', error);
+    }
+  }, [movie?.movie_id, movie?.categories]);
 
   const handleStartAudio = () => {
     if (!hasTrailer) return;
@@ -272,7 +320,6 @@ export default function MovieDetail() {
       document.body.style.overflow = '';
     };
   }, [lightboxOpen, galleryImages.length]);
-  const scheduleLabel = (day) => (day === todayLabel ? 'Hôm nay' : day);
   const description = movie?.description || '';
   const maxDescriptionLength = 280;
   const shouldShowMore = description.length > maxDescriptionLength;
@@ -280,148 +327,6 @@ export default function MovieDetail() {
     showFullDescription || !shouldShowMore
       ? description
       : `${description.slice(0, maxDescriptionLength)}...`;
-
-  const cinemas = [
-    {
-      id: 'danang',
-      name: 'Lunexa Movix Đà Nẵng',
-      schedule: {
-        'Thứ 2': ['09:00 - 2D', '12:30 - 2D', '15:00 - 3D', '18:30 - IMAX'],
-        'Thứ 3': ['10:00 - 2D', '13:30 - 3D', '16:45 - 2D', '20:00 - IMAX'],
-        'Thứ 4': ['09:30 - 2D', '14:00 - 3D', '17:15 - 2D', '21:00 - IMAX'],
-        'Thứ 5': ['10:15 - 2D', '13:00 - 3D', '16:30 - 2D', '19:45 - IMAX'],
-        'Thứ 6': ['09:45 - 2D', '12:15 - 3D', '15:30 - 2D', '20:15 - IMAX'],
-        'Thứ 7': ['11:00 - 2D', '14:45 - 3D', '18:00 - IMAX', '21:15 - 2D'],
-        'Chủ nhật': ['10:30 - 2D', '13:30 - 3D', '17:00 - IMAX', '20:30 - 2D'],
-      },
-    },
-    {
-      id: 'hcm',
-      name: 'Lunexa Movix TP.HCM',
-      schedule: {
-        'Thứ 2': ['09:15 - 2D', '12:00 - 2D', '15:45 - 3D', '19:00 - IMAX'],
-        'Thứ 3': ['10:30 - 2D', '14:15 - 3D', '17:30 - 2D', '20:45 - IMAX'],
-        'Thứ 4': ['09:00 - 2D', '13:45 - 3D', '16:00 - 2D', '21:00 - IMAX'],
-        'Thứ 5': ['10:00 - 2D', '13:30 - 3D', '17:00 - 2D', '20:15 - IMAX'],
-        'Thứ 6': ['11:00 - 2D', '14:30 - 3D', '18:15 - IMAX', '21:30 - 2D'],
-        'Thứ 7': ['09:00 - 2D', '12:30 - 3D', '16:00 - 2D', '19:30 - IMAX'],
-        'Chủ nhật': ['10:15 - 2D', '14:00 - 3D', '17:45 - IMAX', '21:00 - 2D'],
-      },
-    },
-    {
-      id: 'hanoi',
-      name: 'Lunexa Movix Hà Nội',
-      schedule: {
-        'Thứ 2': ['09:45 - 2D', '13:00 - 2D', '16:15 - 3D', '19:30 - IMAX'],
-        'Thứ 3': ['10:15 - 2D', '14:30 - 3D', '18:00 - 2D', '21:15 - IMAX'],
-        'Thứ 4': ['09:30 - 2D', '12:45 - 3D', '15:30 - 2D', '20:00 - IMAX'],
-        'Thứ 5': ['10:30 - 2D', '13:15 - 3D', '17:00 - 2D', '20:30 - IMAX'],
-        'Thứ 6': ['11:00 - 2D', '14:45 - 3D', '18:30 - IMAX', '21:45 - 2D'],
-        'Thứ 7': ['09:15 - 2D', '12:00 - 3D', '15:30 - 2D', '19:15 - IMAX'],
-        'Chủ nhật': ['10:45 - 2D', '14:30 - 3D', '17:15 - IMAX', '21:00 - 2D'],
-      },
-    },
-    {
-      id: 'haiphong',
-      name: 'Lunexa Movix Hải Phòng',
-      schedule: {
-        'Thứ 2': ['09:30 - 2D', '13:00 - 3D', '16:30 - 2D', '20:00 - IMAX'],
-        'Thứ 3': ['10:00 - 2D', '14:30 - 3D', '17:45 - 2D', '21:15 - IMAX'],
-        'Thứ 4': ['09:00 - 2D', '13:15 - 3D', '16:00 - 2D', '20:30 - IMAX'],
-        'Thứ 5': ['10:30 - 2D', '14:00 - 3D', '17:15 - 2D', '21:00 - IMAX'],
-        'Thứ 6': ['09:45 - 2D', '13:30 - 3D', '16:45 - 2D', '20:15 - IMAX'],
-        'Thứ 7': ['10:00 - 2D', '14:30 - 3D', '18:00 - 2D', '21:30 - IMAX'],
-        'Chủ nhật': ['09:30 - 2D', '12:45 - 3D', '16:00 - 2D', '19:15 - IMAX'],
-      },
-    },
-    {
-      id: 'hue',
-      name: 'Lunexa Movix Huế',
-      schedule: {
-        'Thứ 2': ['09:00 - 2D', '12:15 - 3D', '15:30 - 2D', '19:00 - IMAX'],
-        'Thứ 3': ['10:30 - 2D', '14:00 - 3D', '17:15 - 2D', '20:30 - IMAX'],
-        'Thứ 4': ['09:45 - 2D', '13:00 - 3D', '16:30 - 2D', '20:00 - IMAX'],
-        'Thứ 5': ['10:00 - 2D', '13:30 - 3D', '17:00 - 2D', '21:00 - IMAX'],
-        'Thứ 6': ['09:15 - 2D', '12:45 - 3D', '16:00 - 2D', '19:30 - IMAX'],
-        'Thứ 7': ['10:00 - 2D', '13:15 - 3D', '16:45 - 2D', '20:15 - IMAX'],
-        'Chủ nhật': ['09:30 - 2D', '13:00 - 3D', '16:30 - 2D', '20:00 - IMAX'],
-      },
-    },
-    {
-      id: 'quangngai',
-      name: 'Lunexa Movix Quảng Ngãi',
-      schedule: {
-        'Thứ 2': ['09:15 - 2D', '12:30 - 3D', '16:00 - 2D', '19:15 - IMAX'],
-        'Thứ 3': ['10:00 - 2D', '13:45 - 3D', '17:00 - 2D', '20:45 - IMAX'],
-        'Thứ 4': ['09:30 - 2D', '14:00 - 3D', '17:30 - 2D', '21:00 - IMAX'],
-        'Thứ 5': ['10:15 - 2D', '13:30 - 3D', '17:00 - 2D', '20:45 - IMAX'],
-        'Thứ 6': ['09:45 - 2D', '13:00 - 3D', '16:30 - 2D', '19:45 - IMAX'],
-        'Thứ 7': ['10:00 - 2D', '14:30 - 3D', '18:00 - 2D', '21:15 - IMAX'],
-        'Chủ nhật': ['09:30 - 2D', '13:00 - 3D', '16:30 - 2D', '20:00 - IMAX'],
-      },
-    },
-  ];
-  const matchedCinema =
-    bookingContext?.cinema &&
-    cinemas.find((cinema) => cinema.name === bookingContext.cinema);
-  const [activeCinema, setActiveCinema] = useState(
-    matchedCinema?.id || cinemas[0].id,
-  );
-  const [selectedTime, setSelectedTime] = useState(null);
-  const currentCinema = cinemas.find((cinema) => cinema.id === activeCinema);
-  const showTimes = currentCinema?.schedule[activeDay] ?? [];
-
-  // Kiểm tra thời gian Việt Nam hiện tại
-  const isTimePast = (timeStr, dayLabel) => {
-    // Chỉ kiểm tra nếu là hôm nay
-    if (dayLabel !== todayLabel) return false;
-    
-    // Lấy giờ phút từ timeStr (vd: '09:00 - 2D)
-    const [hourStr] = timeStr.split(' - ');
-    const [hour, minute] = hourStr.split(':').map(Number);
-    
-    // Lấy giờ Việt Nam hiện tại
-    const now = new Date();
-    // Chuyển sang múi giờ Việt Nam (UTC+7)
-    const vietnamTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-    const currentHour = vietnamTime.getHours();
-    const currentMinute = vietnamTime.getMinutes();
-    
-    // So sánh
-    if (hour < currentHour) return true;
-    if (hour === currentHour && minute <= currentMinute) return true;
-    
-    return false;
-  };
-
-  // Reset selected time when cinema or day changes
-  const handleCinemaChange = (id) => {
-    setActiveCinema(id);
-    setSelectedTime(null);
-  };
-
-  const handleDayChange = (day) => {
-    setActiveDay(day);
-    setSelectedTime(null);
-  };
-
-  const handleScheduleClick = (time) => {
-    // Không cho chọn nếu thời gian đã qua
-    if (isTimePast(time, activeDay)) return;
-    setSelectedTime((prev) => (prev === time ? null : time));
-  };
-
-  const handleBookNow = () => {
-    navigate('/booking', {
-      state: {
-        ...(bookingContext || {}),
-        movieTitle,
-        cinema: bookingContext?.cinema || currentCinema?.name || 'Lunexa Movix',
-        day: scheduleLabel(activeDay),
-        time: selectedTime,
-      },
-    });
-  };
 
   // Scroll xuống booking bar khi chọn giờ - ĐẶT SAU KHI KHAI BÁO selectedTime
   useEffect(() => {
@@ -451,10 +356,107 @@ export default function MovieDetail() {
   const showOverlay = totalImages > VISIBLE_LIMIT;
   const normalCount = showOverlay ? VISIBLE_LIMIT - 1 : Math.min(totalImages, VISIBLE_LIMIT);
 
+  const showtimeItems = Array.isArray(movie?.showtimes)
+    ? movie.showtimes
+        .filter((showtime) => showtime.room_type !== 'VIP')
+        .map((showtime) => ({
+          id: showtime.showtime_id,
+          cinemaId: Number(showtime.cinema_id),
+          cinemaName: showtime.cinema_name,
+          roomId: Number(showtime.room_id),
+          roomName: showtime.room_name,
+          roomType: showtime.room_type,
+          startTime: showtime.start_time,
+          endTime: showtime.end_time,
+          dateKey: formatDateKey(showtime.start_time),
+          timeLabel: formatTimeLabel(showtime.start_time, showtime.room_type),
+          availableSeats: Number(showtime.available_seats || 0),
+          priceStandard: Number(showtime.price_standard || 0),
+          priceVip: Number(showtime.price_vip || 0),
+          priceCouple: Number(showtime.price_couple || 0),
+        }))
+    : [];
+
+  const cinemas = Array.from(
+    new Map(
+      showtimeItems.map((showtime) => [
+        showtime.cinemaId,
+        { id: showtime.cinemaId, name: showtime.cinemaName },
+      ]),
+    ).values(),
+  );
+
+  useEffect(() => {
+    if (!cinemas.length) {
+      setActiveCinema(null);
+      setSelectedTime(null);
+      return;
+    }
+
+    const bookingCinemaId = bookingContext?.cinema
+      ? cinemas.find((cinema) => cinema.name === bookingContext.cinema)?.id
+      : null;
+
+    setActiveCinema((prev) => {
+      if (prev && cinemas.some((cinema) => cinema.id === prev)) return prev;
+      return bookingCinemaId || cinemas[0].id;
+    });
+  }, [bookingContext, cinemas]);
+
+  const currentCinema = cinemas.find((cinema) => cinema.id === activeCinema) || null;
+  const showTimes = showtimeItems.filter(
+    (showtime) =>
+      showtime.cinemaId === activeCinema && showtime.dateKey === activeDay,
+  );
+
+  const scheduleLabel = (dayKey) => {
+    const dayObj = scheduleDays.find((day) => day.key === dayKey);
+    if (!dayObj) return dayKey;
+    return dayObj.isToday ? `Hôm nay, ${dayObj.dateStr}` : `${dayObj.label}, ${dayObj.dateStr}`;
+  };
+
+  const selectedDayInfo = scheduleDays.find((day) => day.key === activeDay) || scheduleDays[0];
+
+  const isTimePast = (startTime) => new Date(startTime).getTime() <= Date.now();
+
+  const handleCinemaChange = (cinemaId) => {
+    setActiveCinema(cinemaId);
+    setSelectedTime(null);
+  };
+
+  const handleDayChange = (dayKey) => {
+    setActiveDay(dayKey);
+    setSelectedTime(null);
+  };
+
+  const handleScheduleClick = (showtime) => {
+    if (isTimePast(showtime.startTime) || showtime.availableSeats <= 0) return;
+    setSelectedTime((prev) => (prev?.id === showtime.id ? null : showtime));
+  };
+
+  const handleBookNow = () => {
+    if (!selectedTime) return;
+    navigate('/booking', {
+      state: {
+        ...(bookingContext || {}),
+        movieId: Number(movie?.movie_id || id || 0) || null,
+        movieTitle,
+        ageLimit: Number(movie?.age_limit || 0),
+        cinema: currentCinema?.name || selectedTime.cinemaName || 'Lunexa Movix',
+        cinemaId: currentCinema?.id || selectedTime.cinemaId,
+        roomId: selectedTime.roomId,
+        roomName: selectedTime.roomName,
+        roomType: selectedTime.roomType,
+        showtimeId: selectedTime.id,
+        day: scheduleLabel(activeDay),
+        time: selectedTime.timeLabel,
+      },
+    });
+  };
+
 
   return (
     <div className="movie-detail-page">
-
       {/* ── Banner cố định phía sau, nội dung scroll lên trên ── */}
       <div
         className="trailer-hero-banner"
@@ -542,7 +544,6 @@ export default function MovieDetail() {
                     {reviewCount > 0 ? `${averageRating.toFixed(1)}/5.0` : 'Chưa có đánh giá'}
                   </span>
                   <span>{formatReviewCount(reviewCount)} đánh giá</span>
-                  <span className="movie-favorite">❤ {recommendedPercent}% yêu thích</span>
                 </div>
 
                 <div className="movie-chips-row">
@@ -585,9 +586,6 @@ export default function MovieDetail() {
                 </div>
 
                 <div className="movie-action-row">
-                  <button className={`btn-heart ${isFavorite ? 'active' : ''}`} type="button" onClick={() => setIsFavorite((prev) => !prev)}>
-                    ♥ {isFavorite ? 'Đã thích' : 'Yêu thích'}
-                  </button>
                   <button className="btn-book" type="button" onClick={handleBookClick}><span className="icon">🎟️</span>Đặt vé ngay</button>
                 </div>
               </div>
@@ -682,7 +680,7 @@ export default function MovieDetail() {
                 )}
               </div>
               <div className="trailer-category-card">
-                <h3><span className="icon">📌</span>Danh mục</h3>
+                <h3><span className="icon">📌</span>Tags</h3>
                 <div className="category-pill-row">
                   {Array.isArray(movie?.categories) && movie.categories.length ? (
                     movie.categories.map((c) => <span key={c.category_id}>{c.category_name}</span>)
@@ -858,9 +856,12 @@ export default function MovieDetail() {
               <button
                 className="btn-view-all"
                 type="button"
+                disabled={cinemas.length <= 4}
                 onClick={() => setShowAllCinemas((p) => !p)}
               >
-                {showAllCinemas
+                {cinemas.length <= 4
+                  ? `Hiển thị ${cinemas.length} rạp`
+                  : showAllCinemas
                   ? 'Thu gọn'
                   : `Xem tất cả (${Math.min(4, cinemas.length)}/${cinemas.length})`}
               </button>
@@ -870,10 +871,10 @@ export default function MovieDetail() {
               <div className="schedule-days-row">
                 {scheduleDays.map((dayObj) => (
                   <button
-                    key={dayObj.label + dayObj.dateStr}
+                    key={dayObj.key}
                     type="button"
-                    className={activeDay === dayObj.label ? 'active' : ''}
-                    onClick={() => handleDayChange(dayObj.label)}
+                    className={activeDay === dayObj.key ? 'active' : ''}
+                    onClick={() => handleDayChange(dayObj.key)}
                   >
                     <span className="day-label">{dayObj.isToday ? 'Hôm nay' : dayObj.label}</span>
                     <span className="day-date">{dayObj.dateStr}</span>
@@ -884,38 +885,35 @@ export default function MovieDetail() {
                 <div className="schedule-result-header">
                   <div>
                     <p>Rạp</p>
-                    <strong>{currentCinema?.name}</strong>
+                    <strong>{currentCinema?.name || 'Chưa có rạp khả dụng'}</strong>
                   </div>
                   <div>
                     <p>Ngày</p>
-                    <strong>
-                      {(() => {
-                        const dayObj = scheduleDays.find(d => d.label === activeDay);
-                        return dayObj
-                          ? `${dayObj.isToday ? 'Hôm nay' : dayObj.label}, ${dayObj.dateStr}`
-                          : activeDay;
-                      })()}
-                    </strong>
+                    <strong>{scheduleLabel(activeDay)}</strong>
                   </div>
                 </div>
                 <div className="schedule-times">
                   {showTimes.length > 0 ? (
-                    showTimes.map((time) => {
-                      const past = isTimePast(time, activeDay);
+                    showTimes.map((showtime) => {
+                      const past = isTimePast(showtime.startTime);
+                      const soldOut = showtime.availableSeats <= 0;
                       return (
                         <button
-                          key={time}
+                          key={showtime.id}
                           type="button"
-                          className={`time-slot${selectedTime === time ? ' selected' : ''}${past ? ' past' : ''}`}
-                          onClick={() => handleScheduleClick(time)}
-                          disabled={past}
+                          className={`time-slot${selectedTime?.id === showtime.id ? ' selected' : ''}${past || soldOut ? ' past' : ''}`}
+                          onClick={() => handleScheduleClick(showtime)}
+                          disabled={past || soldOut}
+                          title={`${showtime.roomName} · Ve thuong ${showtime.priceStandard.toLocaleString('vi-VN')} VND`}
                         >
-                          {time}
+                          {soldOut ? `${showtime.timeLabel} - Het cho` : showtime.timeLabel}
                         </button>
                       );
                     })
                   ) : (
-                    <div className="schedule-empty">Chưa có lịch cho ngày này.</div>
+                    <div className="schedule-empty">
+                      {cinemas.length === 0 ? 'Phim này chưa có lịch chiếu nào.' : 'Chưa có lịch cho ngày này.'}
+                    </div>
                   )}
                 </div>
               </div>
@@ -927,7 +925,7 @@ export default function MovieDetail() {
               <div className="schedule-book-bar-info">
                 <span className="schedule-book-bar-label">Suất đã chọn</span>
                 <span className="schedule-book-bar-detail">
-                  {currentCinema?.name} &nbsp;·&nbsp; {activeDay} &nbsp;·&nbsp; <strong>{selectedTime}</strong>
+                  {currentCinema?.name} &nbsp;·&nbsp; {selectedDayInfo?.isToday ? 'Hôm nay' : selectedDayInfo?.label} &nbsp;·&nbsp; <strong>{selectedTime.timeLabel}</strong>
                 </span>
               </div>
               <button

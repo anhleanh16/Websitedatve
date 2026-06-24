@@ -929,7 +929,7 @@ function RoomForm({ room, onClose, onSave }) {
       : {
           name: "",
           type: "2D",
-          status: "active",
+          status: "maintenance",
           seatRows: [],
           previewGaps: [],
         },
@@ -949,7 +949,6 @@ function RoomForm({ room, onClose, onSave }) {
   const validate = () => {
     const e = {};
     if (!form.name.trim()) e.name = "Nhập tên phòng.";
-    if (form.seatRows.length === 0) e.seatRows = "Thêm ít nhất một dãy ghế.";
     return e;
   };
 
@@ -962,6 +961,7 @@ function RoomForm({ room, onClose, onSave }) {
     onSave({
       ...form,
       id: room?.id || Date.now(),
+      status: form.seatRows.length === 0 ? "maintenance" : form.status,
       previewGaps: normalizePreviewGaps(previewGaps),
       totalSeats: calcTotalSeats(form.seatRows),
     });
@@ -1110,6 +1110,11 @@ function RoomForm({ room, onClose, onSave }) {
                 <div className="room-preview-rows">
                   {form.seatRows.length} dãy ghế
                 </div>
+                {totalSeats === 0 && (
+                  <div className="room-preview-note">
+                    Phòng chưa có ghế, sẽ lưu ở trạng thái bảo trì
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1117,9 +1122,9 @@ function RoomForm({ room, onClose, onSave }) {
           {/* Seat rows */}
           <div className="cn-section-divider">
             <span>Quản lý dãy ghế</span>
-            {errors.seatRows && (
-              <span className="cn-error">{errors.seatRows}</span>
-            )}
+          </div>
+          <div className="cn-helper-text">
+            Có thể để trống sơ đồ ghế. Phòng mới chưa có ghế sẽ tự chuyển sang bảo trì.
           </div>
 
           <SeatRowManager
@@ -1327,7 +1332,11 @@ function CinemaForm({ cinema, onClose, onSave, saving }) {
       setErrors(e);
       return;
     }
-    onSave({ ...form, id: cinema?.id });
+    onSave({
+      ...form,
+      id: cinema?.id,
+      status: form.rooms.length === 0 ? "inactive" : form.status,
+    });
   };
 
   return (
@@ -1544,6 +1553,11 @@ function CinemaForm({ cinema, onClose, onSave, saving }) {
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {form.rooms.length === 0 && (
+              <div className="cn-helper-text">
+                Rạp chưa có phòng sẽ tự lưu ở trạng thái tạm ngưng.
               </div>
             )}
           </div>

@@ -7,7 +7,17 @@ export const CategoryModel = {
    */
   async findAll() {
     const [categories] = await db.query(
-      "SELECT * FROM Movie_Categories ORDER BY category_name",
+      `
+      SELECT
+        mc.category_id,
+        mc.category_name,
+        COUNT(DISTINCT CASE WHEN m.movie_id IS NOT NULL THEN m.movie_id END) AS movieCount
+      FROM Movie_Categories mc
+      LEFT JOIN Movie_Category_Detail mcd ON mc.category_id = mcd.category_id
+      LEFT JOIN Movies m ON mcd.movie_id = m.movie_id AND (m.is_deleted = 0 OR m.is_deleted IS NULL)
+      GROUP BY mc.category_id, mc.category_name
+      ORDER BY mc.category_name
+      `,
     );
     return categories;
   },
