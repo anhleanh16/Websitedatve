@@ -13,7 +13,12 @@ const ROOM_TYPE_COLOR = { IMAX: "#7c61ff", "3D": "#5bcad4", "2D": "#4ade80", VIP
 
 const EMPTY_FORM = {
   movieId: "", roomId: "", cinemaId: "",
-  startTime: "", price: "", availableSeats: "", status: "active",
+  startTime: "",
+  priceStandard: "",
+  priceVip: "",
+  priceCouple: "",
+  availableSeats: "",
+  status: "active",
 };
 
 function fmtTime(iso) {
@@ -106,7 +111,7 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, 
               <th>Loại phòng</th>
               <th>Bắt đầu</th>
               <th>Kết thúc</th>
-              <th>Giá vé</th>
+              <th>Bảng giá vé</th>
               <th>Ghế trống</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
@@ -138,7 +143,13 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, 
                   </td>
                   <td><span style={{ color: "#c0d0ff", fontSize: 13 }}>{fmtTime(s.startTime)}</span></td>
                   <td><span style={{ color: "#7a8fc0", fontSize: 13 }}>{fmtTime(s.endTime)}</span></td>
-                  <td><span style={{ color: "#a78bfa", fontWeight: 600 }}>{fmtMoney(s.price)}</span></td>
+                  <td>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <span style={{ color: "#a78bfa", fontWeight: 600 }}>Thường: {fmtMoney(s.priceStandard)}</span>
+                      <span style={{ color: "#fbbf24", fontSize: 12 }}>VIP: {fmtMoney(s.priceVip)}</span>
+                      <span style={{ color: "#fb7185", fontSize: 12 }}>Ghế đôi: {fmtMoney(s.priceCouple)}</span>
+                    </div>
+                  </td>
                   <td>
                     <span style={{ color: s.availableSeats === 0 ? "#f87171" : "#4ade80", fontWeight: 600 }}>
                       {s.availableSeats} / {room?.totalSeats}
@@ -239,7 +250,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
                       key={s.id}
                       className="sh-block"
                       style={{ left: `${left}%`, width: `${width}%`, background: isFull ? "rgba(248,113,113,0.25)" : "rgba(124,97,255,0.28)", borderColor: isFull ? "rgba(248,113,113,0.5)" : "rgba(124,97,255,0.6)" }}
-                      title={`${movie?.title} | ${fmtTime(s.startTime)} – ${fmtTime(s.endTime)} | ${fmtMoney(s.price)}`}
+                      title={`${movie?.title} | ${fmtTime(s.startTime)} – ${fmtTime(s.endTime)} | Thường ${fmtMoney(s.priceStandard)} | VIP ${fmtMoney(s.priceVip)} | Ghế đôi ${fmtMoney(s.priceCouple)}`}
                     >
                       <span className="sh-block-title">{movie?.title}</span>
                       <span className="sh-block-time">{new Date(s.startTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -320,7 +331,9 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
                       </span>
                     </div>
                     <div className="sh-schedule-meta">
-                      <span style={{ color: "#a78bfa", fontWeight: 600 }}>{fmtMoney(s.price)}</span>
+                      <span style={{ color: "#a78bfa", fontWeight: 600 }}>
+                        Thường {fmtMoney(s.priceStandard)} · VIP {fmtMoney(s.priceVip)} · Đôi {fmtMoney(s.priceCouple)}
+                      </span>
                       <span style={{ color: isFull ? "#f87171" : "#4ade80", fontSize: 12 }}>
                         {isCancelled ? "Đã hủy" : isFull ? "Hết chỗ" : `${s.availableSeats} ghế trống`}
                       </span>
@@ -340,7 +353,17 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
 function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, onSave }) {
   const isEdit = !!showtime;
   const [form, setForm] = useState(showtime
-    ? { movieId: showtime.movieId, cinemaId: showtime.cinemaId, roomId: showtime.roomId, startTime: toDateTimeLocalValue(showtime.startTime), price: showtime.price, availableSeats: showtime.availableSeats, status: showtime.status }
+    ? {
+        movieId: showtime.movieId,
+        cinemaId: showtime.cinemaId,
+        roomId: showtime.roomId,
+        startTime: toDateTimeLocalValue(showtime.startTime),
+        priceStandard: showtime.priceStandard,
+        priceVip: showtime.priceVip,
+        priceCouple: showtime.priceCouple,
+        availableSeats: showtime.availableSeats,
+        status: showtime.status,
+      }
     : { ...EMPTY_FORM }
   );
   const [errors, setErrors] = useState({});
@@ -360,7 +383,9 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
     if (!form.cinemaId)    e.cinemaId   = "Chọn rạp.";
     if (!form.roomId)      e.roomId     = "Chọn phòng chiếu.";
     if (!form.startTime)   e.startTime  = "Chọn giờ bắt đầu.";
-    if (!form.price || Number(form.price) <= 0) e.price = "Nhập giá vé hợp lệ.";
+    if (!form.priceStandard || Number(form.priceStandard) <= 0) e.priceStandard = "Nhập giá vé thường hợp lệ.";
+    if (!form.priceVip || Number(form.priceVip) <= 0) e.priceVip = "Nhập giá vé VIP hợp lệ.";
+    if (!form.priceCouple || Number(form.priceCouple) <= 0) e.priceCouple = "Nhập giá ghế đôi hợp lệ.";
     if (conflicts.length)  e.startTime  = "Phòng đã có suất chiếu trùng giờ.";
     return e;
   };
@@ -377,7 +402,9 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
       roomId: Number(form.roomId),
       startTime: form.startTime,
       endTime,
-      price: Number(form.price),
+      priceStandard: Number(form.priceStandard),
+      priceVip: Number(form.priceVip),
+      priceCouple: Number(form.priceCouple),
       availableSeats: Number(form.availableSeats) || room?.totalSeats || 0,
       status: form.status,
     });
@@ -445,16 +472,28 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
                 </div>
               )}
 
+              <div className="sh-field">
+                <label>Giá vé thường (₫) *</label>
+                <input type="number" min={0} className={errors.priceStandard ? "error" : ""} value={form.priceStandard} onChange={e => set("priceStandard", e.target.value)} placeholder="120000" />
+                {errors.priceStandard && <span className="sh-error">{errors.priceStandard}</span>}
+              </div>
+
               <div className="sh-field-row">
                 <div className="sh-field">
-                  <label>Giá vé (₫) *</label>
-                  <input type="number" min={0} className={errors.price ? "error" : ""} value={form.price} onChange={e => set("price", e.target.value)} placeholder="120000" />
-                  {errors.price && <span className="sh-error">{errors.price}</span>}
+                  <label>Giá vé VIP (₫) *</label>
+                  <input type="number" min={0} className={errors.priceVip ? "error" : ""} value={form.priceVip} onChange={e => set("priceVip", e.target.value)} placeholder="150000" />
+                  {errors.priceVip && <span className="sh-error">{errors.priceVip}</span>}
                 </div>
                 <div className="sh-field">
-                  <label>Ghế trống</label>
-                  <input type="number" min={0} value={form.availableSeats} onChange={e => set("availableSeats", e.target.value)} placeholder="Tự động từ phòng" />
+                  <label>Giá ghế đôi (₫) *</label>
+                  <input type="number" min={0} className={errors.priceCouple ? "error" : ""} value={form.priceCouple} onChange={e => set("priceCouple", e.target.value)} placeholder="220000" />
+                  {errors.priceCouple && <span className="sh-error">{errors.priceCouple}</span>}
                 </div>
+              </div>
+
+              <div className="sh-field">
+                <label>Ghế trống</label>
+                <input type="number" min={0} value={form.availableSeats} onChange={e => set("availableSeats", e.target.value)} placeholder="Tự động từ phòng" />
               </div>
 
               {/* Conflict warning */}
@@ -474,7 +513,9 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
                   <div className="sh-preview-row"><span>Phim</span><strong>{selMovie.title}</strong></div>
                   <div className="sh-preview-row"><span>Thời lượng</span><strong>{selMovie.duration} phút</strong></div>
                   {endTime && <div className="sh-preview-row"><span>Kết thúc</span><strong>{fmtTime(endTime)}</strong></div>}
-                  {form.price && <div className="sh-preview-row"><span>Giá vé</span><strong style={{ color: "#a78bfa" }}>{fmtMoney(form.price)}</strong></div>}
+                  {form.priceStandard && <div className="sh-preview-row"><span>Vé thường</span><strong style={{ color: "#a78bfa" }}>{fmtMoney(form.priceStandard)}</strong></div>}
+                  {form.priceVip && <div className="sh-preview-row"><span>Vé VIP</span><strong style={{ color: "#fbbf24" }}>{fmtMoney(form.priceVip)}</strong></div>}
+                  {form.priceCouple && <div className="sh-preview-row"><span>Ghế đôi</span><strong style={{ color: "#fb7185" }}>{fmtMoney(form.priceCouple)}</strong></div>}
                 </div>
               )}
             </div>
@@ -558,6 +599,9 @@ export default function AdminShowtimes() {
         startTime:      toDateTimeLocalValue(s.start_time),
         endTime:        toDateTimeLocalValue(s.end_time),
         price:          Number(s.price),
+        priceStandard:  Number(s.price_standard ?? s.price),
+        priceVip:       Number(s.price_vip ?? s.price),
+        priceCouple:    Number(s.price_couple ?? s.price),
         availableSeats: Number(s.available_seats),
         status:         s.status,
         // join fields (dùng cho display nhanh)
@@ -610,7 +654,10 @@ export default function AdminShowtimes() {
         roomId:         data.roomId,
         startTime:      data.startTime,
         endTime:        data.endTime,
-        price:          data.price,
+        price:          data.priceStandard,
+        priceStandard:  data.priceStandard,
+        priceVip:       data.priceVip,
+        priceCouple:    data.priceCouple,
         availableSeats: data.availableSeats,
         status:         data.status,
       };

@@ -2,6 +2,7 @@ import { db } from "../../../config/db.js";
 
 const DEFAULT_SEAT_STATUS = "active";
 let ensureRoomSeatGapsTablePromise;
+const ALLOWED_ROOM_STATUSES = new Set(["active", "inactive", "maintenance"]);
 
 const calcTotalSeats = (seatRows = []) =>
   (seatRows || []).reduce(
@@ -13,6 +14,11 @@ const buildSeatCode = (rowName, seatNumber) =>
   `${String(rowName || "")
     .trim()
     .toUpperCase()}${seatNumber}`;
+
+const normalizeRoomStatus = (status, totalSeat) => {
+  if (Number(totalSeat || 0) <= 0) return "maintenance";
+  return ALLOWED_ROOM_STATUSES.has(status) ? status : "active";
+};
 
 const ensureRoomSeatGapsTable = async () => {
   if (!ensureRoomSeatGapsTablePromise) {
@@ -243,18 +249,22 @@ const syncRooms = async (connection, cinemaId, rooms = []) => {
         (Array.isArray(room.seats) ? room.seats.length : 0) ||
         calcTotalSeats(room.seatRows),
     );
+    const roomStatus = normalizeRoomStatus(
+      room.status || room.room_status,
+      totalSeat,
+    );
 
     let currentRoomId = roomId;
 
     if (roomId && existingRoomIds.has(roomId)) {
       await connection.query(
-        "UPDATE Rooms SET room_name = ?, room_type = ?, total_seat = ? WHERE room_id = ? AND cinema_id = ?",
-        [roomName, roomType, totalSeat, roomId, cinemaId],
+        "UPDATE Rooms SET room_name = ?, room_type = ?, total_seat = ?, status = ? WHERE room_id = ? AND cinema_id = ?",
+        [roomName, roomType, totalSeat, roomStatus, roomId, cinemaId],
       );
     } else {
       const [result] = await connection.query(
-        "INSERT INTO Rooms (cinema_id, room_name, room_type, total_seat) VALUES (?, ?, ?, ?)",
-        [cinemaId, roomName, roomType, totalSeat],
+        "INSERT INTO Rooms (cinema_id, room_name, room_type, total_seat, status) VALUES (?, ?, ?, ?, ?)",
+        [cinemaId, roomName, roomType, totalSeat, roomStatus],
       );
       currentRoomId = result.insertId;
     }
@@ -387,7 +397,7 @@ export const remove = async (id) => {
 
 export const getRoomsByCinemaId = async (cinemaId) => {
   const [rooms] = await db.query(
-    "SELECT room_id, cinema_id, room_name, room_type, total_seat FROM Rooms WHERE cinema_id = ? ORDER BY room_id DESC",
+    "SELECT room_id, cinema_id, room_name, room_type, total_seat, status FROM Rooms WHERE cinema_id = ? ORDER BY room_id DESC",
     [cinemaId],
   );
   return rooms;

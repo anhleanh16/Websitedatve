@@ -295,8 +295,8 @@ export default function Booking() {
     seatLayout.totalVisualColumns +
       Math.max(0, seatLayout.totalVisualColumns - 1) * 0.18,
   );
-  const seatSize = Math.max(26, Math.min(36, Math.floor(620 / seatGridWeight)));
-  const seatGap = Math.max(6, Math.round(seatSize * 0.18));
+  const seatSize = Math.max(28, Math.min(42, Math.floor(700 / seatGridWeight)));
+  const seatGap = Math.max(6, Math.min(10, Math.round(seatSize * 0.16)));
 
   const seatPrices = {
     regular: 80000,

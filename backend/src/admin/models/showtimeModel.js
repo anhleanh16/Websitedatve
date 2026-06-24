@@ -13,7 +13,10 @@ export const ShowtimeModel = {
         r.cinema_id,
         s.start_time,
         s.end_time,
-        s.price,
+        COALESCE(s.price_standard, s.price) AS price_standard,
+        COALESCE(s.price_vip, s.price) AS price_vip,
+        COALESCE(s.price_couple, s.price) AS price_couple,
+        COALESCE(s.price_standard, s.price) AS price,
         s.available_seats,
         s.status,
         m.title AS movie_title,
@@ -39,6 +42,9 @@ export const ShowtimeModel = {
       `
       SELECT 
         s.*,
+        COALESCE(s.price_standard, s.price) AS normalized_price_standard,
+        COALESCE(s.price_vip, s.price) AS normalized_price_vip,
+        COALESCE(s.price_couple, s.price) AS normalized_price_couple,
         m.title AS movie_title,
         m.duration,
         c.cinema_name,
@@ -66,13 +72,30 @@ export const ShowtimeModel = {
       room_id,
       start_time,
       end_time,
+      price_standard,
+      price_vip,
+      price_couple,
       price,
       available_seats,
       status = "active",
     } = showtimeData;
+    const standardPrice = price_standard ?? price ?? 0;
+    const vipPrice = price_vip ?? standardPrice;
+    const couplePrice = price_couple ?? standardPrice;
     const [result] = await db.query(
-      "INSERT INTO Showtimes (movie_id, room_id, start_time, end_time, price, available_seats, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [movie_id, room_id, start_time, end_time, price, available_seats, status],
+      "INSERT INTO Showtimes (movie_id, room_id, start_time, end_time, price, price_standard, price_vip, price_couple, available_seats, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        movie_id,
+        room_id,
+        start_time,
+        end_time,
+        standardPrice,
+        standardPrice,
+        vipPrice,
+        couplePrice,
+        available_seats,
+        status,
+      ],
     );
     return result.insertId;
   },
@@ -86,13 +109,31 @@ export const ShowtimeModel = {
       room_id,
       start_time,
       end_time,
+      price_standard,
+      price_vip,
+      price_couple,
       price,
       available_seats,
       status,
     } = showtimeData;
+    const standardPrice = price_standard ?? price ?? 0;
+    const vipPrice = price_vip ?? standardPrice;
+    const couplePrice = price_couple ?? standardPrice;
     const [result] = await db.query(
-      "UPDATE Showtimes SET movie_id = ?, room_id = ?, start_time = ?, end_time = ?, price = ?, available_seats = ?, status = ? WHERE showtime_id = ?",
-      [movie_id, room_id, start_time, end_time, price, available_seats, status, id],
+      "UPDATE Showtimes SET movie_id = ?, room_id = ?, start_time = ?, end_time = ?, price = ?, price_standard = ?, price_vip = ?, price_couple = ?, available_seats = ?, status = ? WHERE showtime_id = ?",
+      [
+        movie_id,
+        room_id,
+        start_time,
+        end_time,
+        standardPrice,
+        standardPrice,
+        vipPrice,
+        couplePrice,
+        available_seats,
+        status,
+        id,
+      ],
     );
     return result.affectedRows > 0;
   },
@@ -135,8 +176,8 @@ export const ShowtimeModel = {
    */
   async getRoomsByCinema(cinemaId) {
     const sql = cinemaId
-      ? "SELECT room_id, cinema_id, room_name, room_type, total_seat FROM Rooms WHERE cinema_id = ? ORDER BY room_name ASC"
-      : "SELECT room_id, cinema_id, room_name, room_type, total_seat FROM Rooms ORDER BY room_name ASC";
+      ? "SELECT room_id, cinema_id, room_name, room_type, total_seat, status FROM Rooms WHERE cinema_id = ? AND status = 'active' ORDER BY room_name ASC"
+      : "SELECT room_id, cinema_id, room_name, room_type, total_seat, status FROM Rooms WHERE status = 'active' ORDER BY room_name ASC";
     const [rooms] = await db.query(sql, cinemaId ? [cinemaId] : []);
     return rooms;
   },

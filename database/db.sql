@@ -165,6 +165,9 @@ CREATE TABLE Showtimes (
     start_time DATETIME,
     end_time DATETIME,
     price DECIMAL(12,2),
+    price_standard DECIMAL(12,2),
+    price_vip DECIMAL(12,2),
+    price_couple DECIMAL(12,2),
     available_seats INT,
     status ENUM('active','cancelled'),
 

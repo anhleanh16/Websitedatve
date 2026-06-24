@@ -138,6 +138,32 @@ export const userGetMovieById = async (req, res) => {
       [movieId],
     );
 
+    const [showtimeRows] = await db.query(
+      `
+      SELECT
+        s.showtime_id,
+        s.room_id,
+        s.start_time,
+        s.end_time,
+        COALESCE(s.price_standard, s.price) AS price_standard,
+        COALESCE(s.price_vip, s.price) AS price_vip,
+        COALESCE(s.price_couple, s.price) AS price_couple,
+        s.available_seats,
+        r.room_name,
+        r.room_type,
+        c.cinemas_id AS cinema_id,
+        c.cinema_name
+      FROM Showtimes s
+      JOIN Rooms r ON s.room_id = r.room_id
+      JOIN Cinemas c ON r.cinema_id = c.cinemas_id
+      WHERE s.movie_id = ?
+        AND s.status = 'active'
+        AND DATE(s.start_time) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 6 DAY)
+      ORDER BY c.cinema_name ASC, s.start_time ASC
+    `,
+      [movieId],
+    );
+
     const totalReviews = Number(reviewStats?.review_count || 0);
     const breakdownMap = new Map(
       reviewBreakdownRows.map((row) => [Number(row.star), Number(row.count)]),
@@ -160,6 +186,7 @@ export const userGetMovieById = async (req, res) => {
         review_count: totalReviews,
         recommended_percent: Number(reviewStats?.recommended_percent || 0),
         rating_breakdown,
+        showtimes: showtimeRows,
       },
     });
   } catch (error) {
