@@ -317,11 +317,12 @@
   letter-spacing: 0.04em;
 }
 
-.movie-title {
-  font-size: clamp(2rem, 3vw, 3rem);
-  line-height: 1.05;
+.movie-detail-title {
+  font-size: clamp(2.4rem, 3.4vw, 3.6rem);
+  line-height: 1.06;
   margin: 0;
-  color: #ffffff;
+  color: #fff;
+  font-weight: 800;
 }
 
 .icon {
@@ -1434,8 +1435,8 @@
     border-radius: 12px;
   }
 
-  .movie-title {
-    font-size: 1.5rem;
+  .movie-detail-title {
+    font-size: 1.7rem;
     line-height: 1.1;
   }
 
@@ -1715,8 +1716,8 @@
     min-height: 160px;
   }
 
-  .movie-title {
-    font-size: 1.35rem;
+  .movie-detail-title {
+    font-size: 1.45rem;
   }
 
   .time-slot {

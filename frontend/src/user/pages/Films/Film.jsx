@@ -2,17 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import "./Film.css";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
-const sampleMovies = [
-  { id: 1, title: "Doraemon: Nobita và cuộc chiến vũ trụ tí hon", rating: 5 },
-  { id: 2, title: "Oppenheimer", rating: 5 },
-  { id: 3, title: "Dune: Part Two", rating: 5 },
-  { id: 4, title: "Inside Out 2", rating: 4 },
-  { id: 5, title: "Barbie", rating: 4 },
-  { id: 6, title: "The Batman", rating: 5 },
-  { id: 7, title: "Wicked", rating: 4 },
-  { id: 8, title: "Gladiator II", rating: 4 },
-];
-
 const banners = [
   "/uploads/banners/banner1.jpg",
   "/uploads/banners/banner2.jpg",
@@ -34,6 +23,10 @@ export default function Film() {
       roomLabel: roomParts.length > 0 ? roomParts.join(" • ") : "Chưa chọn phòng",
     };
   }, [bookingContext]);
+  const [activeTab, setActiveTab] = useState("now_showing");
+  const [movies, setMovies] = useState([]);
+  const [loadingMovies, setLoadingMovies] = useState(false);
+  const [moviesError, setMoviesError] = useState(null);
 
   const handleBannerChange = (newIndex) => {
     setIsTransitioning(true);
@@ -60,6 +53,45 @@ export default function Film() {
 
     return () => clearInterval(interval);
   }, [currentBannerIndex]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadMovies = async () => {
+      setLoadingMovies(true);
+      setMoviesError(null);
+      try {
+        const res = await fetch(`/api/user/movies?status=${encodeURIComponent(activeTab)}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("API error");
+        const data = await res.json();
+        const list = Array.isArray(data?.movies) ? data.movies : [];
+        setMovies(
+          list.map((m) => ({
+            id: m.movie_id,
+            title: m.title,
+            poster: m.poster,
+            rating: Number.isFinite(Number(m.rating)) && Number(m.review_count) > 0
+              ? Number(m.rating)
+              : null,
+            reviewCount: Number(m.review_count || 0),
+            status: m.status,
+          })),
+        );
+      } catch (err) {
+        if (err?.name === "AbortError") return;
+        console.error(err);
+        setMovies([]);
+        setMoviesError("Không thể tải danh sách phim.");
+      } finally {
+        setLoadingMovies(false);
+      }
+    };
+
+    loadMovies();
+    return () => controller.abort();
+  }, [activeTab]);
 
   return (
     <div className="film-page">
@@ -125,50 +157,87 @@ export default function Film() {
             </div>
 
             <div className="tabs">
-              <button className="tab active">Phim đang chiếu</button>
-              <button className="tab">Phim sắp chiếu</button>
+              <button
+                className={`tab ${activeTab === "now_showing" ? "active" : ""}`}
+                onClick={() => setActiveTab("now_showing")}
+              >
+                Phim đang chiếu
+              </button>
+              <button
+                className={`tab ${activeTab === "coming_soon" ? "active" : ""}`}
+                onClick={() => setActiveTab("coming_soon")}
+              >
+                Phim sắp chiếu
+              </button>
             </div>
 
             <div className="movie-grid">
-              {sampleMovies.map((m) => (
-                <Link
-                  to={`/movie/${m.id}`}
-                  state={{
-                    bookingContext,
-                    movieTitle: m.title,
-                  }}
-                  className="movie-card"
-                  key={m.id}
-                >
-                  <div className="poster" />
+              {loadingMovies && (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", opacity: 0.85 }}>
+                  Đang tải phim...
+                </div>
+              )}
 
-                  <div className="card-actions">
+              {!loadingMovies && moviesError && (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", opacity: 0.85 }}>
+                  {moviesError}
+                </div>
+              )}
+
+              {!loadingMovies && !moviesError && movies.length === 0 && (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", opacity: 0.85 }}>
+                  Chưa có phim.
+                </div>
+              )}
+
+              {!loadingMovies &&
+                !moviesError &&
+                movies.map((m) => (
+                  <Link
+                    to={`/movie/${m.id}`}
+                    state={bookingContext ? { bookingContext, movieTitle: m.title } : { movieTitle: m.title }}
+                    className="movie-card"
+                    key={m.id}
+                  >
                     <div
-                      className="rating"
-                      aria-label={`Đánh giá ${m.rating} sao`}
-                    >
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <span
-                          key={i}
-                          className={i < m.rating ? "star filled" : "star"}
-                        >
-                          ★
-                        </span>
-                      ))}
-                      <span className="rating-num">{m.rating}.0</span>
+                      className="poster"
+                      style={
+                        m.poster
+                          ? {
+                              backgroundImage: `url(${m.poster})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                            }
+                          : undefined
+                      }
+                    />
+
+                    <div className="card-actions">
+                      {typeof m.rating === "number" && (
+                        <div className="rating" aria-label={`Đánh giá ${m.rating} sao`}>
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <span
+                              key={i}
+                              className={i < m.rating ? "star filled" : "star"}
+                            >
+                              ★
+                            </span>
+                          ))}
+                          <span className="rating-num">{m.rating}.0</span>
+                        </div>
+                      )}
+
+                      <div className="action-btns">
+                        <button className="btn primary" type="button">
+                          {bookingContext ? "Chọn phim này" : "Mua vé"}
+                        </button>
+                        <button className="btn secondary">Chi tiết</button>
+                      </div>
                     </div>
 
-                    <div className="action-btns">
-                      <button className="btn primary" type="button">
-                        {bookingContext ? "Chọn phim này" : "Mua vé"}
-                      </button>
-                      <button className="btn secondary">Chi tiết</button>
-                    </div>
-                  </div>
-
-                  <div className="movie-title">{m.title}</div>
-                </Link>
-              ))}
+                    <div className="movie-title">{m.title}</div>
+                  </Link>
+                ))}
             </div>
 
             <div className="load-more">

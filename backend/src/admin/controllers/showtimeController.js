@@ -1,5 +1,15 @@
 import { ShowtimeModel } from "../models/showtimeModel.js";
 
+const normalizeShowtimePayload = (body = {}) => ({
+  movie_id: body.movie_id ?? body.movieId,
+  room_id: body.room_id ?? body.roomId,
+  start_time: body.start_time ?? body.startTime,
+  end_time: body.end_time ?? body.endTime,
+  price: body.price,
+  available_seats: body.available_seats ?? body.availableSeats,
+  status: body.status,
+});
+
 export const getShowtimes = async (req, res) => {
   try {
     const showtimes = await ShowtimeModel.findAll();
@@ -28,7 +38,9 @@ export const getShowtimeById = async (req, res) => {
 export const createShowtime = async (req, res) => {
   try {
     // Thêm logic kiểm tra xung đột lịch chiếu ở đây nếu cần
-    const showtimeId = await ShowtimeModel.create(req.body);
+    const showtimeId = await ShowtimeModel.create(
+      normalizeShowtimePayload(req.body),
+    );
     res
       .status(201)
       .json({ message: "Showtime created successfully", showtimeId });
@@ -41,7 +53,10 @@ export const createShowtime = async (req, res) => {
 export const updateShowtime = async (req, res) => {
   try {
     const { id } = req.params;
-    const success = await ShowtimeModel.update(id, req.body);
+    const success = await ShowtimeModel.update(
+      id,
+      normalizeShowtimePayload(req.body),
+    );
     if (success) {
       res.json({ message: "Showtime updated successfully" });
     } else {
@@ -107,9 +122,6 @@ export const getShowtimeCinemas = async (req, res) => {
 export const getShowtimeRooms = async (req, res) => {
   try {
     const { cinemaId } = req.query;
-    if (!cinemaId) {
-      return res.status(400).json({ message: "Cinema ID is required" });
-    }
     const rooms = await ShowtimeModel.getRoomsByCinema(cinemaId);
     res.json({ rooms });
   } catch (err) {

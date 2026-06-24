@@ -1,4 +1,5 @@
 import * as CinemaModel from "../../admin/models/cinemaModel.js";
+import { db } from "../../../config/db.js";
 
 const normalizeCinemaImagePath = (cinema) => {
   if (!cinema) return cinema;
@@ -42,6 +43,128 @@ export const userGetProfile = async (req, res) => {
     res.json({ user: { id: userId, name: "", email: "" } });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+export const userGetMovies = async (req, res) => {
+  try {
+    const { status } = req.query;
+
+    const params = [];
+    let whereSql = "WHERE m.is_deleted = 0 AND m.is_hidden = 0";
+
+    if (status && ["now_showing", "coming_soon"].includes(status)) {
+      whereSql += " AND m.status = ?";
+      params.push(status);
+    }
+
+    const [movies] = await db.query(
+      `
+      SELECT
+        m.movie_id,
+        m.title,
+        m.poster,
+        m.status,
+        m.release_date,
+        COALESCE(ROUND(AVG(r.rating), 1), 0) AS rating,
+        COUNT(r.review_id) AS review_count
+      FROM Movies m
+      LEFT JOIN Reviews r ON r.movie_id = m.movie_id
+      ${whereSql}
+      GROUP BY m.movie_id, m.title, m.poster, m.status, m.release_date
+      ORDER BY m.release_date DESC, m.movie_id DESC
+    `,
+      params,
+    );
+
+    res.json({ movies });
+  } catch (error) {
+    console.error("Error in userGetMovies:", error);
+    res.status(500).json({ message: "Error getting movies", movies: [] });
+  }
+};
+
+export const userGetMovieById = async (req, res) => {
+  try {
+    const movieId = Number(req.params.id);
+    if (!Number.isInteger(movieId) || movieId <= 0) {
+      return res.status(400).json({ message: "Invalid movie id" });
+    }
+
+    const [rows] = await db.query(
+      `
+      SELECT *
+      FROM Movies
+      WHERE movie_id = ? AND is_deleted = 0 AND is_hidden = 0
+      LIMIT 1
+    `,
+      [movieId],
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Movie not found" });
+    }
+
+    const movie = rows[0];
+    const [categories] = await db.query(
+      `
+      SELECT mc.category_id, mc.category_name
+      FROM Movie_Categories mc
+      JOIN Movie_Category_Detail mcd ON mc.category_id = mcd.category_id
+      WHERE mcd.movie_id = ?
+    `,
+      [movieId],
+    );
+
+    const [[reviewStats]] = await db.query(
+      `
+      SELECT
+        COALESCE(ROUND(AVG(rating), 1), 0) AS average_rating,
+        COUNT(*) AS review_count,
+        COALESCE(ROUND(AVG(CASE WHEN rating >= 4 THEN 100 ELSE 0 END), 0), 0) AS recommended_percent
+      FROM Reviews
+      WHERE movie_id = ?
+    `,
+      [movieId],
+    );
+
+    const [reviewBreakdownRows] = await db.query(
+      `
+      SELECT ROUND(rating) AS star, COUNT(*) AS count
+      FROM Reviews
+      WHERE movie_id = ?
+      GROUP BY ROUND(rating)
+    `,
+      [movieId],
+    );
+
+    const totalReviews = Number(reviewStats?.review_count || 0);
+    const breakdownMap = new Map(
+      reviewBreakdownRows.map((row) => [Number(row.star), Number(row.count)]),
+    );
+    const rating_breakdown = [5, 4, 3, 2, 1].map((star) => {
+      const count = breakdownMap.get(star) || 0;
+      return {
+        stars: star,
+        count,
+        percent: totalReviews > 0 ? Math.round((count / totalReviews) * 100) : 0,
+      };
+    });
+
+    res.json({
+      movie: {
+        ...movie,
+        posters: movie.posters ? JSON.parse(movie.posters) : [],
+        categories,
+        rating: Number(reviewStats?.average_rating || 0),
+        review_count: totalReviews,
+        recommended_percent: Number(reviewStats?.recommended_percent || 0),
+        rating_breakdown,
+      },
+    });
+  } catch (error) {
+    console.error("Error in userGetMovieById:", error);
+    res.status(500).json({ message: "Error getting movie" });
   }
 };
 

@@ -27,11 +27,23 @@ function fmtDate(iso) {
 }
 function fmtMoney(n) { return Number(n).toLocaleString("vi-VN") + " ₫"; }
 
+function toDateTimeLocalValue(input) {
+  if (!input) return "";
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hour = String(d.getHours()).padStart(2, "0");
+  const minute = String(d.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
 function calcEndTime(startIso, durationMin) {
   if (!startIso || !durationMin) return "";
   const d = new Date(startIso);
   d.setMinutes(d.getMinutes() + Number(durationMin));
-  return d.toISOString().slice(0, 16);
+  return toDateTimeLocalValue(d);
 }
 
 function getConflicts(showtimes, rooms, movies, newSt, excludeId = null) {
@@ -328,7 +340,7 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
 function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, onSave }) {
   const isEdit = !!showtime;
   const [form, setForm] = useState(showtime
-    ? { movieId: showtime.movieId, cinemaId: showtime.cinemaId, roomId: showtime.roomId, startTime: showtime.startTime.slice(0, 16), price: showtime.price, availableSeats: showtime.availableSeats, status: showtime.status }
+    ? { movieId: showtime.movieId, cinemaId: showtime.cinemaId, roomId: showtime.roomId, startTime: toDateTimeLocalValue(showtime.startTime), price: showtime.price, availableSeats: showtime.availableSeats, status: showtime.status }
     : { ...EMPTY_FORM }
   );
   const [errors, setErrors] = useState({});
@@ -539,22 +551,35 @@ export default function AdminShowtimes() {
 
       // Chuẩn hoá dữ liệu từ DB sang format component cần
       const normalizedSt = (stRes.showtimes || []).map(s => ({
-        id:             s.id,
-        movieId:        s.movieId,
-        roomId:         s.roomId,
-        cinemaId:       s.cinemaId,
-        startTime:      s.startTime ? new Date(s.startTime).toISOString().slice(0, 16) : "",
-        endTime:        s.endTime   ? new Date(s.endTime).toISOString().slice(0, 16)   : "",
+        id:             s.showtime_id,
+        movieId:        s.movie_id,
+        roomId:         s.room_id,
+        cinemaId:       s.cinema_id,
+        startTime:      toDateTimeLocalValue(s.start_time),
+        endTime:        toDateTimeLocalValue(s.end_time),
         price:          Number(s.price),
-        availableSeats: Number(s.availableSeats),
+        availableSeats: Number(s.available_seats),
         status:         s.status,
         // join fields (dùng cho display nhanh)
-        movieTitle:  s.movieTitle,
+        movieTitle:  s.movie_title,
         duration:    s.duration,
-        roomName:    s.roomName,
-        roomType:    s.roomType,
-        totalSeats:  s.totalSeats,
-        cinemaName:  s.cinemaName,
+        roomName:    s.room_name,
+        roomType:    s.room_type,
+        totalSeats:  s.total_seat,
+        cinemaName:  s.cinema_name,
+      }));
+
+      const normalizedCinemas = (cinRes.cinemas || []).map((c) => ({
+        id: c.cinema_id,
+        name: c.cinema_name,
+      }));
+
+      const normalizedRooms = (roomRes.rooms || []).map((r) => ({
+        id: r.room_id,
+        cinemaId: r.cinema_id,
+        name: r.room_name,
+        type: r.room_type,
+        totalSeats: Number(r.total_seat),
       }));
 
       const normalizedMovies = (mvRes.movies || []).map(m => ({
@@ -564,8 +589,8 @@ export default function AdminShowtimes() {
       }));
 
       setShowtimes(normalizedSt);
-      setCinemas(cinRes.cinemas  || []);
-      setRooms(roomRes.rooms     || []);
+      setCinemas(normalizedCinemas);
+      setRooms(normalizedRooms);
       setMovies(normalizedMovies);
     } catch (err) {
       console.error(err);

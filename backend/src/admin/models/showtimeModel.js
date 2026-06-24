@@ -8,13 +8,20 @@ export const ShowtimeModel = {
     const [showtimes] = await db.query(`
       SELECT 
         s.showtime_id,
+        s.movie_id,
+        s.room_id,
+        r.cinema_id,
         s.start_time,
         s.end_time,
+        s.price,
+        s.available_seats,
         s.status,
         m.title AS movie_title,
+        m.duration,
         c.cinema_name,
         r.room_name,
-        r.room_type
+        r.room_type,
+        r.total_seat
       FROM Showtimes s
       JOIN Movies m ON s.movie_id = m.movie_id
       JOIN Rooms r ON s.room_id = r.room_id
@@ -33,8 +40,12 @@ export const ShowtimeModel = {
       SELECT 
         s.*,
         m.title AS movie_title,
+        m.duration,
         c.cinema_name,
-        r.room_name
+        r.cinema_id,
+        r.room_name,
+        r.room_type,
+        r.total_seat
       FROM Showtimes s
       JOIN Movies m ON s.movie_id = m.movie_id
       JOIN Rooms r ON s.room_id = r.room_id
@@ -55,11 +66,13 @@ export const ShowtimeModel = {
       room_id,
       start_time,
       end_time,
+      price,
+      available_seats,
       status = "active",
     } = showtimeData;
     const [result] = await db.query(
-      "INSERT INTO Showtimes (movie_id, room_id, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)",
-      [movie_id, room_id, start_time, end_time, status],
+      "INSERT INTO Showtimes (movie_id, room_id, start_time, end_time, price, available_seats, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [movie_id, room_id, start_time, end_time, price, available_seats, status],
     );
     return result.insertId;
   },
@@ -68,10 +81,18 @@ export const ShowtimeModel = {
    * Cập nhật một lịch chiếu.
    */
   async update(id, showtimeData) {
-    const { movie_id, room_id, start_time, end_time, status } = showtimeData;
+    const {
+      movie_id,
+      room_id,
+      start_time,
+      end_time,
+      price,
+      available_seats,
+      status,
+    } = showtimeData;
     const [result] = await db.query(
-      "UPDATE Showtimes SET movie_id = ?, room_id = ?, start_time = ?, end_time = ?, status = ? WHERE showtime_id = ?",
-      [movie_id, room_id, start_time, end_time, status, id],
+      "UPDATE Showtimes SET movie_id = ?, room_id = ?, start_time = ?, end_time = ?, price = ?, available_seats = ?, status = ? WHERE showtime_id = ?",
+      [movie_id, room_id, start_time, end_time, price, available_seats, status, id],
     );
     return result.affectedRows > 0;
   },
@@ -104,7 +125,7 @@ export const ShowtimeModel = {
    */
   async getCinemas() {
     const [cinemas] = await db.query(
-      "SELECT cinemas_id AS cinema_id, cinema_name FROM Cinemas",
+      "SELECT cinemas_id AS cinema_id, cinema_name FROM Cinemas ORDER BY cinema_name ASC",
     );
     return cinemas;
   },
@@ -113,10 +134,10 @@ export const ShowtimeModel = {
    * Lấy danh sách phòng chiếu thuộc một rạp cụ thể.
    */
   async getRoomsByCinema(cinemaId) {
-    const [rooms] = await db.query(
-      "SELECT room_id, room_name FROM Rooms WHERE cinema_id = ?",
-      [cinemaId],
-    );
+    const sql = cinemaId
+      ? "SELECT room_id, cinema_id, room_name, room_type, total_seat FROM Rooms WHERE cinema_id = ? ORDER BY room_name ASC"
+      : "SELECT room_id, cinema_id, room_name, room_type, total_seat FROM Rooms ORDER BY room_name ASC";
+    const [rooms] = await db.query(sql, cinemaId ? [cinemaId] : []);
     return rooms;
   },
 };

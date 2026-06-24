@@ -12,8 +12,19 @@ const start = async () => {
       conn.release();
     }
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Backend running on http://localhost:${PORT}`);
+    });
+
+    server.on("error", (err) => {
+      if (err && err.code === "EADDRINUSE") {
+        console.error(
+          `Port ${PORT} is already in use. Backend may already be running.`,
+        );
+        process.exit(0);
+      }
+      console.error(err);
+      process.exit(1);
     });
   } catch (err) {
     console.error("Database connection failed:", err);

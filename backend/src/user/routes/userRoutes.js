@@ -3,6 +3,8 @@ import {
   getPublicCinemas,
   getPublicCinemaById,
   userGetProfile,
+  userGetMovies,
+  userGetMovieById,
   userUpdateProfile,
   userGetBookings,
   userCreateBooking
@@ -13,6 +15,8 @@ const router = express.Router();
 // Public cinemas
 router.get('/cinemas', getPublicCinemas);
 router.get('/cinemas/:id', getPublicCinemaById);
+router.get('/movies', userGetMovies);
+router.get('/movies/:id', userGetMovieById);
 
 // Profile
 router.get('/:userId/profile', userGetProfile);
