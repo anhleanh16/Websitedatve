@@ -10,7 +10,7 @@ export default function AdminHeader({ onMenuToggle }) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     dispatch(clearUser());
-    navigate('/');
+    navigate('/login');
   };
 
   return (

@@ -1,4 +1,5 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import AdminLayout from "../layouts/AdminLayout";
 import Dashboard from "../pages/Dashboard";
 import Users from "../pages/Users";
@@ -12,8 +13,17 @@ import Settings from "../pages/Settings";
 import Notifications from "../pages/Notifications";
 import Comments from "../pages/Comments";
 import Staff from "../pages/Staff";
+import NewsManagement from "../pages/NewsManagement";
+import { getValidStoredToken } from "../../utils/auth";
 
 export function AdminRoutes() {
+  const profile = useSelector((state) => state.user.profile);
+  const token = getValidStoredToken();
+
+  if (!token || profile?.role !== "admin") {
+    return <Navigate to="/login" replace />;
+  }
+
   return (
     <AdminLayout>
       <Routes>
@@ -26,6 +36,7 @@ export function AdminRoutes() {
         <Route path="cinemas"       element={<Cinemas />}       />
         <Route path="bookings"      element={<Bookings />}      />
         <Route path="promotions"    element={<Promotions />}    />
+        <Route path="news"          element={<NewsManagement />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="comments"      element={<Comments />}      />
         <Route path="reports"       element={<Reports />}       />

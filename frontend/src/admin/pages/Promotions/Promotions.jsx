@@ -1,100 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { adminPromotionService } from "../../services/adminApi";
 import './promotions.css';
-
-// ─── Sample Data ──────────────────────────────────────────────────────────────
-const SAMPLE_COUPONS = [
-  {
-    id: 1, code: "SUMMER25", type: "percent", value: 25,
-    minOrder: 100000, maxDiscount: 80000,
-    startDate: "2026-06-01", endDate: "2026-06-30",
-    usageLimit: 500, usedCount: 213,
-    applicableTo: "all", status: "active",
-    desc: "Giảm 25% mùa hè cho tất cả vé",
-  },
-  {
-    id: 2, code: "FLAT50K", type: "fixed", value: 50000,
-    minOrder: 150000, maxDiscount: 50000,
-    startDate: "2026-06-10", endDate: "2026-07-10",
-    usageLimit: 300, usedCount: 87,
-    applicableTo: "all", status: "active",
-    desc: "Giảm 50,000₫ cho đơn từ 150,000₫",
-  },
-  {
-    id: 3, code: "VIP20", type: "percent", value: 20,
-    minOrder: 200000, maxDiscount: 100000,
-    startDate: "2026-05-01", endDate: "2026-05-31",
-    usageLimit: 200, usedCount: 200,
-    applicableTo: "vip", status: "expired",
-    desc: "Ưu đãi 20% dành riêng thành viên VIP",
-  },
-  {
-    id: 4, code: "NEWUSER", type: "percent", value: 15,
-    minOrder: 0, maxDiscount: 60000,
-    startDate: "2026-01-01", endDate: "2026-12-31",
-    usageLimit: 1000, usedCount: 456,
-    applicableTo: "new", status: "active",
-    desc: "Giảm 15% cho lần đặt vé đầu tiên",
-  },
-  {
-    id: 5, code: "IMAX10", type: "percent", value: 10,
-    minOrder: 180000, maxDiscount: 50000,
-    startDate: "2026-07-01", endDate: "2026-07-31",
-    usageLimit: 400, usedCount: 0,
-    applicableTo: "imax", status: "inactive",
-    desc: "Giảm 10% cho suất chiếu IMAX",
-  },
-];
-
-const SAMPLE_VOUCHERS = [
-  {
-    id: 1, code: "VCH-BIRTH-AN", type: "percent", value: 30,
-    minOrder: 0, maxDiscount: 90000,
-    issuedTo: "Nguyễn Văn An", userId: 1,
-    issuedDate: "2026-03-15", expiryDate: "2026-04-15",
-    status: "used", usedDate: "2026-03-20",
-    desc: "Voucher sinh nhật khách hàng thân thiết",
-  },
-  {
-    id: 2, code: "VCH-GOLD-BINH", type: "fixed", value: 100000,
-    minOrder: 200000, maxDiscount: 100000,
-    issuedTo: "Trần Thị Bình", userId: 2,
-    issuedDate: "2026-06-01", expiryDate: "2026-06-30",
-    status: "active", usedDate: null,
-    desc: "Voucher hạng Vàng tháng 6",
-  },
-  {
-    id: 3, code: "VCH-COMP-0095", type: "percent", value: 100,
-    minOrder: 0, maxDiscount: 390000,
-    issuedTo: "Lê Minh Chi", userId: 3,
-    issuedDate: "2026-06-09", expiryDate: "2026-07-09",
-    status: "active", usedDate: null,
-    desc: "Bồi thường sự cố hoàn vé B0095",
-  },
-  {
-    id: 4, code: "VCH-DIA-HUNG", type: "percent", value: 15,
-    minOrder: 300000, maxDiscount: 120000,
-    issuedTo: "Phạm Đức Hùng", userId: 4,
-    issuedDate: "2026-05-01", expiryDate: "2026-05-31",
-    status: "expired", usedDate: null,
-    desc: "Voucher Kim Cương tháng 5",
-  },
-  {
-    id: 5, code: "VCH-EVENT-LAN", type: "fixed", value: 80000,
-    minOrder: 150000, maxDiscount: 80000,
-    issuedTo: "Nguyễn Thị Lan", userId: 5,
-    issuedDate: "2026-06-08", expiryDate: "2026-07-08",
-    status: "active", usedDate: null,
-    desc: "Voucher sự kiện ra mắt phim",
-  },
-];
-
-const USERS_LIST = [
-  { id: 1, name: "Nguyễn Văn An" },
-  { id: 2, name: "Trần Thị Bình" },
-  { id: 3, name: "Lê Minh Chi" },
-  { id: 4, name: "Phạm Đức Hùng" },
-  { id: 5, name: "Nguyễn Thị Lan" },
-];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const PROMO_STATUS = {
@@ -274,7 +180,7 @@ function CouponForm({ coupon, onClose, onSave }) {
 }
 
 // ─── Voucher Form Modal ───────────────────────────────────────────────────────
-function VoucherForm({ voucher, onClose, onSave }) {
+function VoucherForm({ voucher, users, onClose, onSave }) {
   const isEdit = !!voucher;
   const [form, setForm] = useState(voucher ? { ...voucher } : { ...EMPTY_VOUCHER, code: genCode("VCH"), issuedDate: new Date().toISOString().slice(0, 10) });
   const [errors, setErrors] = useState({});
@@ -323,12 +229,12 @@ function VoucherForm({ voucher, onClose, onSave }) {
                 <select className={errors.issuedTo ? "error" : ""}
                   value={form.userId}
                   onChange={e => {
-                    const u = USERS_LIST.find(x => String(x.id) === e.target.value);
+                    const u = users.find(x => String(x.id) === e.target.value);
                     set("userId", e.target.value);
-                    set("issuedTo", u?.name || "");
+                    set("issuedTo", u?.full_name || "");
                   }}>
                   <option value="">-- Chọn khách hàng --</option>
-                  {USERS_LIST.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
                 </select>
                 {errors.issuedTo && <span className="pr-error">{errors.issuedTo}</span>}
               </div>
@@ -531,7 +437,7 @@ function CouponTab({ coupons, onAdd, onEdit, onDelete }) {
 }
 
 // ─── Voucher Tab ──────────────────────────────────────────────────────────────
-function VoucherTab({ vouchers, onAdd, onEdit, onDelete }) {
+function VoucherTab({ vouchers, users, onAdd, onEdit, onDelete }) {
   const [search, setSearch]   = useState("");
   const [filterStatus, setFS] = useState("all");
   const [filterUser, setFU]   = useState("all");
@@ -556,7 +462,7 @@ function VoucherTab({ vouchers, onAdd, onEdit, onDelete }) {
         </select>
         <select className="pr-select" value={filterUser} onChange={e => setFU(e.target.value)}>
           <option value="all">Tất cả khách hàng</option>
-          {USERS_LIST.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
         </select>
         <button className="pr-btn pr-btn-add" onClick={onAdd}>+ Cấp voucher</button>
       </div>
@@ -617,9 +523,12 @@ function VoucherTab({ vouchers, onAdd, onEdit, onDelete }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminPromotions() {
-  const [coupons,  setCoupons]  = useState(SAMPLE_COUPONS);
-  const [vouchers, setVouchers] = useState(SAMPLE_VOUCHERS);
+  const [coupons,  setCoupons]  = useState([]);
+  const [vouchers, setVouchers] = useState([]);
+  const [users,    setUsers]    = useState([]);
   const [activeTab, setActiveTab] = useState("coupon");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [couponForm,  setCouponForm]  = useState(undefined); // undefined=closed, null=new, obj=edit
   const [voucherForm, setVoucherForm] = useState(undefined);
@@ -628,40 +537,81 @@ export default function AdminPromotions() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3200); };
 
-  // Coupon handlers
-  const handleSaveCoupon = (data) => {
-    if (coupons.find(c => c.id === data.id)) {
-      setCoupons(p => p.map(c => c.id === data.id ? data : c));
-      showToast(`Đã cập nhật mã "${data.code}".`);
-    } else {
-      setCoupons(p => [data, ...p]);
-      showToast(`Đã tạo mã khuyến mãi "${data.code}".`);
+  const loadData = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [promotionData, userData] = await Promise.all([
+        adminPromotionService.getAll(),
+        adminPromotionService.getRecipients(),
+      ]);
+      setCoupons(Array.isArray(promotionData?.coupons) ? promotionData.coupons : []);
+      setVouchers(Array.isArray(promotionData?.vouchers) ? promotionData.vouchers : []);
+      setUsers(Array.isArray(userData?.users) ? userData.users : []);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Không thể tải dữ liệu khuyến mãi.");
+    } finally {
+      setLoading(false);
     }
-    setCouponForm(undefined);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Coupon handlers
+  const handleSaveCoupon = async (data) => {
+    try {
+      if (coupons.find(c => c.id === data.id)) {
+        await adminPromotionService.updateCoupon(data.id, data);
+        showToast(`Đã cập nhật mã "${data.code}".`);
+      } else {
+        await adminPromotionService.createCoupon(data);
+        showToast(`Đã tạo mã khuyến mãi "${data.code}".`);
+      }
+      setCouponForm(undefined);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Không thể lưu mã khuyến mãi.");
+    }
   };
 
   // Voucher handlers
-  const handleSaveVoucher = (data) => {
-    if (vouchers.find(v => v.id === data.id)) {
-      setVouchers(p => p.map(v => v.id === data.id ? data : v));
-      showToast(`Đã cập nhật voucher "${data.code}".`);
-    } else {
-      setVouchers(p => [data, ...p]);
-      showToast(`Đã cấp voucher "${data.code}" cho ${data.issuedTo}.`);
+  const handleSaveVoucher = async (data) => {
+    try {
+      if (vouchers.find(v => v.id === data.id)) {
+        await adminPromotionService.updateVoucher(data.id, data);
+        showToast(`Đã cập nhật voucher "${data.code}".`);
+      } else {
+        await adminPromotionService.createVoucher(data);
+        showToast(`Đã cấp voucher "${data.code}" cho ${data.issuedTo}.`);
+      }
+      setVoucherForm(undefined);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Không thể lưu voucher.");
     }
-    setVoucherForm(undefined);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     const { type, item } = deleteTarget;
-    if (type === "coupon") {
-      setCoupons(p => p.filter(c => c.id !== item.id));
-      showToast(`Đã xóa mã "${item.code}".`);
-    } else {
-      setVouchers(p => p.filter(v => v.id !== item.id));
-      showToast(`Đã xóa voucher "${item.code}".`);
+    try {
+      await adminPromotionService.delete(item.id);
+      if (type === "coupon") {
+        setCoupons(p => p.filter(c => c.id !== item.id));
+        showToast(`Đã xóa mã "${item.code}".`);
+      } else {
+        setVouchers(p => p.filter(v => v.id !== item.id));
+        showToast(`Đã xóa voucher "${item.code}".`);
+      }
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Không thể xóa khuyến mãi.");
     }
-    setDeleteTarget(null);
   };
 
   // Stats
@@ -683,6 +633,12 @@ export default function AdminPromotions() {
         <h2>Quản lý khuyến mãi</h2>
         <p>Quản lý mã khuyến mãi dùng chung và voucher cấp riêng cho khách hàng</p>
       </div>
+
+      {error && (
+        <div className="pr-empty" style={{ padding: 18, textAlign: "left", color: "#fecaca" }}>
+          {error}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="pr-stats-row">
@@ -714,6 +670,7 @@ export default function AdminPromotions() {
       {activeTab === "voucher" && (
         <VoucherTab
           vouchers={vouchers}
+          users={users}
           onAdd={() => setVoucherForm(null)}
           onEdit={v => setVoucherForm(v)}
           onDelete={v => setDeleteTarget({ type: "voucher", item: v })}
@@ -722,7 +679,7 @@ export default function AdminPromotions() {
 
       {/* Modals */}
       {couponForm  !== undefined && <CouponForm  coupon={couponForm}   onClose={() => setCouponForm(undefined)}  onSave={handleSaveCoupon}  />}
-      {voucherForm !== undefined && <VoucherForm voucher={voucherForm} onClose={() => setVoucherForm(undefined)} onSave={handleSaveVoucher} />}
+      {voucherForm !== undefined && <VoucherForm voucher={voucherForm} users={users} onClose={() => setVoucherForm(undefined)} onSave={handleSaveVoucher} />}
       {deleteTarget && (
         <Confirm
           message={`Bạn có chắc muốn xóa ${deleteTarget.type === "coupon" ? `mã khuyến mãi` : "voucher"} "${deleteTarget.item.code}"? Hành động này không thể hoàn tác.`}
@@ -731,6 +688,7 @@ export default function AdminPromotions() {
         />
       )}
 
+      {loading && <div className="pr-empty">Đang tải dữ liệu khuyến mãi...</div>}
       <Toast message={toast} onClose={() => setToast("")} />
     </div>
   );

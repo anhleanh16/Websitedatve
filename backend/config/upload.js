@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 const moviesUploadDir = path.join(__dirname, "../uploads/movies");
 const trailersUploadDir = path.join(__dirname, "../uploads/trailers");
 const cinemasUploadDir = path.join(__dirname, "../uploads/cinemas");
+const newsUploadDir = path.join(__dirname, "../uploads/news");
 
 if (!fs.existsSync(moviesUploadDir)) {
   fs.mkdirSync(moviesUploadDir, { recursive: true });
@@ -19,6 +20,9 @@ if (!fs.existsSync(trailersUploadDir)) {
 }
 if (!fs.existsSync(cinemasUploadDir)) {
   fs.mkdirSync(cinemasUploadDir, { recursive: true });
+}
+if (!fs.existsSync(newsUploadDir)) {
+  fs.mkdirSync(newsUploadDir, { recursive: true });
 }
 
 // Cấu hình storage chung, phân biệt dựa trên fieldname
@@ -31,6 +35,8 @@ const storage = multer.diskStorage({
     } else if (file.fieldname === "image") {
       // For cinema images
       cb(null, cinemasUploadDir);
+    } else if (file.fieldname === "thumbnailFile") {
+      cb(null, newsUploadDir);
     }
   },
   filename: (req, file, cb) => {
@@ -41,13 +47,19 @@ const storage = multer.diskStorage({
       cb(null, "trailer-" + uniqueSuffix + path.extname(file.originalname));
     } else if (file.fieldname === "image") {
       cb(null, "cinema-" + uniqueSuffix + path.extname(file.originalname));
+    } else if (file.fieldname === "thumbnailFile") {
+      cb(null, "news-" + uniqueSuffix + path.extname(file.originalname));
     }
   },
 });
 
 // Filter file chung, phân biệt dựa trên fieldname
 const fileFilter = (req, file, cb) => {
-  if (file.fieldname === "posters" || file.fieldname === "image") {
+  if (
+    file.fieldname === "posters" ||
+    file.fieldname === "image" ||
+    file.fieldname === "thumbnailFile"
+  ) {
     // Gộp filter cho ảnh
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedTypes.test(
@@ -89,4 +101,10 @@ export const uploadCinemaImage = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB for cinema images
+});
+
+export const uploadNewsImage = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 },
 });

@@ -1,8 +1,14 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-// Khớp với cinema IDs trong MovieDetail.jsx
+const REGION_STORAGE_KEY = 'selectedRegion';
+
+const getInitialRegion = () => {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(REGION_STORAGE_KEY) || '';
+};
+
 const initialState = {
-  selectedRegion: 'danang', // Mặc định Đà Nẵng
+  selectedRegion: getInitialRegion(),
 };
 
 const regionSlice = createSlice({
@@ -11,6 +17,13 @@ const regionSlice = createSlice({
   reducers: {
     setRegion: (state, action) => {
       state.selectedRegion = action.payload;
+      if (typeof window !== 'undefined') {
+        if (action.payload) {
+          localStorage.setItem(REGION_STORAGE_KEY, action.payload);
+        } else {
+          localStorage.removeItem(REGION_STORAGE_KEY);
+        }
+      }
     },
   },
 });

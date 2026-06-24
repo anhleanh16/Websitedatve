@@ -2,14 +2,9 @@ import { useState } from 'react'
 import { useSelector } from 'react-redux'
 import { FaCrown, FaStar, FaGift, FaTicketAlt, FaHistory, FaInfoCircle, FaCopy, FaChevronDown, FaChevronUp } from 'react-icons/fa'
 import { MdCardMembership, MdLocalOffer } from 'react-icons/md'
+import { useEffect } from 'react'
+import { userPromotionService } from '../../services/userApi'
 import './membership.css'
-
-// --- Mock data ---
-const MOCK_VOUCHERS = [
-  { id: 1, code: 'LUNA50K', title: 'Giảm 50.000đ', desc: 'Áp dụng cho đơn từ 150.000đ', expiry: '30/06/2026', color: '#7c3aed' },
-  { id: 2, code: 'FREEPOP', title: 'Combo bắp + nước miễn phí', desc: 'Áp dụng khi mua từ 2 vé trở lên', expiry: '15/07/2026', color: '#0ea5e9' },
-  { id: 3, code: 'IMAX20', title: 'Giảm 20% vé IMAX', desc: 'Không áp dụng ngày lễ', expiry: '31/07/2026', color: '#f59e0b' },
-]
 
 const MOCK_REWARDS = [
   { id: 1, points: 200, title: 'Vé xem phim 2D', icon: '🎟️' },
@@ -82,6 +77,10 @@ export default function Membership() {
   const [activeTab, setActiveTab] = useState('overview')
   const [copiedCode, setCopiedCode] = useState(null)
   const [openFaq, setOpenFaq] = useState(null)
+  const [vouchers, setVouchers] = useState([])
+  const [coupons, setCoupons] = useState([])
+  const [loadingPromotions, setLoadingPromotions] = useState(false)
+  const [promotionError, setPromotionError] = useState('')
 
   // Mock data cho user
   const memberCode = profile ? `LNX-${String(profile.id || 10001).padStart(6, '0')}` : 'LNX-010001'
@@ -98,6 +97,31 @@ export default function Membership() {
     setCopiedCode(code)
     setTimeout(() => setCopiedCode(null), 2000)
   }
+
+  useEffect(() => {
+    const loadPromotions = async () => {
+      if (!profile?.id) {
+        setVouchers([])
+        setCoupons([])
+        return
+      }
+
+      setLoadingPromotions(true)
+      setPromotionError('')
+      try {
+        const data = await userPromotionService.getAll(profile.id)
+        setVouchers(Array.isArray(data?.vouchers) ? data.vouchers : [])
+        setCoupons(Array.isArray(data?.coupons) ? data.coupons : [])
+      } catch (err) {
+        console.error(err)
+        setPromotionError(err.message || 'Không thể tải khuyến mãi.')
+      } finally {
+        setLoadingPromotions(false)
+      }
+    }
+
+    loadPromotions()
+  }, [profile?.id])
 
   const TABS = [
     { key: 'overview', label: 'Tổng quan', icon: <MdCardMembership /> },
@@ -211,7 +235,7 @@ export default function Membership() {
               </div>
               <div>
                 <div className='ov-card-label'>Voucher khả dụng</div>
-                <div className='ov-card-value'>{MOCK_VOUCHERS.length} voucher</div>
+                <div className='ov-card-value'>{vouchers.filter(v => v.status === 'active').length} voucher</div>
               </div>
             </div>
 
@@ -295,16 +319,18 @@ export default function Membership() {
           <div className='vouchers-section'>
             <p className='section-desc'>Voucher của bạn — click sao chép để sử dụng khi đặt vé</p>
             <div className='vouchers-grid'>
-              {MOCK_VOUCHERS.map(v => (
-                <div key={v.id} className='voucher-card' style={{ '--v-color': v.color }}>
-                  <div className='voucher-left' style={{ background: v.color }}>
+              {vouchers.map(v => {
+                const voucherColor = v.type === 'fixed' ? '#0ea5e9' : '#7c3aed'
+                return (
+                <div key={v.id} className='voucher-card' style={{ '--v-color': voucherColor }}>
+                  <div className='voucher-left' style={{ background: voucherColor }}>
                     <FaTicketAlt />
                   </div>
                   <div className='voucher-body'>
-                    <div className='voucher-title'>{v.title}</div>
+                    <div className='voucher-title'>{v.title || v.code}</div>
                     <div className='voucher-desc'>{v.desc}</div>
                     <div className='voucher-meta'>
-                      <span className='voucher-expiry'>HSD: {v.expiry}</span>
+                      <span className='voucher-expiry'>HSD: {v.expiryDate || 'Không giới hạn'}</span>
                       <button className='voucher-copy-btn' onClick={() => handleCopy(v.code)}>
                         <FaCopy />
                         <span>{copiedCode === v.code ? 'Đã sao chép!' : v.code}</span>
@@ -312,12 +338,24 @@ export default function Membership() {
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
-            {MOCK_VOUCHERS.length === 0 && (
+            {loadingPromotions && (
               <div className='empty-state'>
                 <FaTicketAlt />
-                <p>Bạn chưa có voucher nào. Đổi điểm hoặc tham gia ưu đãi để nhận voucher!</p>
+                <p>Đang tải voucher...</p>
+              </div>
+            )}
+            {!loadingPromotions && promotionError && (
+              <div className='empty-state'>
+                <FaTicketAlt />
+                <p>{promotionError}</p>
+              </div>
+            )}
+            {!loadingPromotions && !promotionError && vouchers.length === 0 && (
+              <div className='empty-state'>
+                <FaTicketAlt />
+                <p>{profile?.id ? 'Bạn chưa có voucher nào.' : 'Vui lòng đăng nhập để xem voucher của bạn.'}</p>
               </div>
             )}
           </div>
@@ -326,16 +364,26 @@ export default function Membership() {
         {/* ===== ƯU ĐÃI ===== */}
         {activeTab === 'benefits' && (
           <div className='benefits-section'>
-            <p className='section-desc'>Đặc quyền dành riêng cho thành viên <strong style={{ color: tier.color }}>{tier.icon} {tier.name}</strong></p>
+            <p className='section-desc'>Ưu đãi đang hoạt động dành cho thành viên <strong style={{ color: tier.color }}>{tier.icon} {tier.name}</strong></p>
             <div className='benefits-grid'>
-              {MOCK_BENEFITS.map((b, i) => (
-                <div key={i} className='benefit-card card-glass'>
-                  <div className='benefit-icon'>{b.icon}</div>
-                  <div className='benefit-title'>{b.title}</div>
-                  <div className='benefit-desc'>{b.desc}</div>
+              {coupons.map((b) => (
+                <div key={b.id} className='benefit-card card-glass'>
+                  <div className='benefit-icon'>{b.type === 'fixed' ? '💸' : '🏷️'}</div>
+                  <div className='benefit-title'>{b.title || b.code}</div>
+                  <div className='benefit-desc'>
+                    {b.desc || 'Ưu đãi mới đang áp dụng tại Lunexa Movix.'}
+                  </div>
+                  <div className='benefit-desc'>
+                    Mã: <strong>{b.code}</strong> · HSD: {b.endDate || 'Không giới hạn'}
+                  </div>
                 </div>
               ))}
             </div>
+            {loadingPromotions && <p className='section-desc'>Đang tải ưu đãi...</p>}
+            {!loadingPromotions && !promotionError && coupons.length === 0 && (
+              <p className='section-desc'>Hiện chưa có ưu đãi nào đang hoạt động.</p>
+            )}
+            {!loadingPromotions && promotionError && <p className='section-desc'>{promotionError}</p>}
 
             <div className='benefits-table-wrap card-glass'>
               <h3>So sánh quyền lợi theo hạng</h3>

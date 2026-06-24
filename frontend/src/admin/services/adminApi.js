@@ -1,13 +1,42 @@
 const BASE = import.meta.env.VITE_API_URL || "/api";
+import { clearStoredSession, getValidStoredToken } from "../../utils/auth";
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
+function getAuthHeaders() {
+  const token = getValidStoredToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function apiFetch(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders(), ...options.headers },
     ...options,
   });
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.message || `API error ${res.status}`);
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearStoredSession();
+      window.location.assign("/login");
+    }
+    throw new Error(data?.message || `API error ${res.status}`);
+  }
+  return data;
+}
+
+async function uploadFetch(path, options = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { ...getAuthHeaders(), ...options.headers },
+    ...options,
+  });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearStoredSession();
+      window.location.assign("/login");
+    }
+    throw new Error(data?.message || `API error ${res.status}`);
+  }
   return data;
 }
 
@@ -17,6 +46,7 @@ export const adminMovieService = {
   createMovie: (formData) => {
     return fetch(`${BASE}/admin/movies`, {
       method: "POST",
+      headers: getAuthHeaders(),
       body: formData,
     }).then((res) => {
       if (!res.ok) throw new Error("API error");
@@ -26,6 +56,7 @@ export const adminMovieService = {
   updateMovie: (id, formData) => {
     return fetch(`${BASE}/admin/movies/${id}`, {
       method: "PUT",
+      headers: getAuthHeaders(),
       body: formData,
     }).then((res) => {
       if (!res.ok) throw new Error("API error");
@@ -61,8 +92,79 @@ export const adminCategoryService = {
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const adminUserService = {
   getAllUsers: () => apiFetch("/admin/users"),
+  deactivateUser: (id) =>
+    apiFetch(`/admin/users/${id}/deactivate`, { method: "PUT" }),
   lockUser: (id) => apiFetch(`/admin/users/${id}/lock`, { method: "PUT" }),
   unlockUser: (id) => apiFetch(`/admin/users/${id}/unlock`, { method: "PUT" }),
+};
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+export const adminNotificationService = {
+  getAll: () => apiFetch("/admin/notifications"),
+  getRecipients: () => apiFetch("/admin/notifications/recipients"),
+  getDetail: (id) => apiFetch(`/admin/notifications/${id}`),
+  create: (data) =>
+    apiFetch("/admin/notifications", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id, data) =>
+    apiFetch(`/admin/notifications/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id) => apiFetch(`/admin/notifications/${id}`, { method: "DELETE" }),
+};
+
+// ─── Promotions ───────────────────────────────────────────────────────────────
+export const adminPromotionService = {
+  getAll: () => apiFetch("/admin/promotions"),
+  getRecipients: () => apiFetch("/admin/promotions/recipients"),
+  createCoupon: (data) =>
+    apiFetch("/admin/promotions/coupons", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateCoupon: (id, data) =>
+    apiFetch(`/admin/promotions/coupons/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  createVoucher: (data) =>
+    apiFetch("/admin/promotions/vouchers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateVoucher: (id, data) =>
+    apiFetch(`/admin/promotions/vouchers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id) => apiFetch(`/admin/promotions/${id}`, { method: "DELETE" }),
+};
+
+// ─── News ─────────────────────────────────────────────────────────────────────
+export const adminNewsService = {
+  getAll: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+      ),
+    ).toString();
+    return apiFetch(`/admin/news${q ? `?${q}` : ""}`);
+  },
+  getById: (id) => apiFetch(`/admin/news/${id}`),
+  create: (formData) =>
+    uploadFetch("/admin/news", {
+      method: "POST",
+      body: formData,
+    }),
+  update: (id, formData) =>
+    uploadFetch(`/admin/news/${id}`, {
+      method: "PUT",
+      body: formData,
+    }),
+  delete: (id) => apiFetch(`/admin/news/${id}`, { method: "DELETE" }),
 };
 
 // ─── Bookings ─────────────────────────────────────────────────────────────────
@@ -159,6 +261,7 @@ export const adminCinemaService = {
   createCinema: (formData) => {
     return fetch(`${BASE}/admin/cinemas`, {
       method: "POST",
+      headers: getAuthHeaders(),
       body: formData,
     }).then((res) => {
       return res.json().then((data) => {
@@ -171,6 +274,7 @@ export const adminCinemaService = {
   updateCinema: (id, formData) => {
     return fetch(`${BASE}/admin/cinemas/${id}`, {
       method: "PUT",
+      headers: getAuthHeaders(),
       body: formData,
     }).then((res) => {
       return res.json().then((data) => {

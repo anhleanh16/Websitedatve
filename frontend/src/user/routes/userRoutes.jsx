@@ -5,6 +5,7 @@ import Film from "../pages/Films/Film";
 import Booking from "../pages/Bookings/Booking";
 import Payment from "../pages/Payment/Payment";
 import News from "../pages/News/News";
+import NewsDetail from "../pages/News/NewsDetail";
 import Cinemas from "../pages/Cinemas";
 import AIAssistant from "../pages/AIAssistant";
 import Notifications from "../pages/Notifications/Notifications";
@@ -26,11 +27,14 @@ export function UserRoutes() {
         <Route path="/Bookings/Booking" element={<Booking />} />
         <Route path="/payment" element={<Payment />} />
         <Route path="/news" element={<News />} />
+        <Route path="/news/:slug" element={<NewsDetail />} />
         <Route path="/cinemas" element={<Cinemas />} />
         <Route path="/ai-assistant" element={<AIAssistant />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/Logins/Login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route path="/Registers/Register" element={<Register />} />
         <Route path="/Membership" element={<Membership />} />
         <Route path="*" element={<h1>404 Not Found</h1>} />

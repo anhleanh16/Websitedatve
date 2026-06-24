@@ -1,14 +1,24 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
   FaPlay, FaTicketAlt, FaStar, FaMapMarkerAlt, FaClock,
-  FaFire, FaRobot, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt, FaNewspaper
+  FaFire, FaRobot, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt
 } from 'react-icons/fa'
 import { MdLocalOffer } from 'react-icons/md'
+import { userNewsService } from '../../services/userApi'
+import { toAbsoluteAssetUrl } from '../../../utils/api'
 import './home.css'
 
 /* ─── Helpers ─── */
 const clamp = (r) => Math.min(r, 5)
+const VISIBLE = 4
+const FORMAT_COLORS = { '2D': '#3b82f6', '3D': '#8b5cf6', IMAX: '#f59e0b' }
+const BOOKING_STEPS = ['Chọn phim', 'Chọn rạp', 'Chọn ngày', 'Suất chiếu']
+const HERO_THEMES = [
+  { accent: '#818cf8', bg: 'linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#0f172a 100%)' },
+  { accent: '#fca5a5', bg: 'linear-gradient(135deg,#450a0a 0%,#7f1d1d 40%,#0f172a 100%)' },
+  { accent: '#86efac', bg: 'linear-gradient(135deg,#052e16 0%,#14532d 40%,#0f172a 100%)' },
+]
 
 function StarRating({ rating }) {
   const full  = Math.floor(clamp(rating))
@@ -20,40 +30,6 @@ function StarRating({ rating }) {
     </span>
   )
 }
-
-/* ─── Data ─── */
-const SLIDES = [
-  {
-    id: 1, label: 'PHIM HOT THÁNG 6',
-    title: 'Doraemon: Nobita và Cuộc Chiến Vũ Trụ Tí Hon',
-    desc: 'Hành trình phiêu lưu kỳ diệu cùng Doraemon và những người bạn trong thế giới vũ trụ thu nhỏ đầy bất ngờ.',
-    genre: 'Hoạt hình · Phiêu lưu', duration: '96 phút', rating: 4.1,
-    bg: 'linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#0f172a 100%)', accent: '#818cf8',
-  },
-  {
-    id: 2, label: 'PHIM SẮP CHIẾU',
-    title: 'Avengers: Secret Wars',
-    desc: 'Cuộc chiến vũ trụ quy mô lớn nhất từ trước đến nay. Số phận đa vũ trụ được quyết định bởi những anh hùng cuối cùng.',
-    genre: 'Hành động · Siêu anh hùng', duration: '180 phút', rating: 4.6,
-    bg: 'linear-gradient(135deg,#450a0a 0%,#7f1d1d 40%,#0f172a 100%)', accent: '#fca5a5',
-  },
-  {
-    id: 3, label: 'ĐANG CHIẾU',
-    title: 'Inside Out 3: Cảm Xúc Bùng Nổ',
-    desc: 'Riley trưởng thành hơn, thế giới cảm xúc bên trong cũng phức tạp hơn bao giờ hết với những cảm xúc hoàn toàn mới.',
-    genre: 'Hoạt hình · Gia đình', duration: '100 phút', rating: 4.4,
-    bg: 'linear-gradient(135deg,#052e16 0%,#14532d 40%,#0f172a 100%)', accent: '#86efac',
-  },
-]
-
-const NOW_SHOWING = [
-  { id: 1, title: 'Doraemon',     genre: 'Hoạt hình',           rating: 4.1, votes: '2.1k', age: 'P',   hot: true  },
-  { id: 2, title: 'Avengers',     genre: 'Hành động',           rating: 4.6, votes: '5.4k', age: '13+', hot: true  },
-  { id: 3, title: 'Inside Out 3', genre: 'Gia đình',            rating: 4.4, votes: '3.2k', age: 'P',   hot: false },
-  { id: 4, title: 'Dune: Part 3', genre: 'Khoa học viễn tưởng', rating: 4.3, votes: '1.8k', age: '13+', hot: false },
-  { id: 5, title: 'Moana 3',      genre: 'Hoạt hình',           rating: 4.0, votes: '1.1k', age: 'P',   hot: false },
-  { id: 6, title: 'Spider-Man 4', genre: 'Hành động',           rating: 4.5, votes: '4.7k', age: '13+', hot: true  },
-]
 
 const DEALS = [
   { id: 1, emoji: '🍿', title: 'Combo ưu đãi',    desc: 'Vé + bắp rang + nước chỉ 99K', tag: 'TIẾT KIỆM', color: '#0ea5e9' },
@@ -68,31 +44,199 @@ const AD_SLIDES = [
   { id: 3, icon: <FaTag />,  tag: 'SẮP RA MẮT', title: 'Avengers: Secret Wars – Mở bán trước', desc: 'Đặt vé trước 7 ngày, nhận poster độc quyền kèm vé.',              color: '#818cf8' },
 ]
 
-const SHOWTIMES = {
-  all:  [
-    { id: 1, title: 'Doraemon',     times: ['09:00','11:30','14:00','16:30'], format: '2D'   },
-    { id: 2, title: 'Avengers',     times: ['10:00','13:15','16:45','20:00'], format: 'IMAX' },
-    { id: 3, title: 'Inside Out 3', times: ['09:30','12:00','15:30','18:00'], format: '3D'   },
-    { id: 4, title: 'Spider-Man 4', times: ['11:00','14:30','17:00','20:30'], format: 'IMAX' },
-  ],
-  '2D':  [{ id: 1, title: 'Doraemon',     times: ['09:00','11:30','14:00','16:30'], format: '2D'   }],
-  '3D':  [{ id: 3, title: 'Inside Out 3', times: ['09:30','12:00','15:30','18:00'], format: '3D'   }],
-  IMAX:  [
-    { id: 2, title: 'Avengers',     times: ['10:00','13:15','16:45','20:00'], format: 'IMAX' },
-    { id: 4, title: 'Spider-Man 4', times: ['11:00','14:30','17:00','20:30'], format: 'IMAX' },
-  ],
-}
-
-const NEWS = [
-  { id: 1, tag: 'Điện ảnh', title: 'Avengers: Secret Wars xác nhận ngày khởi chiếu toàn cầu',         time: '2 giờ trước',  img: '🎬' },
-  { id: 2, tag: 'Ưu đãi',   title: 'Lunexa Movix ra mắt thẻ thành viên Diamond với đặc quyền độc quyền', time: '5 giờ trước',  img: '🎁' },
-  { id: 3, tag: 'Phim mới', title: 'Inside Out 3 phá kỷ lục phòng vé tuần đầu tại Việt Nam',           time: '1 ngày trước', img: '📊' },
-  { id: 4, tag: 'Sự kiện', title: 'Đêm hội điện ảnh Lunexa 2026 – Sự kiện không thể bỏ lỡ tháng 7',  time: '2 ngày trước', img: '🎉' },
+const HOME_NEWS_GROUPS = [
+  { key: 'movie_news', label: 'Tin điện ảnh', color: '#7c3aed', icon: '🎬' },
+  { key: 'promotion', label: 'Khuyến mãi', color: '#f59e0b', icon: '🎁' },
+  { key: 'event', label: 'Sự kiện', color: '#22c55e', icon: '🎉' },
 ]
 
-const BOOKING_STEPS  = ['Chọn phim', 'Chọn rạp', 'Chọn ngày', 'Suất chiếu']
-const FORMAT_COLORS  = { '2D': '#3b82f6', '3D': '#8b5cf6', IMAX: '#f59e0b' }
-const VISIBLE        = 4
+const formatReviewCount = (count) => {
+  const value = Number(count || 0)
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1).replace(/\.0$/, '')}k`
+  }
+  return `${value}`
+}
+
+const formatMovieAge = (ageLimit) => {
+  const age = Number(ageLimit || 0)
+  return age > 0 ? `${age}+` : 'P'
+}
+
+const formatHomeDate = () =>
+  new Date().toLocaleDateString('vi-VN', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+
+const formatRelativeTime = (value) => {
+  if (!value) return 'Mới cập nhật'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Mới cập nhật'
+
+  const diff = Date.now() - date.getTime()
+  const hour = 60 * 60 * 1000
+  const day = 24 * hour
+
+  if (diff < hour) {
+    const minutes = Math.max(1, Math.floor(diff / (60 * 1000)))
+    return `${minutes} phút trước`
+  }
+
+  if (diff < day) {
+    return `${Math.max(1, Math.floor(diff / hour))} giờ trước`
+  }
+
+  if (diff < day * 7) {
+    return `${Math.max(1, Math.floor(diff / day))} ngày trước`
+  }
+
+  return date.toLocaleDateString('vi-VN')
+}
+
+const getNewsTag = (category) => {
+  switch (category) {
+    case 'movie_news':
+      return 'Điện ảnh'
+    case 'promotion':
+      return 'Ưu đãi'
+    case 'event':
+      return 'Sự kiện'
+    case 'coming_soon':
+      return 'Sắp chiếu'
+    case 'review':
+      return 'Review'
+    case 'announcement':
+      return 'Thông báo'
+    default:
+      return 'Tin tức'
+  }
+}
+
+const getNewsFallbackIcon = (category) => {
+  switch (category) {
+    case 'movie_news':
+      return '🎬'
+    case 'promotion':
+      return '🎁'
+    case 'event':
+      return '🎉'
+    case 'coming_soon':
+      return '🍿'
+    case 'review':
+      return '⭐'
+    case 'announcement':
+      return '📢'
+    default:
+      return '📰'
+  }
+}
+
+const normalizeHomeNews = (item) => ({
+  id: item.news_id,
+  slug: item.slug,
+  category: item.category,
+  tag: getNewsTag(item.category),
+  title: item.title,
+  time: formatRelativeTime(item.published_at || item.created_at),
+  image: item.thumbnail ? toAbsoluteAssetUrl(item.thumbnail) : '',
+  icon: getNewsFallbackIcon(item.category),
+  excerpt: item.short_description || '',
+})
+
+const buildHeroBackground = (poster, fallbackBg) =>
+  poster
+    ? `linear-gradient(90deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.76) 36%, rgba(15,23,42,0.9) 100%), url(${poster}) center/cover no-repeat`
+    : fallbackBg
+
+const normalizeMovie = (movie) => ({
+  id: movie.movie_id,
+  title: movie.title,
+  poster: movie.poster || '',
+  status: movie.status,
+  releaseDate: movie.release_date,
+  duration: Number(movie.duration || 0),
+  age: formatMovieAge(movie.age_limit),
+  rating: Number(movie.rating || 0),
+  reviewCount: Number(movie.review_count || 0),
+  genre: movie.categories || 'Đang cập nhật',
+  hot: Number(movie.rating || 0) >= 4.5 || Number(movie.review_count || 0) >= 10,
+})
+
+const buildHeroSlides = (movies) => {
+  if (!movies.length) {
+    return [
+      {
+        id: 'fallback',
+        label: 'TRANG CHỦ',
+        title: 'Khám phá phim mới tại Lunexa',
+        desc: 'Danh sách phim, suất chiếu và rạp sẽ được đồng bộ trực tiếp từ cơ sở dữ liệu.',
+        genre: 'Đang cập nhật',
+        duration: '--',
+        rating: 0,
+        poster: '',
+        accent: HERO_THEMES[0].accent,
+        bg: HERO_THEMES[0].bg,
+      },
+    ]
+  }
+
+  return movies.slice(0, 3).map((movie, index) => {
+    const theme = HERO_THEMES[index % HERO_THEMES.length]
+    return {
+      id: movie.id,
+      label: movie.status === 'coming_soon' ? 'PHIM SẮP CHIẾU' : 'PHIM ĐANG CHIẾU',
+      title: movie.title,
+      desc:
+        movie.genre && movie.genre !== 'Đang cập nhật'
+          ? `Thể loại: ${movie.genre}. Đặt vé và xem lịch chiếu mới nhất được đồng bộ từ hệ thống.`
+          : 'Đặt vé và xem lịch chiếu mới nhất được đồng bộ từ hệ thống.',
+      genre: movie.genre,
+      duration: movie.duration > 0 ? `${movie.duration} phút` : '--',
+      rating: movie.rating,
+      poster: movie.poster,
+      accent: theme.accent,
+      bg: buildHeroBackground(movie.poster, theme.bg),
+    }
+  })
+}
+
+const groupShowtimesByMovie = (items) => {
+  const grouped = new Map()
+
+  items.forEach((item) => {
+    const key = `${item.movie_id}-${item.room_type}`
+    const timeLabel = new Date(item.start_time).toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        id: key,
+        movieId: item.movie_id,
+        title: item.movie_title,
+        format: item.room_type || '2D',
+        roomId: item.room_id,
+        roomName: item.room_name,
+        times: [],
+      })
+    }
+
+    grouped.get(key).times.push({
+      label: timeLabel,
+      showtimeId: item.showtime_id,
+      roomId: item.room_id,
+      roomName: item.room_name,
+      format: item.room_type || '2D',
+    })
+  })
+
+  return Array.from(grouped.values()).slice(0, 6)
+}
 
 export default function Home() {
   const [slide,       setSlide]       = useState(0)
@@ -102,15 +246,180 @@ export default function Home() {
   const [bookingStep, setBookingStep] = useState(0)
   const [movieOff,    setMovieOff]    = useState(0)
   const [adSlide,     setAdSlide]     = useState(0)
+  const [nowShowing,  setNowShowing]  = useState([])
+  const [comingSoon,  setComingSoon]  = useState([])
+  const [cinemas,     setCinemas]     = useState([])
+  const [selectedCinemaId, setSelectedCinemaId] = useState('')
+  const [showtimes,   setShowtimes]   = useState([])
+  const [loadingMovies, setLoadingMovies] = useState(false)
+  const [loadingShowtimes, setLoadingShowtimes] = useState(false)
+  const [homeNews, setHomeNews] = useState([])
+  const [moviesError, setMoviesError] = useState('')
+  const [showtimesError, setShowtimesError] = useState('')
+  const [newsError, setNewsError] = useState('')
 
   const heroTimer = useRef(null)
   const adTimer   = useRef(null)
 
+  useEffect(() => {
+    const controller = new AbortController()
+
+    const loadHomeData = async () => {
+      setLoadingMovies(true)
+      setMoviesError('')
+
+      try {
+        const [nowRes, soonRes, cinemaRes] = await Promise.all([
+          fetch('/api/user/movies?status=now_showing', { signal: controller.signal }),
+          fetch('/api/user/movies?status=coming_soon', { signal: controller.signal }),
+          fetch('/api/user/cinemas', { signal: controller.signal }),
+        ])
+
+        if (!nowRes.ok || !soonRes.ok || !cinemaRes.ok) {
+          throw new Error('Không thể tải dữ liệu trang chủ.')
+        }
+
+        const [nowData, soonData, cinemaData] = await Promise.all([
+          nowRes.json(),
+          soonRes.json(),
+          cinemaRes.json(),
+        ])
+
+        const nextNowShowing = Array.isArray(nowData?.movies)
+          ? nowData.movies.map(normalizeMovie)
+          : []
+        const nextComingSoon = Array.isArray(soonData?.movies)
+          ? soonData.movies.map(normalizeMovie)
+          : []
+        const nextCinemas = Array.isArray(cinemaData?.cinemas)
+          ? cinemaData.cinemas
+          : []
+
+        setNowShowing(nextNowShowing)
+        setComingSoon(nextComingSoon)
+        setCinemas(nextCinemas)
+        setSelectedCinemaId((prev) => prev || `${nextCinemas[0]?.cinemas_id || ''}`)
+      } catch (err) {
+        if (err?.name === 'AbortError') return
+        console.error(err)
+        setNowShowing([])
+        setComingSoon([])
+        setCinemas([])
+        setMoviesError('Không thể tải dữ liệu phim từ database.')
+      } finally {
+        setLoadingMovies(false)
+      }
+    }
+
+    loadHomeData()
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    const loadHomeNews = async () => {
+      setNewsError('')
+
+      try {
+        const data = await userNewsService.getAll({ limit: 12 })
+        const nextNews = Array.isArray(data?.news)
+          ? data.news.map(normalizeHomeNews)
+          : []
+        setHomeNews(nextNews)
+      } catch (err) {
+        if (err?.name === 'AbortError') return
+        console.error(err)
+        setHomeNews([])
+        setNewsError('Không thể tải tin tức từ database.')
+      }
+    }
+
+    loadHomeNews()
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    if (!selectedCinemaId) {
+      setShowtimes([])
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadShowtimes = async () => {
+      setLoadingShowtimes(true)
+      setShowtimesError('')
+
+      try {
+        const params = new URLSearchParams({ cinemaId: selectedCinemaId })
+        if (showtimeTab !== 'all') params.set('format', showtimeTab)
+
+        const res = await fetch(`/api/user/showtimes?${params.toString()}`, {
+          signal: controller.signal,
+        })
+
+        if (!res.ok) throw new Error('Không thể tải lịch chiếu.')
+
+        const data = await res.json()
+        setShowtimes(Array.isArray(data?.showtimes) ? data.showtimes : [])
+      } catch (err) {
+        if (err?.name === 'AbortError') return
+        console.error(err)
+        setShowtimes([])
+        setShowtimesError('Không thể tải lịch chiếu từ database.')
+      } finally {
+        setLoadingShowtimes(false)
+      }
+    }
+
+    loadShowtimes()
+    return () => controller.abort()
+  }, [selectedCinemaId, showtimeTab])
+
+  const featuredMovies = movieTab === 'soon' ? comingSoon : nowShowing
+  const heroSlides = useMemo(
+    () => buildHeroSlides([...nowShowing, ...comingSoon]),
+    [nowShowing, comingSoon],
+  )
+  const maxOff = Math.max(featuredMovies.length - VISIBLE, 0)
+  const visibleMovies = featuredMovies.slice(movieOff, movieOff + VISIBLE)
+  const current = heroSlides[slide] || heroSlides[0]
+  const adCurrent = AD_SLIDES[adSlide]
+  const selectedCinema = cinemas.find(
+    (cinema) => `${cinema.cinemas_id}` === `${selectedCinemaId}`,
+  )
+  const groupedShowtimes = useMemo(
+    () => groupShowtimesByMovie(showtimes),
+    [showtimes],
+  )
+  const groupedHomeNews = useMemo(
+    () =>
+      HOME_NEWS_GROUPS.map((group) => ({
+        ...group,
+        items: homeNews.filter((item) => item.category === group.key).slice(0, 3),
+      })),
+    [homeNews],
+  )
+
+  useEffect(() => {
+    setMovieOff((prev) => Math.min(prev, maxOff))
+  }, [maxOff, movieTab])
+
   /* Hero auto-slide */
   const startHero = () => {
-    heroTimer.current = setInterval(() => changeHero(p => (p + 1) % SLIDES.length), 5000)
+    if (heroSlides.length <= 1) return
+    heroTimer.current = setInterval(() => changeHero(p => (p + 1) % heroSlides.length), 5000)
   }
-  useEffect(() => { startHero(); return () => clearInterval(heroTimer.current) }, [])
+  useEffect(() => {
+    clearInterval(heroTimer.current)
+    startHero()
+    return () => clearInterval(heroTimer.current)
+  }, [heroSlides.length])
+
+  useEffect(() => {
+    setSlide((prev) => (prev >= heroSlides.length ? 0 : prev))
+  }, [heroSlides.length])
 
   const changeHero = (fn) => {
     setSliding(true)
@@ -124,12 +433,7 @@ export default function Home() {
   }, [])
 
   /* Movie carousel */
-  const maxOff = NOW_SHOWING.length - VISIBLE
   const goMovies = (dir) => setMovieOff(p => Math.min(Math.max(p + dir, 0), maxOff))
-  const visibleMovies = NOW_SHOWING.slice(movieOff, movieOff + VISIBLE)
-
-  const current = SLIDES[slide]
-  const adCurrent = AD_SLIDES[adSlide]
 
   return (
     <div className='home-page'>
@@ -161,8 +465,10 @@ export default function Home() {
               <p className='hero-desc'>{current.desc}</p>
               <div className='hero-meta'>
                 <span className='hero-meta-item'>
-                  <StarRating rating={current.rating} />
-                  <span style={{ color: '#fbbf24', fontWeight: 700, marginLeft: 4 }}>{current.rating}/5</span>
+                  {current.rating > 0 ? <StarRating rating={current.rating} /> : <FaStar style={{ color: '#64748b' }} />}
+                  <span style={{ color: '#fbbf24', fontWeight: 700, marginLeft: 4 }}>
+                    {current.rating > 0 ? `${current.rating}/5` : 'Chưa có đánh giá'}
+                  </span>
                 </span>
                 <span className='hero-meta-sep'>·</span>
                 <span className='hero-meta-item'>{current.genre}</span>
@@ -181,7 +487,7 @@ export default function Home() {
             </div>
 
             <div className='hero-dots'>
-              {SLIDES.map((_, i) => (
+              {heroSlides.map((_, i) => (
                 <button key={i}
                   className={`hero-dot${i === slide ? ' active' : ''}`}
                   style={i === slide ? { background: current.accent } : {}}
@@ -190,7 +496,7 @@ export default function Home() {
                 />
               ))}
             </div>
-            <div className='hero-counter'>{slide + 1} / {SLIDES.length}</div>
+            <div className='hero-counter'>{slide + 1} / {heroSlides.length}</div>
           </div>
 
           {/* Phim nổi bật */}
@@ -217,11 +523,29 @@ export default function Home() {
             </div>
 
             <div className='movies-grid'>
+              {loadingMovies && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
+                  Đang tải phim từ database...
+                </div>
+              )}
+              {!loadingMovies && moviesError && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
+                  {moviesError}
+                </div>
+              )}
+              {!loadingMovies && !moviesError && visibleMovies.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
+                  Chưa có phim để hiển thị.
+                </div>
+              )}
               {visibleMovies.map(m => (
                 <Link to={`/movie/${m.id}`} className='movie-card' key={m.id}>
                   {m.hot && <span className='movie-hot'><FaFire /> HOT</span>}
-                  <div className='movie-poster'>
-                    <div className='movie-poster-placeholder'><FaPlay className='poster-play' /></div>
+                  <div
+                    className='movie-poster'
+                    style={m.poster ? { backgroundImage: `url(${m.poster})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                  >
+                    {!m.poster && <div className='movie-poster-placeholder'><FaPlay className='poster-play' /></div>}
                     <span className='movie-age'>{m.age}</span>
                   </div>
                   <div className='movie-info'>
@@ -229,9 +553,9 @@ export default function Home() {
                     <div className='movie-genre'>{m.genre}</div>
                     <div className='movie-footer'>
                       <div className='movie-rating-wrap'>
-                        <StarRating rating={m.rating} />
-                        <span className='movie-rating-num'>{m.rating}</span>
-                        <span className='movie-votes'>({m.votes})</span>
+                        {m.rating > 0 ? <StarRating rating={m.rating} /> : <FaStar style={{ color: '#475569', fontSize: '0.7rem' }} />}
+                        <span className='movie-rating-num'>{m.rating > 0 ? m.rating : '--'}</span>
+                        <span className='movie-votes'>({formatReviewCount(m.reviewCount)})</span>
                       </div>
                       <button className='movie-ticket-btn' onClick={e => e.preventDefault()}>
                         <FaTicketAlt />
@@ -243,20 +567,42 @@ export default function Home() {
             </div>
 
             {/* Carousel dots */}
-            <div className='movie-carousel-dots'>
-              {Array(maxOff + 1).fill(0).map((_, i) => (
-                <button key={i} className={`mcd${movieOff === i ? ' active' : ''}`}
-                  onClick={() => setMovieOff(i)} aria-label={`Trang ${i + 1}`} />
-              ))}
-            </div>
+            {maxOff > 0 && (
+              <div className='movie-carousel-dots'>
+                {Array(maxOff + 1).fill(0).map((_, i) => (
+                  <button key={i} className={`mcd${movieOff === i ? ' active' : ''}`}
+                    onClick={() => setMovieOff(i)} aria-label={`Trang ${i + 1}`} />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Suất chiếu hôm nay */}
           <div className='showtime-card'>
             <div className='showtime-top'>
               <div>
-                <h3><FaMapMarkerAlt style={{ color: '#7c3aed' }} /> Lunexa – Đà Nẵng</h3>
-                <p className='showtime-date'>Hôm nay, Thứ Hai 08/06/2026</p>
+                <h3><FaMapMarkerAlt style={{ color: '#7c3aed' }} /> {selectedCinema?.cinema_name || 'Đang chọn rạp'}</h3>
+                <p className='showtime-date'>Hôm nay, {formatHomeDate()}</p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  value={selectedCinemaId}
+                  onChange={(e) => setSelectedCinemaId(e.target.value)}
+                  style={{
+                    minWidth: 220,
+                    padding: '0.42rem 0.75rem',
+                    borderRadius: 8,
+                    border: '1px solid rgba(148,163,184,0.2)',
+                    background: 'rgba(255,255,255,0.04)',
+                    color: '#e2e8f0',
+                  }}
+                >
+                  {cinemas.map((cinema) => (
+                    <option key={cinema.cinemas_id} value={cinema.cinemas_id} style={{ color: '#0f172a' }}>
+                      {cinema.cinema_name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className='showtime-format-tabs'>
                 {['all', '2D', '3D', 'IMAX'].map(f => (
@@ -271,18 +617,53 @@ export default function Home() {
             </div>
 
             <div className='showtime-grid-blocks'>
-              {SHOWTIMES[showtimeTab].map(row => (
+              {loadingShowtimes && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
+                  Đang tải lịch chiếu từ database...
+                </div>
+              )}
+              {!loadingShowtimes && showtimesError && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
+                  {showtimesError}
+                </div>
+              )}
+              {!loadingShowtimes && !showtimesError && groupedShowtimes.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
+                  Chưa có lịch chiếu cho rạp hoặc định dạng đã chọn.
+                </div>
+              )}
+              {groupedShowtimes.map(row => (
                 <div key={row.id} className='showtime-block'>
                   <div className='sb-movie-header'>
                     <span className='sb-title'>{row.title}</span>
                     <span className='sb-format'
-                      style={{ background: FORMAT_COLORS[row.format] + '22', color: FORMAT_COLORS[row.format] }}>
+                      style={{
+                        background: `${FORMAT_COLORS[row.format] || '#7c3aed'}22`,
+                        color: FORMAT_COLORS[row.format] || '#7c3aed',
+                      }}>
                       {row.format}
                     </span>
                   </div>
                   <div className='sb-times'>
                     {row.times.map(t => (
-                      <Link key={t} to='/Bookings/Booking' className='sb-time-btn'>{t}</Link>
+                      <Link
+                        key={`${row.id}-${t.showtimeId}`}
+                        to='/booking'
+                        state={{
+                          movieTitle: row.title,
+                          cinema: selectedCinema?.cinema_name || '',
+                          cinemaId: selectedCinema?.cinemas_id || null,
+                          roomId: t.roomId,
+                          roomName: t.roomName,
+                          roomType: t.format,
+                          day: 'Hôm nay',
+                          time: t.label,
+                          showtimeId: t.showtimeId,
+                        }}
+                        className='sb-time-btn'
+                      >
+                        {t.label}
+                      </Link>
                     ))}
                   </div>
                 </div>
@@ -296,19 +677,75 @@ export default function Home() {
             <div className='sec-header'>
               <div className='sec-title-group'>
                 <h2>Tin tức mới nhất</h2>
+                <p>Tổng hợp theo 3 chủ đề nổi bật từ hệ thống tin tức.</p>
               </div>
               <Link to='/News' className='sec-link'>Xem tất cả →</Link>
             </div>
             <div className='news-grid'>
-              {NEWS.map(n => (
-                <Link to='/News' key={n.id} className='news-card'>
-                  <div className='news-img'>{n.img}</div>
-                  <div className='news-body'>
-                    <span className='news-tag'>{n.tag}</span>
-                    <p className='news-title'>{n.title}</p>
-                    <span className='news-time'><FaClock /> {n.time}</span>
+              {newsError && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
+                  {newsError}
+                </div>
+              )}
+              {!newsError && homeNews.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
+                  Chưa có tin tức nổi bật để hiển thị.
+                </div>
+              )}
+              {!newsError && groupedHomeNews.map(group => (
+                <div key={group.key} className='news-group-card'>
+                  <div className='news-group-head'>
+                    <span
+                      className='news-group-icon'
+                      style={{ background: `${group.color}22`, color: group.color }}
+                    >
+                      {group.icon}
+                    </span>
+                    <div>
+                      <h3 style={{ color: group.color }}>{group.label}</h3>
+                      <p>{group.items.length > 0 ? `${group.items.length} bài mới nhất` : 'Chưa có bài viết'}</p>
+                    </div>
                   </div>
-                </Link>
+
+                  <div className='news-group-list'>
+                    {group.items.length === 0 ? (
+                      <div className='news-group-empty'>Chưa có nội dung trong mục này.</div>
+                    ) : (
+                      <>
+                        <Link to={`/news/${group.items[0].slug}`} className='news-feature-card'>
+                          <div
+                            className='news-feature-image'
+                            style={group.items[0].image ? { backgroundImage: `url(${group.items[0].image})` } : undefined}
+                          >
+                            {!group.items[0].image && <span>{group.items[0].icon}</span>}
+                          </div>
+                          <div className='news-feature-body'>
+                            <span className='news-tag'>{group.items[0].tag}</span>
+                            <h4 className='news-feature-title'>{group.items[0].title}</h4>
+                            {group.items[0].excerpt && <p className='news-feature-excerpt'>{group.items[0].excerpt}</p>}
+                            <span className='news-time'><FaClock /> {group.items[0].time}</span>
+                          </div>
+                        </Link>
+
+                        {group.items.slice(1, 3).map(n => (
+                          <Link to={`/news/${n.slug}`} key={n.id} className='news-card news-card-compact'>
+                            <div
+                              className='news-img'
+                              style={n.image ? { backgroundImage: `url(${n.image})` } : undefined}
+                            >
+                              {!n.image && n.icon}
+                            </div>
+                            <div className='news-body'>
+                              <span className='news-tag'>{n.tag}</span>
+                              <p className='news-title'>{n.title}</p>
+                              <span className='news-time'><FaClock /> {n.time}</span>
+                            </div>
+                          </Link>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

@@ -268,3 +268,42 @@ ALTER TABLE `Movies`
 ADD COLUMN `posters` JSON NULL AFTER `poster`,
 ADD COLUMN `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE AFTER `country`,
 ADD COLUMN `is_hidden` BOOLEAN NOT NULL DEFAULT FALSE AFTER `is_deleted`;
+
+USE Lunexa;
+CREATE TABLE news (
+    news_id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE,
+    thumbnail VARCHAR(255),
+    short_description TEXT,
+    content LONGTEXT NOT NULL,
+
+    category ENUM(
+        'movie_news',
+        'promotion',
+        'event',
+        'coming_soon',
+        'review',
+        'announcement'
+    ) NOT NULL,
+
+    author_id INT NOT NULL,
+
+    view_count INT DEFAULT 0,
+
+    status ENUM(
+        'draft',
+        'published',
+        'hidden'
+    ) DEFAULT 'draft',
+
+    published_at DATETIME NULL,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (author_id)
+        REFERENCES employees(employee_id)
+        ON DELETE CASCADE
+);

@@ -46,7 +46,32 @@ import {
   getAdminUsers,
   deactivateAdminUser,
 } from "../controllers/userController.js";
-import { uploadMovieFiles, uploadCinemaImage } from "../../../config/upload.js";
+import {
+  getAdminNotifications,
+  getAdminNotificationDetail,
+  getNotificationRecipients,
+  createAdminNotification,
+  updateAdminNotification,
+  deleteAdminNotification,
+} from "../controllers/notificationController.js";
+import {
+  getAdminPromotions,
+  getPromotionRecipients,
+  createCoupon,
+  updateCoupon,
+  createVoucher,
+  updateVoucher,
+  deletePromotion,
+} from "../controllers/promotionController.js";
+import {
+  getAdminNews,
+  getAdminNewsById,
+  createAdminNews,
+  updateAdminNews,
+  deleteAdminNews,
+} from "../controllers/newsController.js";
+import { uploadMovieFiles, uploadCinemaImage, uploadNewsImage } from "../../../config/upload.js";
+import { authMiddleware, adminOnly } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -56,6 +81,30 @@ router.get("/dashboard", getDashboardStats);
 // ─── User Management ─────────────────────────────────────────────────────────
 router.get("/users", getAdminUsers);
 router.put("/users/:userId/deactivate", deactivateAdminUser);
+
+// ─── Notifications Management ────────────────────────────────────────────────
+router.get("/notifications", authMiddleware, adminOnly, getAdminNotifications);
+router.get("/notifications/recipients", authMiddleware, adminOnly, getNotificationRecipients);
+router.get("/notifications/:id", authMiddleware, adminOnly, getAdminNotificationDetail);
+router.post("/notifications", authMiddleware, adminOnly, createAdminNotification);
+router.put("/notifications/:id", authMiddleware, adminOnly, updateAdminNotification);
+router.delete("/notifications/:id", authMiddleware, adminOnly, deleteAdminNotification);
+
+// ─── Promotions Management ───────────────────────────────────────────────────
+router.get("/promotions", authMiddleware, adminOnly, getAdminPromotions);
+router.get("/promotions/recipients", authMiddleware, adminOnly, getPromotionRecipients);
+router.post("/promotions/coupons", authMiddleware, adminOnly, createCoupon);
+router.put("/promotions/coupons/:id", authMiddleware, adminOnly, updateCoupon);
+router.post("/promotions/vouchers", authMiddleware, adminOnly, createVoucher);
+router.put("/promotions/vouchers/:id", authMiddleware, adminOnly, updateVoucher);
+router.delete("/promotions/:id", authMiddleware, adminOnly, deletePromotion);
+
+// ─── News Management ──────────────────────────────────────────────────────────
+router.get("/news", authMiddleware, adminOnly, getAdminNews);
+router.get("/news/:id", authMiddleware, adminOnly, getAdminNewsById);
+router.post("/news", authMiddleware, adminOnly, uploadNewsImage.single("thumbnailFile"), createAdminNews);
+router.put("/news/:id", authMiddleware, adminOnly, uploadNewsImage.single("thumbnailFile"), updateAdminNews);
+router.delete("/news/:id", authMiddleware, adminOnly, deleteAdminNews);
 
 // ─── Booking Management ──────────────────────────────────────────────────────
 router.get("/bookings", getAdminBookings);

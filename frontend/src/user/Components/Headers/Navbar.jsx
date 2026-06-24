@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import {
   FaBell, FaSearch, FaUser, FaFilm, FaHome,
   FaMapMarkerAlt, FaCrown, FaNewspaper, FaTimes, FaChevronDown
 } from 'react-icons/fa'
-import { markAsRead, markAllAsRead, deleteNotification } from '../../../redux/slices/notificationSlice'
+import { markAsRead, markAllAsRead, deleteNotification, setNotifications } from '../../../redux/slices/notificationSlice'
+import { setRegion as setRegionAction } from '../../../redux/slices/regionSlice'
 import { clearUser } from '../../../redux/slices/userSlice'
+import { userCinemaService, userNotificationService } from '../../services/userApi'
 import './nav.css'
 
 const NAV_ITEMS = [
@@ -17,20 +19,12 @@ const NAV_ITEMS = [
   { to: '/News',       label: 'Tin tức',    icon: <FaNewspaper /> },
 ]
 
-const REGIONS = [
-  { value: 'dn',  label: 'Đà Nẵng' },
-  { value: 'hcm', label: 'TP. Hồ Chí Minh' },
-  { value: 'hn',  label: 'Hà Nội' },
-  { value: 'hue', label: 'Huế' },
-  { value: 'ctn', label: 'Cần Thơ' },
-  { value: 'vt',  label: 'Vũng Tàu' },
-]
-
 const NOTIF_ICONS = { ticket: '🎟️', promo: '🎁', movie: '🎬', points: '⭐', system: '⚙️' }
 
 export default function Navbar() {
   const profile       = useSelector((s) => s.user.profile)
   const notifications = useSelector((s) => s.notifications.items)
+  const selectedRegion = useSelector((s) => s.region.selectedRegion)
   const unreadCount   = notifications.filter(n => !n.read).length
 
   const location = useLocation()
@@ -45,7 +39,8 @@ export default function Navbar() {
   const [scrolled,     setScrolled]     = useState(false)
   const [mobileOpen,   setMobileOpen]   = useState(false)
   const [regionOpen,   setRegionOpen]   = useState(false)
-  const [region,       setRegion]       = useState(REGIONS[0])
+  const [regions,      setRegions]      = useState([])
+  const [regionError,  setRegionError]  = useState('')
   const [bellOpen,     setBellOpen]     = useState(false)
 
   const dropdownRef = useRef(null)
@@ -95,6 +90,94 @@ export default function Navbar() {
 
   const userInitial = profile?.name?.[0]?.toUpperCase() || <FaUser />
   const userName    = profile?.name || 'Tài khoản'
+  const userId = profile?.id
+  const regionOptions = useMemo(() => {
+    const citySet = new Set(
+      regions
+        .map((cinema) => String(cinema.city || '').trim())
+        .filter(Boolean),
+    )
+
+    return Array.from(citySet)
+      .sort((a, b) => a.localeCompare(b, 'vi'))
+      .map((city) => ({
+        value: city,
+        label: city,
+      }))
+  }, [regions])
+
+  const region = useMemo(() => {
+    if (regionOptions.length === 0) {
+      return { value: '', label: 'Chọn khu vực' }
+    }
+
+    return (
+      regionOptions.find((item) => item.value === selectedRegion) ||
+      regionOptions[0]
+    )
+  }, [regionOptions, selectedRegion])
+
+  const normalizeNotifications = (items = []) =>
+    items.map((n) => ({
+      id: n.notification_id,
+      type: n.type || 'system',
+      title: n.title,
+      desc: n.content,
+      time: new Date(n.created_at).toLocaleString('vi-VN'),
+      read: Boolean(n.is_read),
+    }))
+
+  useEffect(() => {
+    const loadNotifications = async () => {
+      if (!userId) {
+        dispatch(setNotifications([]))
+        return
+      }
+
+      try {
+        const data = await userNotificationService.getAll(userId)
+        dispatch(setNotifications(normalizeNotifications(data?.notifications || [])))
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    loadNotifications()
+  }, [dispatch, userId])
+
+  useEffect(() => {
+    let ignore = false
+
+    const loadRegions = async () => {
+      setRegionError('')
+      try {
+        const data = await userCinemaService.getAll()
+        if (ignore) return
+
+        const nextCinemas = Array.isArray(data?.cinemas) ? data.cinemas : []
+        setRegions(nextCinemas)
+      } catch (err) {
+        if (ignore) return
+        console.error(err)
+        setRegions([])
+        setRegionError('Không tải được khu vực')
+      }
+    }
+
+    loadRegions()
+    return () => { ignore = true }
+  }, [])
+
+  useEffect(() => {
+    if (regionOptions.length === 0) return
+    if (selectedRegion && regionOptions.some((item) => item.value === selectedRegion)) return
+    dispatch(setRegionAction(regionOptions[0].value))
+  }, [dispatch, regionOptions, selectedRegion])
+
+  const handleSelectRegion = (nextRegion) => {
+    dispatch(setRegionAction(nextRegion.value))
+    setRegionOpen(false)
+  }
 
   return (
     <header className={`navbar-container${scrolled ? ' scrolled' : ''}`}>
@@ -139,11 +222,12 @@ export default function Navbar() {
           </button>
           <ul className='region-dropdown'>
             <li className='region-dropdown-title'>Chọn khu vực</li>
-            {REGIONS.map(r => (
+            {regionError && <li className='region-dropdown-title'>{regionError}</li>}
+            {regionOptions.map(r => (
               <li key={r.value}>
                 <button
                   className={`region-option${region.value === r.value ? ' active' : ''}`}
-                  onClick={() => { setRegion(r); setRegionOpen(false) }}
+                  onClick={() => handleSelectRegion(r)}
                 >
                   <FaMapMarkerAlt />
                   {r.label}
@@ -151,6 +235,9 @@ export default function Navbar() {
                 </button>
               </li>
             ))}
+            {!regionError && regionOptions.length === 0 && (
+              <li className='region-dropdown-title'>Chưa có khu vực từ quản lý rạp</li>
+            )}
           </ul>
         </div>
 
@@ -199,7 +286,11 @@ export default function Navbar() {
             <div className='bell-header'>
               <span className='bell-title'>Thông báo</span>
               {unreadCount > 0 && (
-                <button className='bell-mark-all' onClick={() => dispatch(markAllAsRead())}>
+                <button className='bell-mark-all' onClick={async () => {
+                  if (!userId) return
+                  await userNotificationService.markAllAsRead(userId)
+                  dispatch(markAllAsRead())
+                }}>
                   Đánh dấu tất cả đã đọc
                 </button>
               )}
@@ -211,7 +302,14 @@ export default function Navbar() {
                 notifications.slice(0, 5).map(n => (
                   <div key={n.id}
                     className={`bell-item${n.read ? '' : ' unread'}`}
-                    onClick={() => { dispatch(markAsRead(n.id)); setBellOpen(false); navigate('/notifications') }}
+                    onClick={async () => {
+                      if (!n.read && userId) {
+                        await userNotificationService.markAsRead(userId, n.id)
+                        dispatch(markAsRead(n.id))
+                      }
+                      setBellOpen(false)
+                      navigate('/notifications')
+                    }}
                   >
                     <span className='bell-item-icon'>{NOTIF_ICONS[n.type] || '🔔'}</span>
                     <div className='bell-item-body'>
@@ -221,7 +319,12 @@ export default function Navbar() {
                     </div>
                     {!n.read && <span className='bell-item-dot' />}
                     <button className='bell-item-del'
-                      onClick={e => { e.stopPropagation(); dispatch(deleteNotification(n.id)) }}
+                      onClick={async e => {
+                        e.stopPropagation()
+                        if (!userId) return
+                        await userNotificationService.deleteOne(userId, n.id)
+                        dispatch(deleteNotification(n.id))
+                      }}
                       aria-label='Xoá'
                     >
                       <FaTimes />
@@ -319,8 +422,11 @@ export default function Navbar() {
           <FaMapMarkerAlt />
           <span>Khu vực:</span>
           <select className='mobile-region-select' value={region.value}
-            onChange={e => setRegion(REGIONS.find(r => r.value === e.target.value))}>
-            {REGIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            onChange={e => {
+              const nextRegion = regionOptions.find(r => r.value === e.target.value)
+              if (nextRegion) handleSelectRegion(nextRegion)
+            }}>
+            {regionOptions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </div>
         <ul className='mobile-links'>

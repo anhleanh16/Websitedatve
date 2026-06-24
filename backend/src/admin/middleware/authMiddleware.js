@@ -27,3 +27,18 @@ export const adminOnly = (req, res, next) => {
     return res.status(403).json({ message: 'Không có quyền truy cập.' });
   next();
 };
+
+/* Cho phép chính chủ hoặc admin */
+export const selfOrAdminOnly = (req, res, next) => {
+  const paramUserId = Number(req.params.userId);
+
+  if (req.userRole === 'admin') {
+    return next();
+  }
+
+  if (!paramUserId || Number(req.userId) !== paramUserId) {
+    return res.status(403).json({ message: 'Bạn không có quyền truy cập dữ liệu này.' });
+  }
+
+  next();
+};

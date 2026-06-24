@@ -2,17 +2,10 @@ import './App.css'
 import AppRoutes from './routes/AppRoutes'
 import { setUser } from './redux/slices/userSlice'
 import store from './redux/store'
-
-function parseJwt(token) {
-  try {
-    return JSON.parse(atob(token.split('.')[1]))
-  } catch {
-    return null
-  }
-}
+import { clearStoredSession, getValidStoredToken, parseJwt } from './utils/auth'
 
 // Khôi phục session từ localStorage khi tải lại trang
-const token = localStorage.getItem('token')
+const token = getValidStoredToken()
 if (token) {
   const payload = parseJwt(token)
   if (payload?.userId) {
@@ -25,6 +18,8 @@ if (token) {
     }
     store.dispatch(setUser({ token, user }))
   }
+} else {
+  clearStoredSession()
 }
 
 function App() {

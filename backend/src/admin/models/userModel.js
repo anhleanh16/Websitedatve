@@ -2,7 +2,7 @@ import { db } from "../../../config/db.js";
 
 export const UserModel = {
   /**
-   * Lấy tất cả người dùng có vai trò 'admin' hoặc 'staff'.
+   * Lấy tất cả người dùng trong hệ thống để hiển thị ở trang quản lý khách hàng.
    * @returns {Promise<Array>} Danh sách người dùng.
    */
   async findAdminUsers() {
@@ -12,15 +12,18 @@ export const UserModel = {
         u.full_name,
         u.email,
         u.phone as phone_number,
-        r.role_name as role,
+        COALESCE(r.role_name, 'user') as role,
         u.status,
+        u.birthday,
+        u.sex,
+        u.point as points,
         u.created_at
       FROM
         User u
-      JOIN
+      LEFT JOIN
         Roles r ON u.role_id = r.role_id
-      WHERE
-        r.role_name IN ('admin', 'staff')`,
+      ORDER BY
+        u.created_at DESC, u.id DESC`,
     );
     return users;
   },
