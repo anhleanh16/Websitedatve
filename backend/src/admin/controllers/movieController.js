@@ -74,29 +74,14 @@ export const restoreMovie = async (req, res) => {
   }
 };
 
-export const permanentDeleteMovie = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const success = await MovieModel.permanentDelete(id);
-    if (success) {
-      res.json({ message: "Movie permanently deleted successfully" });
-    } else {
-      res.status(404).json({ message: "Movie not found" });
-    }
-  } catch (err) {
-    console.error("Error permanently deleting movie:", err);
-    res.status(500).json({ message: "Failed to permanently delete movie" });
-  }
-};
-
 export const toggleHideMovie = async (req, res) => {
   try {
     const { id } = req.params;
-    const { is_hidden } = req.body;
-    const success = await MovieModel.toggleHide(id, is_hidden);
-    if (success) {
+    const newHiddenValue = await MovieModel.toggleHide(id);
+    if (newHiddenValue !== null) {
       res.json({
-        message: `Movie ${is_hidden ? "hidden" : "shown"} successfully`,
+        message: `Movie ${newHiddenValue ? "hidden" : "shown"} successfully`,
+        is_hidden: newHiddenValue ? 1 : 0,
       });
     } else {
       res.status(404).json({ message: "Movie not found" });

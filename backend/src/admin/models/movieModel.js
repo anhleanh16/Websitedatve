@@ -240,4 +240,38 @@ export const MovieModel = {
       conn.release();
     }
   },
+
+  async softDelete(movieId) {
+    const [result] = await db.query(
+      "UPDATE Movies SET is_deleted = 1 WHERE movie_id = ?",
+      [movieId],
+    );
+    return result.affectedRows > 0;
+  },
+
+  async restore(movieId) {
+    const [result] = await db.query(
+      "UPDATE Movies SET is_deleted = 0 WHERE movie_id = ?",
+      [movieId],
+    );
+    return result.affectedRows > 0;
+  },
+
+  async toggleHide(movieId) {
+    const [rows] = await db.query(
+      "SELECT is_hidden FROM Movies WHERE movie_id = ?",
+      [movieId],
+    );
+    if (!rows.length) return null;
+
+    const current = rows[0].is_hidden ? 1 : 0;
+    const next = current === 1 ? 0 : 1;
+
+    await db.query("UPDATE Movies SET is_hidden = ? WHERE movie_id = ?", [
+      next,
+      movieId,
+    ]);
+
+    return next === 1;
+  },
 };

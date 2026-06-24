@@ -20,7 +20,6 @@ import {
   updateMovie,
   deleteMovie,
   restoreMovie,
-  permanentDeleteMovie,
   toggleHideMovie,
 } from "../controllers/movieController.js";
 import {
@@ -75,7 +74,6 @@ router.put(
 );
 router.delete("/movies/:id", deleteMovie);
 router.put("/movies/:id/restore", restoreMovie);
-router.delete("/movies/:id/permanent", permanentDeleteMovie);
 router.put("/movies/:id/toggle-hide", toggleHideMovie);
 
 // ─── Movie Category Management ─────────────────────────────────────────────────
