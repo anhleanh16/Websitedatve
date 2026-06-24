@@ -1,4 +1,63 @@
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 import { db } from "../../../config/db.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const UPLOADS_ROOT = path.resolve(__dirname, "../../../uploads");
+
+const parsePosterList = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+};
+
+const toUploadAbsolutePath = (uploadPath) => {
+  if (typeof uploadPath !== "string" || !uploadPath.startsWith("/uploads/")) {
+    return null;
+  }
+
+  const relativeUploadPath = uploadPath.replace(/^\/uploads[\\/]/, "");
+  const absolutePath = path.resolve(UPLOADS_ROOT, relativeUploadPath);
+  return absolutePath.startsWith(UPLOADS_ROOT) ? absolutePath : null;
+};
+
+const deleteUploadFiles = async (filePaths = []) => {
+  await Promise.all(
+    filePaths
+      .filter(Boolean)
+      .map(async (filePath) => {
+        const absolutePath = toUploadAbsolutePath(filePath);
+        if (!absolutePath) return;
+
+        try {
+          await fs.unlink(absolutePath);
+        } catch (error) {
+          if (error.code !== "ENOENT") {
+            console.error(`Không thể xóa file cũ: ${filePath}`, error);
+          }
+        }
+      }),
+  );
+};
+
+const getUploadedPaths = (files = {}) => {
+  const posterPaths = Array.isArray(files.posters)
+    ? files.posters.map((file) => `/uploads/movies/${file.filename}`)
+    : [];
+  const trailerPaths = Array.isArray(files.trailer)
+    ? files.trailer.map((file) => `/uploads/trailers/${file.filename}`)
+    : [];
+
+  return [...posterPaths, ...trailerPaths];
+};
 
 export const MovieModel = {
   async syncStatuses() {
@@ -78,6 +137,7 @@ export const MovieModel = {
    */
   async create(movieData, files) {
     const conn = await db.getConnection();
+    const uploadedPaths = getUploadedPaths(files);
     try {
       await conn.beginTransaction();
 
@@ -155,6 +215,7 @@ export const MovieModel = {
       return movieId;
     } catch (err) {
       await conn.rollback();
+      await deleteUploadFiles(uploadedPaths);
       // Ném lỗi để controller có thể bắt và xử lý
       throw err;
     } finally {
@@ -171,6 +232,7 @@ export const MovieModel = {
    */
   async update(movieId, movieData, files) {
     const conn = await db.getConnection();
+    const uploadedPaths = getUploadedPaths(files);
     try {
       await conn.beginTransaction();
 
@@ -198,13 +260,14 @@ export const MovieModel = {
         throw new Error("Movie not found");
       }
       const movie = existingMovie[0];
+      const oldPoster = movie.poster || null;
+      const oldPosters = parsePosterList(movie.posters);
+      const oldTrailer = movie.trailer || null;
 
       let poster = existing_main_poster || movie.poster;
       let posters = existing_posters
-        ? JSON.parse(existing_posters)
-        : movie.posters
-          ? JSON.parse(movie.posters)
-          : [];
+        ? parsePosterList(existing_posters)
+        : oldPosters;
 
       if (files && files.posters) {
         const posterFiles = Array.isArray(files.posters)
@@ -229,6 +292,14 @@ export const MovieModel = {
           trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
         }
       }
+
+      const finalPosterSet = new Set([poster, ...posters].filter(Boolean));
+      const filesToDeleteAfterCommit = [
+        ...[oldPoster, ...oldPosters].filter(
+          (filePath) => filePath && !finalPosterSet.has(filePath),
+        ),
+        ...(oldTrailer && trailer !== oldTrailer ? [oldTrailer] : []),
+      ];
 
       await conn.query(
         "UPDATE Movies SET title=?, description=?, duration=?, age_limit=?, director=?, actors=?, trailer=?, poster=?, posters=?, release_date=?, status=?, language=?, country=? WHERE movie_id=?",
@@ -266,9 +337,11 @@ export const MovieModel = {
       }
 
       await conn.commit();
+      await deleteUploadFiles(filesToDeleteAfterCommit);
       return true;
     } catch (err) {
       await conn.rollback();
+      await deleteUploadFiles(uploadedPaths);
       throw err;
     } finally {
       conn.release();
