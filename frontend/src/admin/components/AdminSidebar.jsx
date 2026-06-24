@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 
 const NAV_ITEMS = [
   { to: "/admin/dashboard",     label: "Tổng quan",        icon: "⊞" },
-  { to: "/admin/users",         label: "Khách hàng",       icon: "👥" },
+  { to: "/admin/users",         label: "Tài khoản",        icon: "👥" },
   { to: "/admin/staff",         label: "Nhân viên",        icon: "🧑‍💼" },
   { to: "/admin/movies",        label: "Phim",             icon: "🎬" },
   { to: "/admin/showtimes",     label: "Lịch chiếu",       icon: "🕐" },

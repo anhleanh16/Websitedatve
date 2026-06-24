@@ -1,4 +1,5 @@
 import * as CinemaModel from "../../admin/models/cinemaModel.js";
+import { MovieModel } from "../../admin/models/movieModel.js";
 import { db } from "../../../config/db.js";
 
 const normalizeCinemaImagePath = (cinema) => {
@@ -12,6 +13,26 @@ const normalizeCinemaImagePath = (cinema) => {
     };
   }
   return cinema;
+};
+
+const mapMovieCategories = (movies, categoryRows) => {
+  const categoriesByMovie = new Map();
+
+  categoryRows.forEach((row) => {
+    const movieId = Number(row.movie_id);
+    if (!categoriesByMovie.has(movieId)) {
+      categoriesByMovie.set(movieId, []);
+    }
+    categoriesByMovie.get(movieId).push({
+      category_id: row.category_id,
+      category_name: row.category_name,
+    });
+  });
+
+  return movies.map((movie) => ({
+    ...movie,
+    categories: categoriesByMovie.get(Number(movie.movie_id)) || [],
+  }));
 };
 
 export const getPublicCinemas = async (req, res) => {
@@ -48,6 +69,7 @@ export const userGetProfile = async (req, res) => {
 
 export const userGetMovies = async (req, res) => {
   try {
+    await MovieModel.syncStatuses();
     const { status } = req.query;
 
     const params = [];
@@ -64,6 +86,7 @@ export const userGetMovies = async (req, res) => {
         m.movie_id,
         m.title,
         m.poster,
+        m.age_limit,
         m.status,
         m.release_date,
         COALESCE(ROUND(AVG(r.rating), 1), 0) AS rating,
@@ -71,13 +94,35 @@ export const userGetMovies = async (req, res) => {
       FROM Movies m
       LEFT JOIN Reviews r ON r.movie_id = m.movie_id
       ${whereSql}
-      GROUP BY m.movie_id, m.title, m.poster, m.status, m.release_date
-      ORDER BY m.release_date DESC, m.movie_id DESC
+      GROUP BY m.movie_id, m.title, m.poster, m.age_limit, m.status, m.release_date
+      ORDER BY
+        CASE WHEN m.status = 'ended' THEN 1 ELSE 0 END ASC,
+        m.release_date DESC,
+        m.movie_id DESC
     `,
       params,
     );
 
-    res.json({ movies });
+    if (movies.length === 0) {
+      return res.json({ movies: [] });
+    }
+
+    const movieIds = movies.map((movie) => movie.movie_id);
+    const [categoryRows] = await db.query(
+      `
+      SELECT
+        mcd.movie_id,
+        mc.category_id,
+        mc.category_name
+      FROM Movie_Category_Detail mcd
+      JOIN Movie_Categories mc ON mc.category_id = mcd.category_id
+      WHERE mcd.movie_id IN (${movieIds.map(() => "?").join(", ")})
+      ORDER BY mc.category_name ASC
+    `,
+      movieIds,
+    );
+
+    res.json({ movies: mapMovieCategories(movies, categoryRows) });
   } catch (error) {
     console.error("Error in userGetMovies:", error);
     res.status(500).json({ message: "Error getting movies", movies: [] });
@@ -86,6 +131,7 @@ export const userGetMovies = async (req, res) => {
 
 export const userGetMovieById = async (req, res) => {
   try {
+    await MovieModel.syncStatuses();
     const movieId = Number(req.params.id);
     if (!Number.isInteger(movieId) || movieId <= 0) {
       return res.status(400).json({ message: "Invalid movie id" });

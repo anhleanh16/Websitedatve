@@ -3,6 +3,8 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import './MovieDetail.css';
 
+const VISITED_TAG_STORAGE_KEY = 'lunexa_user_tag_preferences';
+
 const formatDateKey = (input) => {
   const d = new Date(input);
   const year = d.getFullYear();
@@ -53,7 +55,6 @@ export default function MovieDetail() {
   const [activeDay, setActiveDay] = useState(scheduleDays[0].key);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [showAllCinemas, setShowAllCinemas] = useState(false);
   const [activeCinema, setActiveCinema] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
@@ -133,6 +134,29 @@ export default function MovieDetail() {
     loadMovie();
     return () => controller.abort();
   }, [id]);
+
+  useEffect(() => {
+    if (!movie?.movie_id || !Array.isArray(movie?.categories) || movie.categories.length === 0) {
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(VISITED_TAG_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const next = { ...(parsed && typeof parsed === 'object' ? parsed : {}) };
+
+      movie.categories.forEach((category) => {
+        const categoryId = Number(category?.category_id);
+        if (!categoryId) return;
+        const currentScore = Number(next[categoryId] || 0);
+        next[categoryId] = currentScore + 1;
+      });
+
+      window.localStorage.setItem(VISITED_TAG_STORAGE_KEY, JSON.stringify(next));
+    } catch (error) {
+      console.error('Không thể lưu thói quen xem tag của người dùng:', error);
+    }
+  }, [movie?.movie_id, movie?.categories]);
 
   const handleStartAudio = () => {
     if (!hasTrailer) return;
@@ -333,22 +357,24 @@ export default function MovieDetail() {
   const normalCount = showOverlay ? VISIBLE_LIMIT - 1 : Math.min(totalImages, VISIBLE_LIMIT);
 
   const showtimeItems = Array.isArray(movie?.showtimes)
-    ? movie.showtimes.map((showtime) => ({
-        id: showtime.showtime_id,
-        cinemaId: Number(showtime.cinema_id),
-        cinemaName: showtime.cinema_name,
-        roomId: Number(showtime.room_id),
-        roomName: showtime.room_name,
-        roomType: showtime.room_type,
-        startTime: showtime.start_time,
-        endTime: showtime.end_time,
-        dateKey: formatDateKey(showtime.start_time),
-        timeLabel: formatTimeLabel(showtime.start_time, showtime.room_type),
-        availableSeats: Number(showtime.available_seats || 0),
-        priceStandard: Number(showtime.price_standard || 0),
-        priceVip: Number(showtime.price_vip || 0),
-        priceCouple: Number(showtime.price_couple || 0),
-      }))
+    ? movie.showtimes
+        .filter((showtime) => showtime.room_type !== 'VIP')
+        .map((showtime) => ({
+          id: showtime.showtime_id,
+          cinemaId: Number(showtime.cinema_id),
+          cinemaName: showtime.cinema_name,
+          roomId: Number(showtime.room_id),
+          roomName: showtime.room_name,
+          roomType: showtime.room_type,
+          startTime: showtime.start_time,
+          endTime: showtime.end_time,
+          dateKey: formatDateKey(showtime.start_time),
+          timeLabel: formatTimeLabel(showtime.start_time, showtime.room_type),
+          availableSeats: Number(showtime.available_seats || 0),
+          priceStandard: Number(showtime.price_standard || 0),
+          priceVip: Number(showtime.price_vip || 0),
+          priceCouple: Number(showtime.price_couple || 0),
+        }))
     : [];
 
   const cinemas = Array.from(
@@ -413,7 +439,9 @@ export default function MovieDetail() {
     navigate('/booking', {
       state: {
         ...(bookingContext || {}),
+        movieId: Number(movie?.movie_id || id || 0) || null,
         movieTitle,
+        ageLimit: Number(movie?.age_limit || 0),
         cinema: currentCinema?.name || selectedTime.cinemaName || 'Lunexa Movix',
         cinemaId: currentCinema?.id || selectedTime.cinemaId,
         roomId: selectedTime.roomId,
@@ -429,7 +457,6 @@ export default function MovieDetail() {
 
   return (
     <div className="movie-detail-page">
-
       {/* ── Banner cố định phía sau, nội dung scroll lên trên ── */}
       <div
         className="trailer-hero-banner"
@@ -517,7 +544,6 @@ export default function MovieDetail() {
                     {reviewCount > 0 ? `${averageRating.toFixed(1)}/5.0` : 'Chưa có đánh giá'}
                   </span>
                   <span>{formatReviewCount(reviewCount)} đánh giá</span>
-                  <span className="movie-favorite">❤ {recommendedPercent}% yêu thích</span>
                 </div>
 
                 <div className="movie-chips-row">
@@ -560,9 +586,6 @@ export default function MovieDetail() {
                 </div>
 
                 <div className="movie-action-row">
-                  <button className={`btn-heart ${isFavorite ? 'active' : ''}`} type="button" onClick={() => setIsFavorite((prev) => !prev)}>
-                    ♥ {isFavorite ? 'Đã thích' : 'Yêu thích'}
-                  </button>
                   <button className="btn-book" type="button" onClick={handleBookClick}><span className="icon">🎟️</span>Đặt vé ngay</button>
                 </div>
               </div>
@@ -657,7 +680,7 @@ export default function MovieDetail() {
                 )}
               </div>
               <div className="trailer-category-card">
-                <h3><span className="icon">📌</span>Danh mục</h3>
+                <h3><span className="icon">📌</span>Tags</h3>
                 <div className="category-pill-row">
                   {Array.isArray(movie?.categories) && movie.categories.length ? (
                     movie.categories.map((c) => <span key={c.category_id}>{c.category_name}</span>)
@@ -889,7 +912,7 @@ export default function MovieDetail() {
                     })
                   ) : (
                     <div className="schedule-empty">
-                      {cinemas.length === 0 ? 'Phim này chưa có lịch chiếu trong CSDL.' : 'Chưa có lịch cho ngày này.'}
+                      {cinemas.length === 0 ? 'Phim này chưa có lịch chiếu nào.' : 'Chưa có lịch cho ngày này.'}
                     </div>
                   )}
                 </div>

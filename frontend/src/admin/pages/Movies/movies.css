@@ -31,8 +31,6 @@
 .mv-btn-show:hover   { background: rgba(59,130,246,0.3); }
 .mv-btn-restore  { background: rgba(74,222,128,0.18);  color: #b7f5c8; }
 .mv-btn-restore:hover { background: rgba(74,222,128,0.3); }
-.mv-btn-permanent-delete { background: rgba(239,68,68,0.18);  color: #fca5a5; }
-.mv-btn-permanent-delete:hover { background: rgba(239,68,68,0.3); }
 .mv-btn-secondary { background: rgba(255,255,255,0.07); color: #ccd8ff; }
 .mv-btn-secondary:hover { background: rgba(255,255,255,0.14); }
 .mv-btn-lg { padding: 11px 22px; font-size: 14px; border-radius: 14px; }

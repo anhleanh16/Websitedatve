@@ -4,12 +4,12 @@ import './showtimes.css';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const STATUS_SHOW = {
-  active:    { label: "Đang hoạt động", cls: "confirmed" },
-  cancelled: { label: "Đã hủy",         cls: "cancelled" },
-  full:      { label: "Hết chỗ",        cls: "pending"   },
+  active: { label: "Đang hoạt động", cls: "confirmed" },
+  ended:  { label: "Đã kết thúc",    cls: "cancelled" },
 };
 
 const ROOM_TYPE_COLOR = { IMAX: "#7c61ff", "3D": "#5bcad4", "2D": "#4ade80", VIP: "#fbbf24" };
+const CLEANUP_BUFFER_MINUTES = 20;
 
 const EMPTY_FORM = {
   movieId: "", roomId: "", cinemaId: "",
@@ -44,11 +44,39 @@ function toDateTimeLocalValue(input) {
   return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
+function normalizeDateInputValue(input) {
+  if (!input) return "";
+  if (typeof input === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return input;
+  }
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) {
+    return typeof input === "string" ? input.slice(0, 10) : "";
+  }
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function calcEndTime(startIso, durationMin) {
   if (!startIso || !durationMin) return "";
   const d = new Date(startIso);
   d.setMinutes(d.getMinutes() + Number(durationMin));
   return toDateTimeLocalValue(d);
+}
+
+function addMinutes(input, minutes) {
+  if (!input && input !== 0) return null;
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setMinutes(d.getMinutes() + Number(minutes || 0));
+  return d;
+}
+
+function calcNextAllowedStartTime(endIso) {
+  const nextStart = addMinutes(endIso, CLEANUP_BUFFER_MINUTES);
+  return nextStart ? toDateTimeLocalValue(nextStart) : "";
 }
 
 function getConflicts(showtimes, rooms, movies, newSt, excludeId = null) {
@@ -57,18 +85,20 @@ function getConflicts(showtimes, rooms, movies, newSt, excludeId = null) {
   if (!room || !movie || !newSt.startTime) return [];
   const newStart = new Date(newSt.startTime);
   const newEnd   = new Date(calcEndTime(newSt.startTime, movie.duration));
+  const newEndWithCleanup = addMinutes(newEnd, CLEANUP_BUFFER_MINUTES);
   return showtimes.filter(s => {
-    if (s.id === excludeId || s.roomId !== room.id || s.status === "cancelled") return false;
+    if (s.id === excludeId || s.roomId !== room.id || s.status === "ended") return false;
     const sStart = new Date(s.startTime);
     const sEnd   = new Date(s.endTime);
-    return newStart < sEnd && newEnd > sStart;
+    const sEndWithCleanup = addMinutes(sEnd, CLEANUP_BUFFER_MINUTES);
+    return newStart < sEndWithCleanup && newEndWithCleanup > sStart;
   });
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** 1. Quản lý Suất chiếu – bảng tổng hợp */
-function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, onCancel }) {
+function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete }) {
   const [search, setSearch]     = useState("");
   const [filterCinema, setFC]   = useState("all");
   const [filterDate, setFD]     = useState("");
@@ -84,7 +114,12 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, 
     const matchD  = !filterDate || s.startTime.startsWith(filterDate);
     const matchS  = filterStatus === "all" || s.status === filterStatus;
     return matchQ && matchC && matchD && matchS;
-  }).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+  }).sort((a, b) => {
+    if (a.status !== b.status) {
+      return a.status === "active" ? -1 : 1;
+    }
+    return new Date(a.startTime) - new Date(b.startTime);
+  });
 
   return (
     <div className="sh-section">
@@ -98,7 +133,7 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, 
         <select className="sh-select" value={filterStatus} onChange={e => setFS(e.target.value)}>
           <option value="all">Tất cả trạng thái</option>
           <option value="active">Đang hoạt động</option>
-          <option value="cancelled">Đã hủy</option>
+          <option value="ended">Đã kết thúc</option>
         </select>
       </div>
 
@@ -124,8 +159,7 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, 
               const movie  = movies.find(m => m.id === s.movieId);
               const room   = rooms.find(r => r.id === s.roomId);
               const cinema = cinemas.find(c => c.id === s.cinemaId);
-              const st     = s.availableSeats === 0 && s.status === "active"
-                ? STATUS_SHOW.full : STATUS_SHOW[s.status] || STATUS_SHOW.active;
+              const st     = STATUS_SHOW[s.status] || STATUS_SHOW.active;
               const rtColor = ROOM_TYPE_COLOR[room?.type] || "#8fa6ff";
               return (
                 <tr key={s.id}>
@@ -159,9 +193,6 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, 
                   <td>
                     <div className="sh-actions">
                       <button className="sh-btn sh-btn-edit" onClick={() => onEdit(s)}>Sửa</button>
-                      {s.status === "active" && (
-                        <button className="sh-btn sh-btn-cancel" onClick={() => onCancel(s)}>Hủy</button>
-                      )}
                       <button className="sh-btn sh-btn-delete" onClick={() => onDelete(s)}>Xóa</button>
                     </div>
                   </td>
@@ -184,8 +215,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
   const cinemaRooms = rooms.filter(r => String(r.cinemaId) === selectedCinema);
   const dayShows    = showtimes.filter(s =>
     String(s.cinemaId) === selectedCinema &&
-    s.startTime.startsWith(selectedDate) &&
-    s.status !== "cancelled"
+    s.startTime.startsWith(selectedDate)
   );
 
   const HOURS = Array.from({ length: 15 }, (_, i) => i + 8); // 08:00 – 22:00
@@ -245,11 +275,26 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
                   const left  = pct(s.startTime);
                   const width = widthPct(s.startTime, s.endTime);
                   const isFull = s.availableSeats === 0;
+                  const isEnded = s.status === "ended";
                   return (
                     <div
                       key={s.id}
                       className="sh-block"
-                      style={{ left: `${left}%`, width: `${width}%`, background: isFull ? "rgba(248,113,113,0.25)" : "rgba(124,97,255,0.28)", borderColor: isFull ? "rgba(248,113,113,0.5)" : "rgba(124,97,255,0.6)" }}
+                      style={{
+                        left: `${left}%`,
+                        width: `${width}%`,
+                        background: isEnded
+                          ? "rgba(148,163,184,0.16)"
+                          : isFull
+                            ? "rgba(248,113,113,0.25)"
+                            : "rgba(124,97,255,0.28)",
+                        borderColor: isEnded
+                          ? "rgba(148,163,184,0.34)"
+                          : isFull
+                            ? "rgba(248,113,113,0.5)"
+                            : "rgba(124,97,255,0.6)",
+                        opacity: isEnded ? 0.78 : 1,
+                      }}
                       title={`${movie?.title} | ${fmtTime(s.startTime)} – ${fmtTime(s.endTime)} | Thường ${fmtMoney(s.priceStandard)} | VIP ${fmtMoney(s.priceVip)} | Ghế đôi ${fmtMoney(s.priceCouple)}`}
                     >
                       <span className="sh-block-title">{movie?.title}</span>
@@ -318,9 +363,9 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
                 const cinema = cinemas.find(c => c.id === s.cinemaId);
                 const rtColor = ROOM_TYPE_COLOR[room?.type] || "#8fa6ff";
                 const isFull = s.availableSeats === 0;
-                const isCancelled = s.status === "cancelled";
+                const isEnded = s.status === "ended";
                 return (
-                  <div key={s.id} className={`sh-schedule-card${isCancelled ? " cancelled" : isFull ? " full" : ""}`}>
+                  <div key={s.id} className={`sh-schedule-card${isEnded ? " ended" : isFull ? " full" : ""}`}>
                     <div className="sh-schedule-time">
                       {new Date(s.startTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
                     </div>
@@ -334,8 +379,8 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
                       <span style={{ color: "#a78bfa", fontWeight: 600 }}>
                         Thường {fmtMoney(s.priceStandard)} · VIP {fmtMoney(s.priceVip)} · Đôi {fmtMoney(s.priceCouple)}
                       </span>
-                      <span style={{ color: isFull ? "#f87171" : "#4ade80", fontSize: 12 }}>
-                        {isCancelled ? "Đã hủy" : isFull ? "Hết chỗ" : `${s.availableSeats} ghế trống`}
+                      <span style={{ color: isEnded ? "#94a3b8" : isFull ? "#f87171" : "#4ade80", fontSize: 12 }}>
+                        {isEnded ? "Đã kết thúc" : isFull ? "Hết chỗ" : `${s.availableSeats} ghế trống`}
                       </span>
                     </div>
                   </div>
@@ -362,7 +407,7 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
         priceVip: showtime.priceVip,
         priceCouple: showtime.priceCouple,
         availableSeats: showtime.availableSeats,
-        status: showtime.status,
+        status: "active",
       }
     : { ...EMPTY_FORM }
   );
@@ -372,7 +417,10 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
 
   const cinemaRooms = rooms.filter(r => String(r.cinemaId) === String(form.cinemaId));
   const selMovie    = movies.find(m => m.id === Number(form.movieId));
+  const releaseDate = selMovie?.releaseDate || "";
+  const minStartTime = releaseDate ? `${releaseDate}T00:00` : "";
   const endTime     = calcEndTime(form.startTime, selMovie?.duration);
+  const nextAllowedStartTime = calcNextAllowedStartTime(endTime);
   const conflicts   = form.roomId && form.startTime && form.movieId
     ? getConflicts(showtimes, rooms, movies, form, showtime?.id)
     : [];
@@ -383,10 +431,13 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
     if (!form.cinemaId)    e.cinemaId   = "Chọn rạp.";
     if (!form.roomId)      e.roomId     = "Chọn phòng chiếu.";
     if (!form.startTime)   e.startTime  = "Chọn giờ bắt đầu.";
+    if (releaseDate && form.startTime && form.startTime.slice(0, 10) < releaseDate) {
+      e.startTime = `Phim này chỉ được chiếu từ ngày phát hành ${fmtDate(releaseDate)} trở đi.`;
+    }
     if (!form.priceStandard || Number(form.priceStandard) <= 0) e.priceStandard = "Nhập giá vé thường hợp lệ.";
     if (!form.priceVip || Number(form.priceVip) <= 0) e.priceVip = "Nhập giá vé VIP hợp lệ.";
     if (!form.priceCouple || Number(form.priceCouple) <= 0) e.priceCouple = "Nhập giá ghế đôi hợp lệ.";
-    if (conflicts.length)  e.startTime  = "Phòng đã có suất chiếu trùng giờ.";
+    if (conflicts.length)  e.startTime  = `Phòng phải nghỉ ${CLEANUP_BUFFER_MINUTES} phút giữa 2 suất chiếu.`;
     return e;
   };
 
@@ -406,7 +457,7 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
       priceVip: Number(form.priceVip),
       priceCouple: Number(form.priceCouple),
       availableSeats: Number(form.availableSeats) || room?.totalSeats || 0,
-      status: form.status,
+      status: "active",
     });
   };
 
@@ -450,10 +501,7 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
 
               <div className="sh-field">
                 <label>Trạng thái</label>
-                <select value={form.status} onChange={e => set("status", e.target.value)}>
-                  <option value="active">Đang hoạt động</option>
-                  <option value="cancelled">Hủy</option>
-                </select>
+                <input value={endTime ? "Tự động: đang hoạt động, hết giờ sẽ chuyển sang đã kết thúc" : "Tự động theo thời gian chiếu"} readOnly style={{ opacity: 0.7, cursor: "not-allowed" }} />
               </div>
             </div>
 
@@ -461,7 +509,10 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
             <div className="sh-form-col">
               <div className="sh-field">
                 <label>Giờ bắt đầu *</label>
-                <input type="datetime-local" className={errors.startTime ? "error" : ""} value={form.startTime} onChange={e => set("startTime", e.target.value)} />
+                <input type="datetime-local" className={errors.startTime ? "error" : ""} value={form.startTime} min={minStartTime || undefined} onChange={e => set("startTime", e.target.value)} />
+                {releaseDate && (
+                  <span className="sh-hint">Chỉ được tạo suất chiếu từ ngày phát hành {fmtDate(releaseDate)} trở đi.</span>
+                )}
                 {errors.startTime && <span className="sh-error">{errors.startTime}</span>}
               </div>
 
@@ -469,6 +520,13 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
                 <div className="sh-field">
                   <label>Giờ kết thúc (tự tính)</label>
                   <input type="datetime-local" value={endTime} readOnly style={{ opacity: 0.6, cursor: "not-allowed" }} />
+                </div>
+              )}
+
+              {nextAllowedStartTime && (
+                <div className="sh-field">
+                  <label>Giờ sớm nhất cho suất kế tiếp</label>
+                  <input type="datetime-local" value={nextAllowedStartTime} readOnly style={{ opacity: 0.6, cursor: "not-allowed" }} />
                 </div>
               )}
 
@@ -499,10 +557,10 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
               {/* Conflict warning */}
               {conflicts.length > 0 && (
                 <div className="sh-conflict-warn">
-                  ⚠️ Phòng đã có <strong>{conflicts.length}</strong> suất chiếu trùng giờ:
+                  ⚠️ Phòng đã có <strong>{conflicts.length}</strong> suất chưa đủ khoảng nghỉ {CLEANUP_BUFFER_MINUTES} phút:
                   {conflicts.map(c => {
                     const m = movies.find(x => x.id === c.movieId);
-                    return <div key={c.id} className="sh-conflict-item">• {m?.title} | {fmtTime(c.startTime)} – {fmtTime(c.endTime)}</div>;
+                    return <div key={c.id} className="sh-conflict-item">• {m?.title} | {fmtTime(c.startTime)} – {fmtTime(c.endTime)} | Suất sau chỉ được bắt đầu từ {fmtTime(calcNextAllowedStartTime(c.endTime))}</div>;
                   })}
                 </div>
               )}
@@ -513,6 +571,7 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
                   <div className="sh-preview-row"><span>Phim</span><strong>{selMovie.title}</strong></div>
                   <div className="sh-preview-row"><span>Thời lượng</span><strong>{selMovie.duration} phút</strong></div>
                   {endTime && <div className="sh-preview-row"><span>Kết thúc</span><strong>{fmtTime(endTime)}</strong></div>}
+                  {nextAllowedStartTime && <div className="sh-preview-row"><span>Suất kế tiếp sớm nhất</span><strong>{fmtTime(nextAllowedStartTime)}</strong></div>}
                   {form.priceStandard && <div className="sh-preview-row"><span>Vé thường</span><strong style={{ color: "#a78bfa" }}>{fmtMoney(form.priceStandard)}</strong></div>}
                   {form.priceVip && <div className="sh-preview-row"><span>Vé VIP</span><strong style={{ color: "#fbbf24" }}>{fmtMoney(form.priceVip)}</strong></div>}
                   {form.priceCouple && <div className="sh-preview-row"><span>Ghế đôi</span><strong style={{ color: "#fb7185" }}>{fmtMoney(form.priceCouple)}</strong></div>}
@@ -630,6 +689,7 @@ export default function AdminShowtimes() {
         id:       m.movie_id,
         title:    m.title,
         duration: m.duration,
+        releaseDate: normalizeDateInputValue(m.release_date),
       }));
 
       setShowtimes(normalizedSt);
@@ -659,7 +719,7 @@ export default function AdminShowtimes() {
         priceVip:       data.priceVip,
         priceCouple:    data.priceCouple,
         availableSeats: data.availableSeats,
-        status:         data.status,
+        status:         "active",
       };
 
       if (data.id && showtimes.find(s => s.id === data.id)) {
@@ -672,26 +732,18 @@ export default function AdminShowtimes() {
       await fetchAll();
       setEditSt(undefined);
     } catch (err) {
-      const msg = err.message?.includes('409') || err.message?.includes('conflict')
-        ? "Phòng đã có suất chiếu trùng giờ."
-        : "Lỗi lưu suất chiếu. Vui lòng thử lại.";
+      const msg = err?.message || "Lỗi lưu suất chiếu. Vui lòng thử lại.";
       showToast(msg);
     }
   };
 
-  const handleCancel = (s) => setConfirmTarget({ type: "cancel", data: s });
   const handleDelete = (s) => setConfirmTarget({ type: "delete", data: s });
 
   const handleConfirm = async () => {
-    const { type, data } = confirmTarget;
+    const { data } = confirmTarget;
     try {
-      if (type === "cancel") {
-        await adminShowtimeService.cancel(data.id);
-        showToast(`Đã hủy suất chiếu phim "${data.movieTitle || movies.find(m => m.id === data.movieId)?.title}".`);
-      } else {
-        await adminShowtimeService.delete(data.id);
-        showToast("Đã xóa suất chiếu.");
-      }
+      await adminShowtimeService.delete(data.id);
+      showToast("Đã xóa suất chiếu.");
       await fetchAll();
     } catch (err) {
       const msg = err.message?.includes('400')
@@ -704,10 +756,9 @@ export default function AdminShowtimes() {
 
   // ── Stats ──
   const stats = [
-    { label: "Tổng suất chiếu", value: showtimes.length,                                                          color: "#7c61ff" },
-    { label: "Đang hoạt động",  value: showtimes.filter(s => s.status === "active").length,                       color: "#4ade80" },
-    { label: "Hết chỗ",        value: showtimes.filter(s => s.availableSeats === 0 && s.status === "active").length, color: "#fbbf24" },
-    { label: "Đã hủy",         value: showtimes.filter(s => s.status === "cancelled").length,                     color: "#f87171" },
+    { label: "Tổng suất chiếu", value: showtimes.length,                                    color: "#7c61ff" },
+    { label: "Đang hoạt động",  value: showtimes.filter(s => s.status === "active").length, color: "#4ade80" },
+    { label: "Đã kết thúc",     value: showtimes.filter(s => s.status === "ended").length,  color: "#94a3b8" },
   ];
 
   const TABS = [
@@ -770,7 +821,6 @@ export default function AdminShowtimes() {
               showtimes={showtimes} rooms={rooms} movies={movies} cinemas={cinemas}
               onEdit={s => setEditSt(s)}
               onDelete={handleDelete}
-              onCancel={handleCancel}
             />
           )}
           {activeTab === "allocation" && (
@@ -796,12 +846,9 @@ export default function AdminShowtimes() {
       )}
       {confirmTarget && (
         <Confirm
-          title={confirmTarget.type === "cancel" ? "Xác nhận hủy suất chiếu" : "Xác nhận xóa"}
-          message={confirmTarget.type === "cancel"
-            ? `Hủy suất chiếu phim "${confirmTarget.data.movieTitle || movies.find(m => m.id === confirmTarget.data.movieId)?.title}" lúc ${fmtTime(confirmTarget.data.startTime)}? Hành động này không thể hoàn tác.`
-            : `Xóa suất chiếu này? Dữ liệu sẽ bị xóa vĩnh viễn.`
-          }
-          danger={confirmTarget.type === "delete"}
+          title="Xác nhận xóa"
+          message="Xóa suất chiếu này? Dữ liệu sẽ bị xóa vĩnh viễn."
+          danger
           onClose={() => setConfirmTarget(null)}
           onConfirm={handleConfirm}
         />

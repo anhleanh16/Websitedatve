@@ -1,14 +1,48 @@
 import { db } from "../../../config/db.js";
 
 export const MovieModel = {
+  async syncStatuses() {
+    await db.query(
+      `
+      UPDATE Movies m
+      LEFT JOIN (
+        SELECT
+          movie_id,
+          COUNT(CASE WHEN status <> 'cancelled' THEN 1 END) AS non_cancelled_showtime_count,
+          SUM(CASE WHEN status <> 'cancelled' AND end_time >= NOW() THEN 1 ELSE 0 END) AS active_or_upcoming_showtime_count,
+          MAX(CASE WHEN status <> 'cancelled' THEN end_time END) AS last_end_time
+        FROM Showtimes
+        GROUP BY movie_id
+      ) s ON s.movie_id = m.movie_id
+      SET m.status = CASE
+        WHEN DATE(m.release_date) > CURDATE() THEN 'coming_soon'
+        WHEN COALESCE(s.active_or_upcoming_showtime_count, 0) > 0 THEN 'now_showing'
+        WHEN COALESCE(s.non_cancelled_showtime_count, 0) > 0
+          AND s.last_end_time IS NOT NULL
+          AND s.last_end_time < NOW() THEN 'ended'
+        ELSE m.status
+      END
+      `,
+    );
+  },
+
   /**
    * Lấy tất cả phim (bao gồm cả phim trong thùng rác nếu có yêu cầu)
    * @param {boolean} isTrash - True nếu muốn lấy phim trong thùng rác
    * @returns {Promise<Array>} Danh sách phim
    */
   async findAll(isTrash = false) {
+    await this.syncStatuses();
     const [movies] = await db.query(
-      "SELECT * FROM Movies WHERE is_deleted = ? ORDER BY release_date DESC",
+      `
+      SELECT *
+      FROM Movies
+      WHERE is_deleted = ?
+      ORDER BY
+        CASE WHEN status = 'ended' THEN 1 ELSE 0 END ASC,
+        release_date DESC,
+        movie_id DESC
+      `,
       [isTrash ? 1 : 0],
     );
 

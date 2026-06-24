@@ -2,11 +2,28 @@ import React, { useEffect, useMemo, useState } from "react";
 import "./Film.css";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+const VISITED_TAG_STORAGE_KEY = "lunexa_user_tag_preferences";
+
 const banners = [
   "/uploads/banners/banner1.jpg",
   "/uploads/banners/banner2.jpg",
   "/uploads/banners/banner3.jpg",
 ];
+
+const normalizeMovieItem = (m) => ({
+  id: m.movie_id,
+  title: m.title,
+  poster: m.poster,
+  ageLimit: Number(m.age_limit || 0),
+  rating:
+    Number.isFinite(Number(m.rating)) && Number(m.review_count) > 0
+      ? Number(m.rating)
+      : null,
+  reviewCount: Number(m.review_count || 0),
+  status: m.status,
+  releaseDate: m.release_date || "",
+  categories: Array.isArray(m.categories) ? m.categories : [],
+});
 
 export default function Film() {
   const location = useLocation();
@@ -23,10 +40,41 @@ export default function Film() {
       roomLabel: roomParts.length > 0 ? roomParts.join(" • ") : "Chưa chọn phòng",
     };
   }, [bookingContext]);
+  const quickBookingSteps = useMemo(
+    () => [
+      {
+        id: "cinema",
+        step: "Bước 1",
+        title: bookingSummary ? bookingSummary.cinemaName : "Chọn rạp",
+        description: "Bắt đầu bằng rạp bạn muốn xem phim.",
+      },
+      {
+        id: "room",
+        step: "Bước 2",
+        title: bookingSummary ? bookingSummary.roomLabel : "Chọn phòng",
+        description: "Xem phòng chiếu và định dạng phù hợp.",
+      },
+      {
+        id: "movie",
+        step: "Bước 3",
+        title: "Chọn phim",
+        description: "Mở phim bạn thích để xem lịch chiếu.",
+      },
+      {
+        id: "showtime",
+        step: "Bước 4",
+        title: "Chọn suất chiếu",
+        description: "Chọn giờ đẹp rồi vào thẳng phần đặt ghế.",
+      },
+    ],
+    [bookingSummary],
+  );
   const [activeTab, setActiveTab] = useState("now_showing");
   const [movies, setMovies] = useState([]);
+  const [movieCatalog, setMovieCatalog] = useState([]);
   const [loadingMovies, setLoadingMovies] = useState(false);
   const [moviesError, setMoviesError] = useState(null);
+  const [buyingMovieId, setBuyingMovieId] = useState(null);
 
   const handleBannerChange = (newIndex) => {
     setIsTransitioning(true);
@@ -67,18 +115,7 @@ export default function Film() {
         if (!res.ok) throw new Error("API error");
         const data = await res.json();
         const list = Array.isArray(data?.movies) ? data.movies : [];
-        setMovies(
-          list.map((m) => ({
-            id: m.movie_id,
-            title: m.title,
-            poster: m.poster,
-            rating: Number.isFinite(Number(m.rating)) && Number(m.review_count) > 0
-              ? Number(m.rating)
-              : null,
-            reviewCount: Number(m.review_count || 0),
-            status: m.status,
-          })),
-        );
+        setMovies(list.map(normalizeMovieItem));
       } catch (err) {
         if (err?.name === "AbortError") return;
         console.error(err);
@@ -92,6 +129,173 @@ export default function Film() {
     loadMovies();
     return () => controller.abort();
   }, [activeTab]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadMovieCatalog = async () => {
+      try {
+        const res = await fetch("/api/user/movies", { signal: controller.signal });
+        if (!res.ok) throw new Error("API error");
+        const data = await res.json();
+        const list = Array.isArray(data?.movies) ? data.movies : [];
+        setMovieCatalog(list.map(normalizeMovieItem));
+      } catch (err) {
+        if (err?.name === "AbortError") return;
+        console.error(err);
+        setMovieCatalog([]);
+      }
+    };
+
+    loadMovieCatalog();
+    return () => controller.abort();
+  }, []);
+
+  const suggestedMovies = useMemo(() => {
+    const source = movieCatalog.length > 0 ? movieCatalog : movies;
+    const visibleMovieIds = new Set(movies.map((movie) => movie.id));
+
+    let tagScores = {};
+    try {
+      const raw = window.localStorage.getItem(VISITED_TAG_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      tagScores = parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+      console.error("Không thể đọc lịch sử tag đã xem:", error);
+    }
+
+    const scoredMovies = source
+      .filter((movie) => movie.status !== "ended")
+      .map((movie) => {
+        const score = (Array.isArray(movie.categories) ? movie.categories : []).reduce(
+          (total, category) =>
+            total + Number(tagScores[Number(category?.category_id)] || 0),
+          0,
+        );
+        return { ...movie, recommendationScore: score };
+      })
+      .filter(
+        (movie) =>
+          movie.recommendationScore > 0 && !visibleMovieIds.has(movie.id),
+      )
+      .sort((a, b) => {
+        if (b.recommendationScore !== a.recommendationScore) {
+          return b.recommendationScore - a.recommendationScore;
+        }
+        if ((b.rating || 0) !== (a.rating || 0)) {
+          return (b.rating || 0) - (a.rating || 0);
+        }
+        return new Date(b.releaseDate) - new Date(a.releaseDate);
+      });
+
+    const fallbackMovies = source
+      .filter((movie) => movie.status !== "ended" && !visibleMovieIds.has(movie.id))
+      .sort((a, b) => {
+        if ((b.rating || 0) !== (a.rating || 0)) {
+          return (b.rating || 0) - (a.rating || 0);
+        }
+        return new Date(b.releaseDate) - new Date(a.releaseDate);
+      });
+
+    const merged = [...scoredMovies];
+    fallbackMovies.forEach((movie) => {
+      if (!merged.some((item) => item.id === movie.id)) {
+        merged.push(movie);
+      }
+    });
+
+    return merged.slice(0, 3);
+  }, [movieCatalog, movies]);
+
+  const goToMovieDetail = (movie) => {
+    navigate(`/movie/${movie.id}`, {
+      state: bookingContext
+        ? { bookingContext, movieTitle: movie.title }
+        : { movieTitle: movie.title },
+    });
+  };
+
+  const formatBookingDay = (input) => {
+    const d = new Date(input);
+    if (Number.isNaN(d.getTime())) return "Hôm nay";
+    return d.toLocaleDateString("vi-VN", {
+      weekday: "long",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const formatBookingTime = (input, roomType) => {
+    const d = new Date(input);
+    if (Number.isNaN(d.getTime())) return roomType || "Suất chiếu";
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}${roomType ? ` - ${roomType}` : ""}`;
+  };
+
+  const handleBuyTicket = async (movie) => {
+    if (buyingMovieId) return;
+
+    if (bookingContext?.cinemaId && bookingContext?.roomId) {
+      navigate("/booking", {
+        state: {
+          ...bookingContext,
+          movieId: movie.id,
+          movieTitle: movie.title,
+          ageLimit: movie.ageLimit,
+          time: bookingContext.time || "Suất chiếu đã chọn",
+        },
+      });
+      return;
+    }
+
+    try {
+      setBuyingMovieId(movie.id);
+      const res = await fetch(`/api/user/movies/${movie.id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Không thể tải lịch chiếu phim.");
+
+      const showtimes = Array.isArray(data?.movie?.showtimes) ? data.movie.showtimes : [];
+      const firstAvailableShowtime = showtimes.find((showtime) => {
+        const startTime = new Date(showtime.start_time).getTime();
+        return (
+          showtime.room_type !== "VIP" &&
+          Number(showtime.available_seats || 0) > 0 &&
+          startTime > Date.now()
+        );
+      });
+
+      if (!firstAvailableShowtime) {
+        goToMovieDetail(movie);
+        return;
+      }
+
+      navigate("/booking", {
+        state: {
+          movieId: movie.id,
+          movieTitle: movie.title,
+          ageLimit: Number(data?.movie?.age_limit || movie.ageLimit || 0),
+          cinema: firstAvailableShowtime.cinema_name || "Lunexa Movix",
+          cinemaId: Number(firstAvailableShowtime.cinema_id || 0) || null,
+          roomId: Number(firstAvailableShowtime.room_id || 0) || null,
+          roomName: firstAvailableShowtime.room_name || "",
+          roomType: firstAvailableShowtime.room_type || "",
+          showtimeId: Number(firstAvailableShowtime.showtime_id || 0) || null,
+          day: formatBookingDay(firstAvailableShowtime.start_time),
+          time: formatBookingTime(
+            firstAvailableShowtime.start_time,
+            firstAvailableShowtime.room_type,
+          ),
+        },
+      });
+    } catch (err) {
+      console.error(err);
+      goToMovieDetail(movie);
+    } finally {
+      setBuyingMovieId(null);
+    }
+  };
 
   return (
     <div className="film-page">
@@ -193,14 +397,18 @@ export default function Film() {
               {!loadingMovies &&
                 !moviesError &&
                 movies.map((m) => (
-                  <Link
-                    to={`/movie/${m.id}`}
-                    state={bookingContext ? { bookingContext, movieTitle: m.title } : { movieTitle: m.title }}
-                    className="movie-card"
-                    key={m.id}
-                  >
+                  <article className="movie-card" key={m.id}>
                     <div
                       className="poster"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => goToMovieDetail(m)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          goToMovieDetail(m);
+                        }
+                      }}
                       style={
                         m.poster
                           ? {
@@ -210,7 +418,11 @@ export default function Film() {
                             }
                           : undefined
                       }
-                    />
+                    >
+                      <span className="poster-age-badge">
+                        {m.ageLimit > 0 ? `${m.ageLimit}+` : "P"}
+                      </span>
+                    </div>
 
                     <div className="card-actions">
                       {typeof m.rating === "number" && (
@@ -228,38 +440,123 @@ export default function Film() {
                       )}
 
                       <div className="action-btns">
-                        <button className="btn primary" type="button">
-                          {bookingContext ? "Chọn phim này" : "Mua vé"}
+                        <button
+                          className="btn primary"
+                          type="button"
+                          onClick={() => handleBuyTicket(m)}
+                          disabled={buyingMovieId === m.id}
+                        >
+                          {buyingMovieId === m.id
+                            ? "Đang mở..."
+                            : bookingContext
+                              ? "Mua vé"
+                              : "Mua vé"}
                         </button>
-                        <button className="btn secondary">Chi tiết</button>
+                        <button
+                          className="btn secondary"
+                          type="button"
+                          onClick={() => goToMovieDetail(m)}
+                        >
+                          Chi tiết
+                        </button>
                       </div>
                     </div>
 
                     <div className="movie-title">{m.title}</div>
-                  </Link>
+                  </article>
                 ))}
             </div>
 
-            <div className="load-more">
-              <button className="btn load-more-btn">Xem thêm</button>
-            </div>
           </section>
 
           <aside className="film-right">
             <div className="quick-book">
-              <h4>Đặt vé nhanh</h4>
-              <button type="button">
-                {bookingSummary ? bookingSummary.cinemaName : "Chọn rạp"}
-              </button>
-              <button type="button">
-                {bookingSummary ? bookingSummary.roomLabel : "Chọn phòng"}
-              </button>
-              <button type="button">Chọn phim</button>
-              <button type="button">Chọn suất chiếu</button>
+              <div className="quick-book-header">
+                <h4>Đặt vé nhanh</h4>
+                <span>Dành cho người mới, làm lần lượt theo 4 bước này.</span>
+              </div>
+              <div className="quick-book-steps">
+                {quickBookingSteps.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="quick-book-step"
+                    style={{ animationDelay: `${index * 0.24}s` }}
+                  >
+                    <div className="quick-book-step-index">{index + 1}</div>
+                    <div className="quick-book-step-content">
+                      <span className="quick-book-step-badge">{item.step}</span>
+                      <strong>{item.title}</strong>
+                      <p>{item.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="suggest">Gợi ý cho bạn</div>
-            <div className="ad">Banner quảng cáo</div>
+            <div className="suggest">
+              <div className="suggest-header">
+                <h4>Gợi ý cho bạn</h4>
+                <span>Dựa trên các Tags bạn hay xem</span>
+              </div>
+              <div className="suggest-list">
+                {suggestedMovies.length > 0 ? (
+                  suggestedMovies.map((movie) => (
+                    <button
+                      key={movie.id}
+                      type="button"
+                      className="suggest-card"
+                      onClick={() => goToMovieDetail(movie)}
+                    >
+                      <div
+                        className="suggest-poster"
+                        style={
+                          movie.poster
+                            ? {
+                                backgroundImage: `url(${movie.poster})`,
+                                backgroundSize: "cover",
+                                backgroundPosition: "center",
+                              }
+                            : undefined
+                        }
+                      >
+                        <span className="suggest-age-badge">
+                          {movie.ageLimit > 0 ? `${movie.ageLimit}+` : "P"}
+                        </span>
+                      </div>
+                      <div className="suggest-content">
+                        <strong>{movie.title}</strong>
+                        <p>
+                          {movie.categories.length > 0
+                            ? movie.categories
+                                .slice(0, 2)
+                                .map((category) => category.category_name)
+                                .join(" • ")
+                            : "Chưa có Tags"}
+                        </p>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="suggest-empty">
+                    Hãy xem vài phim có Tags bạn thích, hệ thống sẽ gợi ý đúng hơn.
+                  </div>
+                )}
+              </div>
+            </div>
+            <Link
+              to="/"
+              className="ad"
+              style={{
+                backgroundImage: `linear-gradient(180deg, rgba(7, 10, 24, 0.2), rgba(7, 10, 24, 0.76)), url(${banners[(currentBannerIndex + 1) % banners.length]})`,
+              }}
+            >
+              <div className="ad-content">
+                <span className="ad-badge">Ưu đãi</span>
+                <strong>Đặt vé sớm</strong>
+                <p>Chọn suất đẹp và trải nghiệm phim hot tại Lunexa Movix.</p>
+                <span className="ad-cta">Khám phá ngay</span>
+              </div>
+            </Link>
           </aside>
         </main>
       </div>
