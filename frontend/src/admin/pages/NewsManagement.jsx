@@ -4,12 +4,12 @@ import { toAbsoluteAssetUrl } from "../../utils/api";
 import "./news-management.css";
 
 const CATEGORY_OPTIONS = [
-  { value: "movie_news", label: "Tin điện ảnh" },
-  { value: "promotion", label: "Khuyến mãi" },
-  { value: "event", label: "Sự kiện" },
-  { value: "coming_soon", label: "Sắp chiếu" },
-  { value: "review", label: "Review" },
-  { value: "announcement", label: "Thông báo" },
+  { value: "movie_news", label: "Tin điện ảnh",  icon: "🎬", color: "#7c3aed" },
+  { value: "promotion",  label: "Khuyến mãi",    icon: "🎁", color: "#f59e0b" },
+  { value: "event",      label: "Sự kiện",        icon: "🎉", color: "#22c55e" },
+  { value: "coming_soon",label: "Sắp chiếu",      icon: "🍿", color: "#3b82f6" },
+  { value: "review",     label: "Review",         icon: "⭐", color: "#ec4899" },
+  { value: "announcement",label: "Thông báo",     icon: "📢", color: "#06b6d4" },
 ];
 
 const STATUS_OPTIONS = [
@@ -51,6 +51,123 @@ const getStatusMeta = (value) => {
       return { label: "Nháp", cls: "pending" };
   }
 };
+
+// ─── Category Manager ─────────────────────────────────────────────────────────
+function CategoryManager({ newsList }) {
+  const [editingValue, setEditingValue] = useState(null);
+  const [editLabel, setEditLabel]       = useState("");
+  const [editIcon, setEditIcon]         = useState("");
+  const [labels, setLabels]             = useState(() => {
+    try {
+      const raw = localStorage.getItem("lunexa_news_category_labels");
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
+
+  const save = (value) => {
+    const next = {
+      ...labels,
+      [value]: { label: editLabel.trim() || labels[value]?.label, icon: editIcon.trim() || labels[value]?.icon },
+    };
+    setLabels(next);
+    localStorage.setItem("lunexa_news_category_labels", JSON.stringify(next));
+    setEditingValue(null);
+  };
+
+  const getLabel = (cat) => labels[cat.value]?.label || cat.label;
+  const getIcon  = (cat) => labels[cat.value]?.icon  || cat.icon;
+
+  return (
+    <div className="nm-section">
+      <div className="nm-cat-header">
+        <h3>Danh mục tin tức</h3>
+        <p>Tuỳ chỉnh tên hiển thị và icon cho từng danh mục. Thay đổi lưu local và áp dụng ngay.</p>
+      </div>
+      <div className="nm-cat-grid">
+        {CATEGORY_OPTIONS.map((cat) => {
+          const count = newsList.filter((n) => n.category === cat.value).length;
+          const isEditing = editingValue === cat.value;
+          return (
+            <div key={cat.value} className="nm-cat-card" style={{ borderColor: cat.color + "44" }}>
+              <div className="nm-cat-card-top">
+                <span className="nm-cat-icon" style={{ background: cat.color + "22", color: cat.color }}>
+                  {getIcon(cat)}
+                </span>
+                <div className="nm-cat-info">
+                  <strong>{getLabel(cat)}</strong>
+                  <span className="nm-cat-value">{cat.value}</span>
+                </div>
+                <span className="nm-cat-count" style={{ background: cat.color + "22", color: cat.color }}>
+                  {count} bài
+                </span>
+              </div>
+
+              {isEditing ? (
+                <div className="nm-cat-edit-form">
+                  <div className="nm-field-row" style={{ gap: 8 }}>
+                    <div className="nm-field" style={{ flex: 1 }}>
+                      <label>Tên hiển thị</label>
+                      <input
+                        value={editLabel}
+                        onChange={(e) => setEditLabel(e.target.value)}
+                        placeholder={cat.label}
+                        autoFocus
+                        onKeyDown={(e) => e.key === "Enter" && save(cat.value)}
+                      />
+                    </div>
+                    <div className="nm-field" style={{ width: 70 }}>
+                      <label>Icon</label>
+                      <input
+                        value={editIcon}
+                        onChange={(e) => setEditIcon(e.target.value)}
+                        placeholder={cat.icon}
+                        style={{ textAlign: "center", fontSize: 18 }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                    <button className="nm-btn nm-btn-edit nm-btn-sm" onClick={() => save(cat.value)}>
+                      Lưu
+                    </button>
+                    <button className="nm-btn nm-btn-secondary nm-btn-sm" onClick={() => setEditingValue(null)}>
+                      Hủy
+                    </button>
+                    {(labels[cat.value]) && (
+                      <button
+                        className="nm-btn nm-btn-delete nm-btn-sm"
+                        onClick={() => {
+                          const next = { ...labels };
+                          delete next[cat.value];
+                          setLabels(next);
+                          localStorage.setItem("lunexa_news_category_labels", JSON.stringify(next));
+                          setEditingValue(null);
+                        }}
+                      >
+                        Đặt lại
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className="nm-btn nm-btn-edit nm-btn-sm"
+                  style={{ marginTop: 10, alignSelf: "flex-start" }}
+                  onClick={() => {
+                    setEditingValue(cat.value);
+                    setEditLabel(getLabel(cat));
+                    setEditIcon(getIcon(cat));
+                  }}
+                >
+                  ✏️ Chỉnh sửa
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function NewsModal({ open, form, setForm, onClose, onSubmit, saving, editingId }) {
   if (!open) return null;
@@ -222,6 +339,7 @@ export default function NewsManagement() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [activeTab, setActiveTab] = useState("list");
 
   const buildNewsFormData = () => {
     const formData = new FormData();
@@ -393,6 +511,21 @@ export default function NewsManagement() {
         ))}
       </div>
 
+      {/* Tabs */}
+      <div className="nm-tabs">
+        <button className={`nm-tab${activeTab === "list" ? " active" : ""}`} onClick={() => setActiveTab("list")}>
+          📋 Danh sách bài viết
+        </button>
+        <button className={`nm-tab${activeTab === "category" ? " active" : ""}`} onClick={() => setActiveTab("category")}>
+          🏷️ Danh mục
+        </button>
+      </div>
+
+      {/* Tab: Danh mục */}
+      {activeTab === "category" && <CategoryManager newsList={newsList} />}
+
+      {/* Tab: Danh sách */}
+      {activeTab === "list" && <>
       {(message || error) && (
         <div
           className="report-card"
@@ -519,6 +652,7 @@ export default function NewsManagement() {
       <div className="nm-footer-count">
         Hiển thị <strong>{filteredNews.length}</strong> / {newsList.length} bài viết
       </div>
+      </>}
 
       <NewsModal
         open={modalOpen}
