@@ -74,7 +74,7 @@ export default function Film() {
   const [movieCatalog, setMovieCatalog] = useState([]);
   const [loadingMovies, setLoadingMovies] = useState(false);
   const [moviesError, setMoviesError] = useState(null);
-  const [buyingMovieId, setBuyingMovieId] = useState(null);
+  const [buyingMovieId] = useState(null);
 
   const handleBannerChange = (newIndex) => {
     setIsTransitioning(true);
@@ -234,67 +234,14 @@ export default function Film() {
     return `${hours}:${minutes}${roomType ? ` - ${roomType}` : ""}`;
   };
 
-  const handleBuyTicket = async (movie) => {
-    if (buyingMovieId) return;
-
-    if (bookingContext?.cinemaId && bookingContext?.roomId) {
-      navigate("/booking", {
-        state: {
-          ...bookingContext,
-          movieId: movie.id,
-          movieTitle: movie.title,
-          ageLimit: movie.ageLimit,
-          time: bookingContext.time || "Suất chiếu đã chọn",
-        },
-      });
-      return;
-    }
-
-    try {
-      setBuyingMovieId(movie.id);
-      const res = await fetch(`/api/user/movies/${movie.id}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Không thể tải lịch chiếu phim.");
-
-      const showtimes = Array.isArray(data?.movie?.showtimes) ? data.movie.showtimes : [];
-      const firstAvailableShowtime = showtimes.find((showtime) => {
-        const startTime = new Date(showtime.start_time).getTime();
-        return (
-          showtime.room_type !== "VIP" &&
-          Number(showtime.available_seats || 0) > 0 &&
-          startTime > Date.now()
-        );
-      });
-
-      if (!firstAvailableShowtime) {
-        goToMovieDetail(movie);
-        return;
-      }
-
-      navigate("/booking", {
-        state: {
-          movieId: movie.id,
-          movieTitle: movie.title,
-          ageLimit: Number(data?.movie?.age_limit || movie.ageLimit || 0),
-          cinema: firstAvailableShowtime.cinema_name || "Lunexa Movix",
-          cinemaId: Number(firstAvailableShowtime.cinema_id || 0) || null,
-          roomId: Number(firstAvailableShowtime.room_id || 0) || null,
-          roomName: firstAvailableShowtime.room_name || "",
-          roomType: firstAvailableShowtime.room_type || "",
-          showtimeId: Number(firstAvailableShowtime.showtime_id || 0) || null,
-          day: formatBookingDay(firstAvailableShowtime.start_time),
-          time: formatBookingTime(
-            firstAvailableShowtime.start_time,
-            firstAvailableShowtime.room_type,
-          ),
-        },
-      });
-    } catch (err) {
-      console.error(err);
-      goToMovieDetail(movie);
-    } finally {
-      setBuyingMovieId(null);
-    }
+  const handleBuyTicket = (movie) => {
+    // Luôn chuyển tới trang chi tiết phim và scroll xuống phần chọn khung giờ
+    navigate(`/movie/${movie.id}`, {
+      state: {
+        ...(bookingContext ? { bookingContext, movieTitle: movie.title } : { movieTitle: movie.title }),
+        scrollToSchedule: true,
+      },
+    });
   };
 
   return (
@@ -444,13 +391,8 @@ export default function Film() {
                           className="btn primary"
                           type="button"
                           onClick={() => handleBuyTicket(m)}
-                          disabled={buyingMovieId === m.id}
                         >
-                          {buyingMovieId === m.id
-                            ? "Đang mở..."
-                            : bookingContext
-                              ? "Mua vé"
-                              : "Mua vé"}
+                          Mua vé
                         </button>
                         <button
                           className="btn secondary"

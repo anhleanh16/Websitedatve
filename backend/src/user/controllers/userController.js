@@ -105,23 +105,18 @@ export const userGetMovies = async (req, res) => {
       LEFT JOIN Movie_Categories mc ON mc.category_id = mcd.category_id
       LEFT JOIN Reviews r ON r.movie_id = m.movie_id
       ${whereSql}
-<<<<<<< HEAD
       GROUP BY
         m.movie_id,
         m.title,
         m.poster,
+        m.age_limit,
         m.status,
         m.release_date,
-        m.duration,
-        m.age_limit
-      ORDER BY m.release_date DESC, m.movie_id DESC
-=======
-      GROUP BY m.movie_id, m.title, m.poster, m.age_limit, m.status, m.release_date
+        m.duration
       ORDER BY
         CASE WHEN m.status = 'ended' THEN 1 ELSE 0 END ASC,
         m.release_date DESC,
         m.movie_id DESC
->>>>>>> 0319684ae2ed63187f483c3224a1aa4f97891817
     `,
       params,
     );

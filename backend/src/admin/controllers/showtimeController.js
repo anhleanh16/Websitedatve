@@ -38,6 +38,48 @@ export const getShowtimeById = async (req, res) => {
   }
 };
 
+export const createRecurringShowtime = async (req, res) => {
+  try {
+    const {
+      movie_id, movieId,
+      room_id, roomId,
+      time_slots, timeSlots,
+      start_date, startDate,
+      end_date, endDate,
+      price_standard, priceStandard,
+      price_vip, priceVip,
+      price_couple, priceCouple,
+      price,
+      available_seats, availableSeats,
+    } = req.body;
+
+    const result = await ShowtimeModel.createRecurring({
+      movie_id:       movie_id ?? movieId,
+      room_id:        room_id  ?? roomId,
+      time_slots:     time_slots ?? timeSlots,
+      start_date:     start_date ?? startDate,
+      end_date:       end_date   ?? endDate,
+      price_standard: price_standard ?? priceStandard ?? price,
+      price_vip:      price_vip      ?? priceVip      ?? price,
+      price_couple:   price_couple   ?? priceCouple   ?? price,
+      price,
+      available_seats: available_seats ?? availableSeats,
+    });
+
+    res.status(201).json({
+      message: `Đã tạo ${result.created.length} suất chiếu. Bỏ qua ${result.skipped.length} suất bị xung đột.`,
+      created: result.created,
+      skipped: result.skipped,
+    });
+  } catch (err) {
+    console.error("Error in createRecurringShowtime:", err);
+    const statusCode = Number(err?.statusCode) || 500;
+    res.status(statusCode).json({
+      message: statusCode >= 500 ? "Failed to create recurring showtimes" : err.message,
+    });
+  }
+};
+
 export const createShowtime = async (req, res) => {
   try {
     const showtimeId = await ShowtimeModel.create(

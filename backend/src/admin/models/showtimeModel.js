@@ -156,6 +156,88 @@ export const ShowtimeModel = {
   },
 
   /**
+   * Tạo lịch chiếu lặp lại theo khung giờ cố định trong một khoảng ngày.
+   * Bỏ qua (không lỗi) những ngày bị xung đột lịch phòng.
+   * @returns {{ created: number[], skipped: Array<{date:string, reason:string}> }}
+   */
+  async createRecurring(data) {
+    const {
+      movie_id,
+      room_id,
+      time_slots,   // [{ hour: 10, minute: 30 }, ...]
+      start_date,   // "YYYY-MM-DD"
+      end_date,     // "YYYY-MM-DD"
+      price_standard,
+      price_vip,
+      price_couple,
+      price,
+      available_seats,
+    } = data;
+
+    const movie = await this.getMovieById(movie_id);
+    const room  = await this.getRoomById(room_id);
+
+    const standardPrice = price_standard ?? price ?? 0;
+    const vipPrice      = price_vip   ?? standardPrice;
+    const couplePrice   = price_couple ?? standardPrice;
+    const seats         = available_seats ?? room.total_seat ?? 0;
+
+    // parse start/end date
+    const startD = new Date(`${start_date}T00:00:00`);
+    const endD   = new Date(`${end_date}T23:59:59`);
+    if (isNaN(startD.getTime()) || isNaN(endD.getTime()) || startD > endD) {
+      throw buildAppError("Khoảng ngày không hợp lệ.");
+    }
+    if (!Array.isArray(time_slots) || time_slots.length === 0) {
+      throw buildAppError("Cần ít nhất một khung giờ.");
+    }
+
+    const created = [];
+    const skipped = [];
+
+    // iterate each day in range
+    const cur = new Date(startD);
+    while (cur <= endD) {
+      const dateKey = toDateKey(cur);
+
+      for (const slot of time_slots) {
+        const hour   = Number(slot.hour   ?? 0);
+        const minute = Number(slot.minute ?? 0);
+
+        const startTime = new Date(cur);
+        startTime.setHours(hour, minute, 0, 0);
+        const endTime = addMinutes(startTime, movie.duration);
+
+        // bỏ qua nếu trước ngày phát hành
+        try {
+          this.ensureStartTimeOnOrAfterReleaseDate(movie, startTime);
+        } catch {
+          skipped.push({ date: dateKey, hour, minute, reason: "Trước ngày phát hành phim." });
+          continue;
+        }
+
+        // bỏ qua nếu xung đột lịch phòng
+        try {
+          await this.ensureRoomScheduleGap({ roomId: room_id, startTime, endTime });
+        } catch (err) {
+          skipped.push({ date: dateKey, hour, minute, reason: err.message });
+          continue;
+        }
+
+        const [result] = await db.query(
+          "INSERT INTO Showtimes (movie_id, room_id, start_time, end_time, price, price_standard, price_vip, price_couple, available_seats, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [movie_id, room_id, startTime, endTime, standardPrice, standardPrice, vipPrice, couplePrice, seats, ACTIVE_SHOWTIME_STATUS],
+        );
+        created.push(result.insertId);
+      }
+
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    return { created, skipped };
+  },
+
+  /**
    * Cập nhật một lịch chiếu.
    */
   async update(id, showtimeData) {

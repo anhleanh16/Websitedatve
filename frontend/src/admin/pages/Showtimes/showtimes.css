@@ -141,3 +141,113 @@
   color: #fca5a5; cursor: pointer; font-size: 13px; white-space: nowrap;
 }
 .sh-error-banner button:hover { background: rgba(248,113,113,0.3); }
+
+/* ─── Recurring Showtime Form ──────────────────────────────────────────────── */
+.sh-modal-recurring { max-width: 860px; }
+
+.sh-recurring-desc {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(124,97,255,0.08);
+  border: 1px solid rgba(124,97,255,0.2);
+  color: #c4b5ff;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.sh-recurring-days-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(74,222,128,0.08);
+  border: 1px solid rgba(74,222,128,0.2);
+  color: #a7f3d0;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* Slot list */
+.sh-slots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sh-slot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.sh-slot-num {
+  width: 20px;
+  font-size: 12px;
+  color: #5a6e9e;
+  flex-shrink: 0;
+}
+
+.sh-slot-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.sh-slot-inputs select {
+  width: auto !important;
+  min-width: 60px !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  font-size: 15px !important;
+  font-weight: 600;
+  color: #fff !important;
+  background: rgba(124,97,255,0.12) !important;
+  border-color: rgba(124,97,255,0.3) !important;
+}
+
+.sh-slot-colon {
+  font-size: 18px;
+  font-weight: 700;
+  color: #7c61ff;
+  line-height: 1;
+}
+
+.sh-slot-endtime {
+  font-size: 12px;
+  color: #4ade80;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.sh-slot-remove {
+  background: rgba(248,113,113,0.12);
+  border: 1px solid rgba(248,113,113,0.22);
+  color: #f87171;
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.sh-slot-remove:hover { background: rgba(248,113,113,0.25); }
+
+.sh-slot-add-btn {
+  margin-top: 4px;
+  align-self: flex-start;
+  font-size: 13px;
+  padding: 7px 14px;
+}

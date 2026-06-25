@@ -6,7 +6,7 @@ import {
   FaMapMarkerAlt, FaCrown, FaNewspaper, FaTimes, FaChevronDown
 } from 'react-icons/fa'
 import { markAsRead, markAllAsRead, deleteNotification, setNotifications } from '../../../redux/slices/notificationSlice'
-import { setRegion as setRegionAction } from '../../../redux/slices/regionSlice'
+import { setSelectedCinema } from '../../../redux/slices/cinemaSlice'
 import { clearUser } from '../../../redux/slices/userSlice'
 import { userCinemaService, userNotificationService } from '../../services/userApi'
 import './nav.css'
@@ -24,7 +24,7 @@ const NOTIF_ICONS = { ticket: '🎟️', promo: '🎁', movie: '🎬', points: '
 export default function Navbar() {
   const profile       = useSelector((s) => s.user.profile)
   const notifications = useSelector((s) => s.notifications.items)
-  const selectedRegion = useSelector((s) => s.region.selectedRegion)
+  const selectedCinema = useSelector((s) => s.cinema.selectedCinema)
   const unreadCount   = notifications.filter(n => !n.read).length
 
   const location = useLocation()
@@ -36,11 +36,15 @@ export default function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [searchOpen,   setSearchOpen]   = useState(false)
   const [searchQuery,  setSearchQuery]  = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searchSuggestions, setSearchSuggestions] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const searchDebounceRef = useRef(null)
   const [scrolled,     setScrolled]     = useState(false)
   const [mobileOpen,   setMobileOpen]   = useState(false)
-  const [regionOpen,   setRegionOpen]   = useState(false)
-  const [regions,      setRegions]      = useState([])
-  const [regionError,  setRegionError]  = useState('')
+  const [cinemaOpen,   setCinemaOpen]   = useState(false)
+  const [cinemas,      setCinemas]      = useState([])
+  const [cinemaError,  setCinemaError]  = useState('')
   const [bellOpen,     setBellOpen]     = useState(false)
 
   const dropdownRef = useRef(null)
@@ -61,7 +65,7 @@ export default function Navbar() {
     const handler = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false)
       if (searchRef.current   && !searchRef.current.contains(e.target))   setSearchOpen(false)
-      if (regionRef.current   && !regionRef.current.contains(e.target))   setRegionOpen(false)
+      if (regionRef.current   && !regionRef.current.contains(e.target))   setCinemaOpen(false)
       if (bellRef.current     && !bellRef.current.contains(e.target))     setBellOpen(false)
     }
     document.addEventListener('mousedown', handler)
@@ -70,9 +74,60 @@ export default function Navbar() {
 
   /* focus search input */
   useEffect(() => {
-    if (searchOpen) inputRef.current?.focus()
-    else setSearchQuery('')
+    if (searchOpen) {
+      inputRef.current?.focus()
+      // Load suggestions (tất cả phim, xáo trộn) khi mở search
+      if (searchSuggestions.length === 0) {
+        fetch('/api/user/movies')
+          .then(r => r.json())
+          .then(d => {
+            const all = Array.isArray(d?.movies) ? d.movies : []
+            // Xáo trộn Fisher-Yates
+            const shuffled = [...all]
+            for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+            }
+            setSearchSuggestions(shuffled.slice(0, 6))
+          })
+          .catch(() => {})
+      }
+    } else {
+      setSearchQuery('')
+      setSearchResults([])
+    }
   }, [searchOpen])
+
+  /* Debounce search khi gõ */
+  useEffect(() => {
+    clearTimeout(searchDebounceRef.current)
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      return
+    }
+    setSearchLoading(true)
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/user/movies`)
+        const data = await res.json()
+        const all = Array.isArray(data?.movies) ? data.movies : []
+        const q = searchQuery.toLowerCase()
+        const filtered = all.filter(m =>
+          m.title?.toLowerCase().includes(q)
+        ).slice(0, 6)
+        setSearchResults(filtered)
+        // Xáo trộn lại suggestions mỗi lần gõ
+        const shuffled = [...all]
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+        }
+        setSearchSuggestions(shuffled.slice(0, 6))
+      } catch {}
+      setSearchLoading(false)
+    }, 300)
+    return () => clearTimeout(searchDebounceRef.current)
+  }, [searchQuery])
 
   /* close drawer on route change */
   useEffect(() => { setMobileOpen(false); setBellOpen(false) }, [location.pathname])
@@ -91,31 +146,7 @@ export default function Navbar() {
   const userInitial = profile?.name?.[0]?.toUpperCase() || <FaUser />
   const userName    = profile?.name || 'Tài khoản'
   const userId = profile?.id
-  const regionOptions = useMemo(() => {
-    const citySet = new Set(
-      regions
-        .map((cinema) => String(cinema.city || '').trim())
-        .filter(Boolean),
-    )
-
-    return Array.from(citySet)
-      .sort((a, b) => a.localeCompare(b, 'vi'))
-      .map((city) => ({
-        value: city,
-        label: city,
-      }))
-  }, [regions])
-
-  const region = useMemo(() => {
-    if (regionOptions.length === 0) {
-      return { value: '', label: 'Chọn khu vực' }
-    }
-
-    return (
-      regionOptions.find((item) => item.value === selectedRegion) ||
-      regionOptions[0]
-    )
-  }, [regionOptions, selectedRegion])
+  const displayCinema = selectedCinema?.name || 'Chọn rạp'
 
   const normalizeNotifications = (items = []) =>
     items.map((n) => ({
@@ -147,36 +178,31 @@ export default function Navbar() {
 
   useEffect(() => {
     let ignore = false
-
-    const loadRegions = async () => {
-      setRegionError('')
+    const load = async () => {
+      setCinemaError('')
       try {
         const data = await userCinemaService.getAll()
         if (ignore) return
-
-        const nextCinemas = Array.isArray(data?.cinemas) ? data.cinemas : []
-        setRegions(nextCinemas)
+        const list = Array.isArray(data?.cinemas) ? data.cinemas : []
+        setCinemas(list)
+        // Auto-select rạp đầu tiên nếu chưa có lựa chọn
+        if (!selectedCinema && list.length > 0) {
+          dispatch(setSelectedCinema({ id: list[0].cinemas_id, name: list[0].cinema_name }))
+        }
       } catch (err) {
         if (ignore) return
         console.error(err)
-        setRegions([])
-        setRegionError('Không tải được khu vực')
+        setCinemas([])
+        setCinemaError('Không tải được danh sách rạp')
       }
     }
-
-    loadRegions()
+    load()
     return () => { ignore = true }
   }, [])
 
-  useEffect(() => {
-    if (regionOptions.length === 0) return
-    if (selectedRegion && regionOptions.some((item) => item.value === selectedRegion)) return
-    dispatch(setRegionAction(regionOptions[0].value))
-  }, [dispatch, regionOptions, selectedRegion])
-
-  const handleSelectRegion = (nextRegion) => {
-    dispatch(setRegionAction(nextRegion.value))
-    setRegionOpen(false)
+  const handleSelectCinema = (cinema) => {
+    dispatch(setSelectedCinema({ id: cinema.cinemas_id, name: cinema.cinema_name }))
+    setCinemaOpen(false)
   }
 
   return (
@@ -213,30 +239,33 @@ export default function Navbar() {
           </Link>
         )}
 
-        {/* Region */}
-        <div ref={regionRef} className={`region-wrap${regionOpen ? ' open' : ''}`}>
-          <button className='region-btn' onClick={() => setRegionOpen(v => !v)} aria-label='Chọn khu vực'>
+        {/* Cinema selector */}
+        <div ref={regionRef} className={`region-wrap${cinemaOpen ? ' open' : ''}`}>
+          <button className='region-btn' onClick={() => setCinemaOpen(v => !v)} aria-label='Chọn rạp'>
             <FaMapMarkerAlt className='region-pin' />
-            <span className='region-label'>{region.label}</span>
-            <FaChevronDown className={`region-caret${regionOpen ? ' up' : ''}`} />
+            <span className='region-label'>{displayCinema}</span>
+            <FaChevronDown className={`region-caret${cinemaOpen ? ' up' : ''}`} />
           </button>
           <ul className='region-dropdown'>
-            <li className='region-dropdown-title'>Chọn khu vực</li>
-            {regionError && <li className='region-dropdown-title'>{regionError}</li>}
-            {regionOptions.map(r => (
-              <li key={r.value}>
+            <li className='region-dropdown-title'>Chọn rạp chiếu</li>
+            {cinemaError && <li className='region-dropdown-title' style={{ color: '#f87171' }}>{cinemaError}</li>}
+            {cinemas.map(c => (
+              <li key={c.cinemas_id}>
                 <button
-                  className={`region-option${region.value === r.value ? ' active' : ''}`}
-                  onClick={() => handleSelectRegion(r)}
+                  className={`region-option${selectedCinema?.id === c.cinemas_id ? ' active' : ''}`}
+                  onClick={() => handleSelectCinema(c)}
                 >
                   <FaMapMarkerAlt />
-                  {r.label}
-                  {region.value === r.value && <span className='region-check'>✓</span>}
+                  <span style={{ flex: 1, textAlign: 'left' }}>
+                    <span style={{ display: 'block', fontWeight: 600 }}>{c.cinema_name}</span>
+                    {c.city && <span style={{ fontSize: 11, opacity: 0.7 }}>{c.city}</span>}
+                  </span>
+                  {selectedCinema?.id === c.cinemas_id && <span className='region-check'>✓</span>}
                 </button>
               </li>
             ))}
-            {!regionError && regionOptions.length === 0 && (
-              <li className='region-dropdown-title'>Chưa có khu vực từ quản lý rạp</li>
+            {!cinemaError && cinemas.length === 0 && (
+              <li className='region-dropdown-title'>Chưa có rạp nào</li>
             )}
           </ul>
         </div>
@@ -246,11 +275,17 @@ export default function Navbar() {
           <input
             ref={inputRef}
             type='text'
-            placeholder='Tìm phim, rạp...'
+            placeholder='Tìm phim...'
             className='search-input'
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Escape' && setSearchOpen(false)}
+            onKeyDown={e => {
+              if (e.key === 'Escape') setSearchOpen(false)
+              if (e.key === 'Enter' && searchQuery.trim()) {
+                navigate(`/Films/Film?q=${encodeURIComponent(searchQuery.trim())}`)
+                setSearchOpen(false)
+              }
+            }}
           />
           <button
             className='search-toggle'
@@ -259,17 +294,68 @@ export default function Navbar() {
           >
             {searchOpen ? <FaTimes /> : <FaSearch />}
           </button>
-          {searchOpen && searchQuery.length > 0 && (
-            <div className='search-results'>
-              <div className='search-results-hint'>
-                <FaSearch /><span>Kết quả cho "<strong>{searchQuery}</strong>"</span>
+
+          {searchOpen && (
+            <div className='search-results search-results-rich'>
+              {/* Kết quả tìm kiếm */}
+              {searchQuery.trim() && (
+                <>
+                  <div className='search-section-label'>
+                    <FaSearch />
+                    {searchLoading
+                      ? 'Đang tìm...'
+                      : `Kết quả cho "${searchQuery}" (${searchResults.length})`}
+                  </div>
+                  {!searchLoading && searchResults.length === 0 && (
+                    <div className='search-empty'>Không tìm thấy phim nào.</div>
+                  )}
+                  {searchResults.map(m => (
+                    <Link
+                      key={m.movie_id}
+                      to={`/movie/${m.movie_id}`}
+                      className='search-movie-item'
+                      onClick={() => setSearchOpen(false)}
+                    >
+                      <div
+                        className='search-movie-poster'
+                        style={m.poster ? { backgroundImage: `url(${m.poster})` } : undefined}
+                      />
+                      <div className='search-movie-info'>
+                        <span className='search-movie-title'>{m.title}</span>
+                        <span className='search-movie-meta'>
+                          {m.status === 'now_showing' ? '🎬 Đang chiếu' : m.status === 'coming_soon' ? '🕐 Sắp chiếu' : ''}
+                          {m.duration ? ` · ${m.duration} phút` : ''}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </>
+              )}
+
+              {/* Đề xuất cho bạn */}
+              <div className='search-section-label' style={{ marginTop: searchQuery.trim() ? 10 : 0 }}>
+                ✨ Đề xuất cho bạn
               </div>
-              <Link to={`/Films/Film?q=${searchQuery}`} className='search-result-item' onClick={() => setSearchOpen(false)}>
-                <FaFilm /><span>Tìm phim: <strong>{searchQuery}</strong></span>
-              </Link>
-              <Link to={`/cinemas?q=${searchQuery}`} className='search-result-item' onClick={() => setSearchOpen(false)}>
-                <FaMapMarkerAlt /><span>Tìm rạp: <strong>{searchQuery}</strong></span>
-              </Link>
+              {searchSuggestions.map(m => (
+                <Link
+                  key={m.movie_id}
+                  to={`/movie/${m.movie_id}`}
+                  className='search-movie-item'
+                  onClick={() => setSearchOpen(false)}
+                >
+                  <div
+                    className='search-movie-poster'
+                    style={m.poster ? { backgroundImage: `url(${m.poster})` } : undefined}
+                  />
+                  <div className='search-movie-info'>
+                    <span className='search-movie-title'>{m.title}</span>
+                    <span className='search-movie-meta'>
+                      {m.status === 'now_showing' ? '🎬 Đang chiếu' : m.status === 'coming_soon' ? '🕐 Sắp chiếu' : '✅ Đã chiếu'}
+                      {m.duration ? ` · ${m.duration} phút` : ''}
+                    </span>
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
         </div>
@@ -420,13 +506,15 @@ export default function Navbar() {
         </div>
         <div className='mobile-region'>
           <FaMapMarkerAlt />
-          <span>Khu vực:</span>
-          <select className='mobile-region-select' value={region.value}
+          <span>Rạp:</span>
+          <select className='mobile-region-select' value={selectedCinema?.id || ''}
             onChange={e => {
-              const nextRegion = regionOptions.find(r => r.value === e.target.value)
-              if (nextRegion) handleSelectRegion(nextRegion)
+              const c = cinemas.find(x => String(x.cinemas_id) === String(e.target.value))
+              if (c) handleSelectCinema(c)
             }}>
-            {regionOptions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            {cinemas.map(c => (
+              <option key={c.cinemas_id} value={c.cinemas_id}>{c.cinema_name}</option>
+            ))}
           </select>
         </div>
         <ul className='mobile-links'>

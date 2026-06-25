@@ -132,7 +132,7 @@ function formatMoney(n) {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** Danh sách vé */
-function BookingList({ bookings, onView, onRefund, onCheck }) {
+function BookingList({ bookings, onView, onCheck }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
@@ -167,7 +167,6 @@ function BookingList({ bookings, onView, onRefund, onCheck }) {
           <option value="confirmed">Đã xác nhận</option>
           <option value="completed">Hoàn thành</option>
           <option value="cancelled">Đã hủy</option>
-          <option value="refunded">Đã hoàn</option>
         </select>
       </div>
 
@@ -223,11 +222,6 @@ function BookingList({ bookings, onView, onRefund, onCheck }) {
                         <button className="bk-btn bk-btn-view" onClick={() => onView(b)} title="Chi tiết">
                           Chi tiết
                         </button>
-                        {(b.status === "confirmed" || b.status === "pending") && (
-                          <button className="bk-btn bk-btn-refund" onClick={() => onRefund(b)} title="Hoàn vé">
-                            Hoàn vé
-                          </button>
-                        )}
                         {b.status === "confirmed" && (
                           <button className="bk-btn bk-btn-check" onClick={() => onCheck(b)} title="Kiểm tra vé">
                             Kiểm tra
@@ -251,7 +245,7 @@ function BookingList({ bookings, onView, onRefund, onCheck }) {
 }
 
 /** Chi tiết vé */
-function BookingDetail({ booking, onClose, onRefund, onCheck }) {
+function BookingDetail({ booking, onClose, onCheck }) {
   if (!booking) return null;
   const st = STATUS_MAP[booking.status] || { label: booking.status, cls: "pending" };
   const py = PAYMENT_MAP[booking.paymentStatus] || { label: booking.paymentStatus, cls: "pay-pending" };
@@ -339,11 +333,6 @@ function BookingDetail({ booking, onClose, onRefund, onCheck }) {
 
         {/* Actions */}
         <div className="bk-modal-footer">
-          {(booking.status === "confirmed" || booking.status === "pending") && (
-            <button className="bk-btn bk-btn-refund bk-btn-lg" onClick={() => onRefund(booking)}>
-              Hoàn vé
-            </button>
-          )}
           {booking.status === "confirmed" && (
             <button className="bk-btn bk-btn-check bk-btn-lg" onClick={() => onCheck(booking)}>
               Kiểm tra vé
@@ -351,89 +340,6 @@ function BookingDetail({ booking, onClose, onRefund, onCheck }) {
           )}
           <button className="bk-btn bk-btn-secondary bk-btn-lg" onClick={onClose}>
             Đóng
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Hoàn vé */
-function RefundModal({ booking, onClose, onConfirm }) {
-  const [reason, setReason] = useState("");
-  const [refundMethod, setRefundMethod] = useState("original");
-  const [error, setError] = useState("");
-
-  if (!booking) return null;
-
-  const handleSubmit = () => {
-    if (!reason.trim()) {
-      setError("Vui lòng nhập lý do hoàn vé.");
-      return;
-    }
-    onConfirm({ booking, reason, refundMethod });
-  };
-
-  return (
-    <div className="bk-modal-overlay" onClick={onClose}>
-      <div className="bk-modal bk-modal-sm" onClick={(e) => e.stopPropagation()}>
-        <div className="bk-modal-header">
-          <div>
-            <h2>Hoàn vé</h2>
-            <span className="bk-booking-code">{booking.bookingCode}</span>
-          </div>
-          <button className="bk-modal-close" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="bk-modal-body">
-          <div className="bk-refund-info">
-            <div className="bk-detail-row"><span>Khách hàng</span><strong>{booking.user}</strong></div>
-            <div className="bk-detail-row"><span>Phim</span><strong>{booking.movie}</strong></div>
-            <div className="bk-detail-row"><span>Suất chiếu</span><strong>{booking.showtime}</strong></div>
-            <div className="bk-detail-row"><span>Ghế</span><strong>{booking.seats.join(", ")}</strong></div>
-            <div className="bk-detail-row">
-              <span>Số tiền hoàn</span>
-              <strong className="bk-amount">{formatMoney(booking.totalAmount)}</strong>
-            </div>
-          </div>
-
-          <div className="bk-refund-warn">
-            ⚠️ Sau khi hoàn vé, hành động này không thể khôi phục. Vé sẽ bị hủy và khách hàng sẽ được hoàn tiền.
-          </div>
-
-          <div className="field-group" style={{ marginTop: 18 }}>
-            <label>Lý do hoàn vé *</label>
-            <textarea
-              className="bk-textarea"
-              rows={3}
-              placeholder="Nhập lý do hoàn vé…"
-              value={reason}
-              onChange={(e) => { setReason(e.target.value); setError(""); }}
-            />
-            {error && <span className="bk-error">{error}</span>}
-          </div>
-
-          <div className="field-group">
-            <label>Phương thức hoàn tiền</label>
-            <select
-              className="bk-filter-select"
-              style={{ width: "100%" }}
-              value={refundMethod}
-              onChange={(e) => setRefundMethod(e.target.value)}
-            >
-              <option value="original">Hoàn về {booking.paymentMethod}</option>
-              <option value="wallet">Hoàn về ví Lunexa</option>
-              <option value="points">Cộng điểm thưởng</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="bk-modal-footer">
-          <button className="bk-btn bk-btn-refund bk-btn-lg" onClick={handleSubmit}>
-            Xác nhận hoàn vé
-          </button>
-          <button className="bk-btn bk-btn-secondary bk-btn-lg" onClick={onClose}>
-            Hủy
           </button>
         </div>
       </div>
@@ -572,28 +478,10 @@ export default function AdminBookings() {
     setActiveTab("detail");
   };
 
-  // Mở hoàn vé
-  const handleRefund = (b) => {
-    setSelectedBooking(b);
-    setActiveTab("refund");
-  };
-
   // Mở kiểm tra vé
   const handleCheck = (b) => {
     setSelectedBooking(b);
     setActiveTab("check");
-  };
-
-  // Xác nhận hoàn vé
-  const handleConfirmRefund = ({ booking, reason, refundMethod }) => {
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === booking.id ? { ...b, status: "refunded", paymentStatus: "paid" } : b
-      )
-    );
-    showToast(`Đã hoàn vé ${booking.bookingCode} thành công.`, "success");
-    setActiveTab("list");
-    setSelectedBooking(null);
   };
 
   // Xác nhận check-in
@@ -621,25 +509,24 @@ export default function AdminBookings() {
   };
 
   const tabs = [
-    { key: "list",   label: "Danh sách vé" },
-    { key: "refund", label: "Hoàn vé",      disabled: activeTab !== "refund" && activeTab !== "detail" },
-    { key: "check",  label: "Kiểm tra vé",  disabled: activeTab !== "check" && activeTab !== "detail" },
+    { key: "list",  label: "Danh sách vé" },
+    { key: "check", label: "Kiểm tra vé", disabled: activeTab !== "check" && activeTab !== "detail" },
   ];
 
   return (
     <div className="admin-bookings">
       <div className="bk-page-header">
         <h2>Quản lý đặt vé</h2>
-        <p>Quản lý toàn bộ vé đặt, chi tiết, hoàn vé và kiểm tra vé</p>
+        <p>Quản lý toàn bộ vé đặt, chi tiết và kiểm tra vé</p>
       </div>
 
       {/* Summary stats */}
       <div className="bk-stats-row">
         {[
-          { label: "Tổng vé", value: bookings.length, color: "#7c61ff" },
-          { label: "Đã xác nhận", value: bookings.filter(b => b.status === "confirmed").length, color: "#4ade80" },
-          { label: "Đang chờ",   value: bookings.filter(b => b.status === "pending").length,   color: "#fbbf24" },
-          { label: "Đã hủy/Hoàn", value: bookings.filter(b => b.status === "cancelled" || b.status === "refunded").length, color: "#f87171" },
+          { label: "Tổng vé",     value: bookings.length,                                                      color: "#7c61ff" },
+          { label: "Đã xác nhận", value: bookings.filter(b => b.status === "confirmed").length,               color: "#4ade80" },
+          { label: "Đang chờ",    value: bookings.filter(b => b.status === "pending").length,                 color: "#fbbf24" },
+          { label: "Đã hủy",      value: bookings.filter(b => b.status === "cancelled").length,               color: "#f87171" },
         ].map(s => (
           <div className="bk-stat-pill" key={s.label}>
             <span>{s.label}</span>
@@ -666,7 +553,6 @@ export default function AdminBookings() {
         <BookingList
           bookings={bookings}
           onView={handleView}
-          onRefund={handleRefund}
           onCheck={handleCheck}
         />
       )}
@@ -676,16 +562,7 @@ export default function AdminBookings() {
         <BookingDetail
           booking={selectedBooking}
           onClose={handleClose}
-          onRefund={handleRefund}
           onCheck={handleCheck}
-        />
-      )}
-
-      {activeTab === "refund" && (
-        <RefundModal
-          booking={selectedBooking}
-          onClose={handleClose}
-          onConfirm={handleConfirmRefund}
         />
       )}
 

@@ -36,6 +36,7 @@ export default function MovieDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const selectedRegion = useSelector((state) => state.region.selectedRegion);
+  const selectedCinema = useSelector((state) => state.cinema.selectedCinema);
   const bookingContext = location.state?.bookingContext || null;
   const today = new Date();
 
@@ -70,8 +71,9 @@ export default function MovieDetail() {
   const [smallTrailerMuted, setSmallTrailerMuted] = useState(true);
   const [isSmallTrailerFullscreen, setIsSmallTrailerFullscreen] = useState(false);
 
-  // Reset về đầu trang khi mount
+  // Reset về đầu trang khi mount (trừ khi được yêu cầu scroll tới lịch chiếu)
   useEffect(() => {
+    if (location.state?.scrollToSchedule) return;
     window.scrollTo(0, 0);
   }, []);
 
@@ -134,6 +136,17 @@ export default function MovieDetail() {
     loadMovie();
     return () => controller.abort();
   }, [id]);
+
+  // Scroll xuống phần lịch chiếu nếu được navigate từ nút "Mua vé"
+  useEffect(() => {
+    if (!location.state?.scrollToSchedule || loadingMovie || !movie) return;
+    const timeout = setTimeout(() => {
+      if (!scheduleRef.current) return;
+      const top = scheduleRef.current.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top, behavior: 'smooth' });
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [location.state?.scrollToSchedule, loadingMovie, movie]);
 
   useEffect(() => {
     if (!movie?.movie_id || !Array.isArray(movie?.categories) || movie.categories.length === 0) {
@@ -393,15 +406,20 @@ export default function MovieDetail() {
       return;
     }
 
+    // Ưu tiên: 1) bookingContext, 2) rạp đã chọn từ header, 3) rạp đầu tiên
     const bookingCinemaId = bookingContext?.cinema
       ? cinemas.find((cinema) => cinema.name === bookingContext.cinema)?.id
       : null;
 
+    const headerCinemaId = selectedCinema?.id
+      ? cinemas.find((cinema) => cinema.id === selectedCinema.id)?.id
+      : null;
+
     setActiveCinema((prev) => {
       if (prev && cinemas.some((cinema) => cinema.id === prev)) return prev;
-      return bookingCinemaId || cinemas[0].id;
+      return bookingCinemaId || headerCinemaId || cinemas[0].id;
     });
-  }, [bookingContext, cinemas]);
+  }, [bookingContext, cinemas, selectedCinema]);
 
   const currentCinema = cinemas.find((cinema) => cinema.id === activeCinema) || null;
   const showTimes = showtimeItems.filter(

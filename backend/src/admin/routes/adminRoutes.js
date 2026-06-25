@@ -36,6 +36,7 @@ import {
   getShowtimes,
   getShowtimeById,
   createShowtime,
+  createRecurringShowtime,
   updateShowtime,
   deleteShowtime,
   cancelShowtime,
@@ -147,6 +148,7 @@ router.get("/showtimes/cinemas", getShowtimeCinemas);
 router.get("/showtimes/rooms", getShowtimeRooms);
 router.get("/showtimes", getShowtimes);
 router.get("/showtimes/:id", getShowtimeById);
+router.post("/showtimes/recurring", createRecurringShowtime);
 router.post("/showtimes", createShowtime);
 router.put("/showtimes/:id", updateShowtime);
 router.delete("/showtimes/:id", deleteShowtime);

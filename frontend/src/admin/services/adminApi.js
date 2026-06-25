@@ -233,6 +233,13 @@ export const adminShowtimeService = {
   /** Chi tiết suất chiếu */
   getById: (id) => apiFetch(`/admin/showtimes/${id}`),
 
+  /** Tạo lịch chiếu lặp lại theo khung giờ cố định */
+  createRecurring: (data) =>
+    apiFetch("/admin/showtimes/recurring", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   /** Tạo mới */
   create: (data) =>
     apiFetch("/admin/showtimes", {

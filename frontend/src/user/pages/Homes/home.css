@@ -179,6 +179,10 @@
   color: #f8fafc;
   border: 1px solid rgba(255,255,255,0.2);
   backdrop-filter: blur(8px);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  text-decoration: none;
 }
 .hero-btn-secondary:hover { background: rgba(255,255,255,0.18); transform: translateY(-2px); }
 
@@ -1071,4 +1075,126 @@
   .news-grid { grid-template-columns: 1fr; }
   .showtime-format-tabs { grid-template-columns: repeat(2, 1fr); }
   .movies-grid { gap: 0.5rem; }
+}
+
+/* ─── Quick Book (giống Film.jsx) ─────────────────────────────────────────── */
+.quick-book {
+  background: rgba(11, 17, 35, 0.95);
+  padding: 22px;
+  border-radius: 26px;
+  color: #e3efff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+.quick-book-header h4 {
+  margin: 0;
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.quick-book-header span {
+  display: block;
+  margin-top: 6px;
+  color: #9fb0ff;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.quick-book-steps {
+  position: relative;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quick-book-steps::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 19px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.55) 0%, rgba(59, 130, 246, 0.12) 100%);
+}
+
+.quick-book-step {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  animation: quickBookStepReveal 0.65s ease forwards, quickBookGlow 4.5s ease-in-out infinite;
+}
+
+.quick-book-step-index {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #4f46e5 100%);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(99, 102, 241, 0.28);
+}
+
+.quick-book-step-content {
+  min-width: 0;
+}
+
+.quick-book-step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(124, 97, 255, 0.16);
+  color: #c4b5fd;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.quick-book-step-content strong {
+  display: block;
+  color: #f8fbff;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.quick-book-step-content p {
+  margin: 4px 0 0;
+  color: #9fb0ff;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@keyframes quickBookStepReveal {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes quickBookGlow {
+  0%, 100% {
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  50% {
+    box-shadow: 0 18px 34px rgba(79, 70, 229, 0.16);
+    border-color: rgba(124, 97, 255, 0.18);
+  }
 }

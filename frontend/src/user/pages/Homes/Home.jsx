@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   FaPlay, FaTicketAlt, FaStar, FaMapMarkerAlt, FaClock,
   FaFire, FaRobot, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt
 } from 'react-icons/fa'
 import { MdLocalOffer } from 'react-icons/md'
+import { useSelector } from 'react-redux'
 import { userNewsService } from '../../services/userApi'
 import { toAbsoluteAssetUrl } from '../../../utils/api'
 import './home.css'
@@ -13,7 +14,6 @@ import './home.css'
 const clamp = (r) => Math.min(r, 5)
 const VISIBLE = 4
 const FORMAT_COLORS = { '2D': '#3b82f6', '3D': '#8b5cf6', IMAX: '#f59e0b' }
-const BOOKING_STEPS = ['Chọn phim', 'Chọn rạp', 'Chọn ngày', 'Suất chiếu']
 const HERO_THEMES = [
   { accent: '#818cf8', bg: 'linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#0f172a 100%)' },
   { accent: '#fca5a5', bg: 'linear-gradient(135deg,#450a0a 0%,#7f1d1d 40%,#0f172a 100%)' },
@@ -162,7 +162,11 @@ const normalizeMovie = (movie) => ({
   age: formatMovieAge(movie.age_limit),
   rating: Number(movie.rating || 0),
   reviewCount: Number(movie.review_count || 0),
-  genre: movie.categories || 'Đang cập nhật',
+  genre: Array.isArray(movie.categories)
+    ? movie.categories.map(c => c.category_name || c).filter(Boolean).join(', ') || 'Đang cập nhật'
+    : (typeof movie.categories === 'string' && movie.categories.trim())
+      ? movie.categories
+      : 'Đang cập nhật',
   hot: Number(movie.rating || 0) >= 4.5 || Number(movie.review_count || 0) >= 10,
 })
 
@@ -239,11 +243,13 @@ const groupShowtimesByMovie = (items) => {
 }
 
 export default function Home() {
+  const selectedCinema = useSelector((s) => s.cinema.selectedCinema)
+  const navigate = useNavigate()
+
   const [slide,       setSlide]       = useState(0)
   const [sliding,     setSliding]     = useState(false)
   const [movieTab,    setMovieTab]    = useState('now')
   const [showtimeTab, setShowtimeTab] = useState('all')
-  const [bookingStep, setBookingStep] = useState(0)
   const [movieOff,    setMovieOff]    = useState(0)
   const [adSlide,     setAdSlide]     = useState(0)
   const [nowShowing,  setNowShowing]  = useState([])
@@ -298,7 +304,11 @@ export default function Home() {
         setNowShowing(nextNowShowing)
         setComingSoon(nextComingSoon)
         setCinemas(nextCinemas)
-        setSelectedCinemaId((prev) => prev || `${nextCinemas[0]?.cinemas_id || ''}`)
+        setSelectedCinemaId((prev) => {
+          // Ưu tiên rạp đã chọn từ header
+          if (selectedCinema?.id) return String(selectedCinema.id)
+          return prev || String(nextCinemas[0]?.cinemas_id || '')
+        })
       } catch (err) {
         if (err?.name === 'AbortError') return
         console.error(err)
@@ -386,7 +396,7 @@ export default function Home() {
   const visibleMovies = featuredMovies.slice(movieOff, movieOff + VISIBLE)
   const current = heroSlides[slide] || heroSlides[0]
   const adCurrent = AD_SLIDES[adSlide]
-  const selectedCinema = cinemas.find(
+  const selectedCinemaObj = cinemas.find(
     (cinema) => `${cinema.cinemas_id}` === `${selectedCinemaId}`,
   )
   const groupedShowtimes = useMemo(
@@ -405,6 +415,13 @@ export default function Home() {
   useEffect(() => {
     setMovieOff((prev) => Math.min(prev, maxOff))
   }, [maxOff, movieTab])
+
+  // Đồng bộ rạp được chọn từ header navbar
+  useEffect(() => {
+    if (selectedCinema?.id) {
+      setSelectedCinemaId(String(selectedCinema.id))
+    }
+  }, [selectedCinema])
 
   /* Hero auto-slide */
   const startHero = () => {
@@ -480,9 +497,15 @@ export default function Home() {
                   style={{ background: current.accent, color: '#0f172a' }}>
                   <FaPlay /> Xem ngay
                 </Link>
-                <Link to='/Bookings/Booking' className='hero-btn-secondary'>
+                <button
+                  className='hero-btn-secondary'
+                  onClick={() => {
+                    if (!current.id || current.id === 'fallback') return
+                    navigate(`/movie/${current.id}`, { state: { scrollToSchedule: true } })
+                  }}
+                >
                   <FaTicketAlt /> Mua vé
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -503,7 +526,7 @@ export default function Home() {
           <div className='movies-block'>
             <div className='sec-header'>
               <div className='sec-title-group'>
-                <h2>Phim nổi bật</h2>
+                <h2>Phim đang hot</h2>
               </div>
               <div className='sec-tabs'>
                 <button className={`sec-tab${movieTab === 'now' ? ' active' : ''}`}
@@ -581,7 +604,7 @@ export default function Home() {
           <div className='showtime-card'>
             <div className='showtime-top'>
               <div>
-                <h3><FaMapMarkerAlt style={{ color: '#7c3aed' }} /> {selectedCinema?.cinema_name || 'Đang chọn rạp'}</h3>
+                <h3><FaMapMarkerAlt style={{ color: '#7c3aed' }} /> {selectedCinemaObj?.cinema_name || 'Đang chọn rạp'}</h3>
                 <p className='showtime-date'>Hôm nay, {formatHomeDate()}</p>
               </div>
               <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -651,8 +674,8 @@ export default function Home() {
                         to='/booking'
                         state={{
                           movieTitle: row.title,
-                          cinema: selectedCinema?.cinema_name || '',
-                          cinemaId: selectedCinema?.cinemas_id || null,
+                          cinema: selectedCinemaObj?.cinema_name || '',
+                          cinemaId: selectedCinemaObj?.cinemas_id || null,
                           roomId: t.roomId,
                           roomName: t.roomName,
                           roomType: t.format,
@@ -756,29 +779,31 @@ export default function Home() {
         <aside className='col-right'>
 
           {/* Đặt vé nhanh */}
-          <div className='quick-book-card'>
-            <div className='qb-header'>
-              <FaTicketAlt className='qb-icon' />
-              <div>
-                <h2>Đặt vé nhanh</h2>
-                <p>Chỉ vài bước để có vé xem phim</p>
-              </div>
+          <div className='quick-book'>
+            <div className='quick-book-header'>
+              <h4>Đặt vé nhanh</h4>
+              <span>Dành cho người mới, làm lần lượt theo 4 bước này.</span>
             </div>
-            <div className='qb-steps'>
-              {BOOKING_STEPS.map((s, i) => (
-                <button key={i}
-                  className={`qb-step${bookingStep === i ? ' active' : ''}${bookingStep > i ? ' done' : ''}`}
-                  onClick={() => setBookingStep(i)}>
-                  <span className='qb-step-num'>{bookingStep > i ? '✓' : i + 1}</span>
-                  <span>{s}</span>
-                </button>
+            <div className='quick-book-steps'>
+              {[
+                { step: 'Bước 1', title: 'Chọn phim',      description: 'Tìm bộ phim bạn muốn xem trong danh sách phim đang chiếu.' },
+                { step: 'Bước 2', title: 'Chọn rạp',       description: 'Chọn rạp gần bạn nhất hoặc phù hợp nhất.' },
+                { step: 'Bước 3', title: 'Chọn ngày',      description: 'Xem lịch chiếu và chọn ngày bạn muốn đến rạp.' },
+                { step: 'Bước 4', title: 'Chọn suất chiếu','description': 'Chọn giờ đẹp rồi vào thẳng phần đặt ghế.' },
+              ].map((item, index) => (
+                <div
+                  key={item.step}
+                  className='quick-book-step'
+                  style={{ animationDelay: `${index * 0.24}s` }}
+                >
+                  <div className='quick-book-step-index'>{index + 1}</div>
+                  <div className='quick-book-step-content'>
+                    <span className='quick-book-step-badge'>{item.step}</span>
+                    <strong>{item.title}</strong>
+                    <p>{item.description}</p>
+                  </div>
+                </div>
               ))}
-            </div>
-            <Link to='/Bookings/Booking' className='qb-cta'>
-              <FaTicketAlt /> Tiến hành đặt vé
-            </Link>
-            <div className='qb-promo-hint'>
-              <MdLocalOffer /><span>Thành viên Gold giảm 20% hôm nay</span>
             </div>
           </div>
 
