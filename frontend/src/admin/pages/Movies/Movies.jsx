@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { adminMovieService, adminCategoryService } from '../../services/adminApi.js';
 import './movies.css';
 
@@ -74,6 +74,59 @@ const STATUS_OPTS = [
 ];
 const statusInfo = (v) => STATUS_OPTS.find((s) => s.value === v) || STATUS_OPTS[0];
 
+// ─── Custom Tag Dropdown ────────────────────────────────────────────────────────
+function TagDropdown({ value, onChange, categories }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selected = value === "all"
+    ? "Tất cả Tags"
+    : categories.find((c) => String(c.id) === String(value))?.name || "Tất cả Tags";
+
+  return (
+    <div ref={ref} className="mv-tag-dropdown-wrap">
+      <button
+        className="mv-select mv-tag-dropdown-btn"
+        onClick={() => setOpen(v => !v)}
+        type="button"
+      >
+        <span>{selected}</span>
+        <span className={`mv-tag-dropdown-caret${open ? " open" : ""}`}>▾</span>
+      </button>
+      {open && (
+        <ul className="mv-tag-dropdown-list">
+          <li>
+            <button
+              className={`mv-tag-dropdown-item${value === "all" ? " active" : ""}`}
+              onClick={() => { onChange("all"); setOpen(false); }}
+            >
+              Tất cả Tags
+            </button>
+          </li>
+          {categories.map((c) => (
+            <li key={c.id}>
+              <button
+                className={`mv-tag-dropdown-item${String(value) === String(c.id) ? " active" : ""}`}
+                onClick={() => { onChange(String(c.id)); setOpen(false); }}
+              >
+                {c.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 const EMPTY_MOVIE = {
   title: "", description: "", duration: "", ageLimit: 0,
   director: "", actors: "", trailer: "", poster: "",
@@ -113,10 +166,11 @@ function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, on
           {STATUS_OPTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
         {!isTrashMode && (
-          <select className="mv-select" value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
-            <option value="all">Tất cả Tags</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <TagDropdown
+            value={filterCat}
+            onChange={setFilterCat}
+            categories={categories}
+          />
         )}
         {!isTrashMode && <button className="mv-btn mv-btn-add" onClick={() => onEdit(null)}>+ Thêm phim</button>}
       </div>
