@@ -47,11 +47,32 @@ export const userNotificationService = {
 
 export const userPromotionService = {
   getAll: (userId) => apiFetch(`/user/${encodeURIComponent(userId)}/promotions`),
+  getToday: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+      ),
+    ).toString();
+    return apiFetch(`/user/promotions/today${q ? `?${q}` : ""}`);
+  },
 };
 
 export const userCinemaService = {
   getAll: () => apiFetch('/user/cinemas'),
   getById: (id) => apiFetch(`/user/cinemas/${encodeURIComponent(id)}`),
+};
+
+export const userComboService = {
+  getAll: () => apiFetch('/user/combos'),
+};
+
+export const userBookingService = {
+  getAll: (userId) => apiFetch(`/user/${encodeURIComponent(userId)}/bookings`),
+  create: (userId, data) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/bookings`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
 
 export const userNewsService = {

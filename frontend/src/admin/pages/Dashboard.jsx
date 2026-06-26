@@ -1,38 +1,28 @@
-// ─── Data ─────────────────────────────────────────────────────────────────────
-const revenueData = [450, 620, 720, 850, 980, 1140, 1260];
-const visitsData  = [980, 1120, 1350, 1430, 1600, 1780, 1920];
-const chartLabels = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+import { useState, useEffect } from "react";
+import { adminDashboardService, adminStatisticsService } from "../services/adminApi";
+import "../admin.css";
 
-const ticketData = [
-  { name: "VIP",     value: 420, color: "#7c61ff" },
-  { name: "Thường",  value: 610, color: "#5bcad4" },
-  { name: "Cặp đôi", value: 280, color: "#f2917a" },
-  { name: "Family",  value: 190, color: "#f3c74b" },
-];
+function formatCurrency(amount) {
+  const num = Number(amount) || 0;
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(num);
+}
 
-const monthlyTopTickets = [
-  { label: "Thường",  sold: 610, max: 610 },
-  { label: "VIP",     sold: 420, max: 610 },
-  { label: "Cặp đôi", sold: 280, max: 610 },
-];
+function formatNumber(num) {
+  const n = Number(num) || 0;
+  return new Intl.NumberFormat("vi-VN").format(n);
+}
 
-const recentActivity = [
-  { time: "08:32", text: "Người dùng Nguyễn Văn An đặt vé phim Đêm Thiên Cầu",     type: "booking" },
-  { time: "08:15", text: "Tran Thi Binh đăng ký tài khoản mới",                    type: "user"    },
-  { time: "07:58", text: "Đơn hàng ORD-0091 đã thanh toán thành công",             type: "payment" },
-  { time: "07:44", text: "Admin thêm phim mới: Ánh Sao Cuối Trời",                 type: "movie"   },
-  { time: "07:30", text: "Phim Vương Quốc Bóng Tối chuyển trạng thái kết thúc",   type: "movie"   },
-  { time: "07:12", text: "Le Minh Chi yêu cầu hoàn vé B0095",                     type: "refund"  },
-];
-
-const ACTIVITY_ICON = { booking: "🎟", user: "👤", payment: "💳", movie: "🎬", refund: "↩" };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateLinePoints(data, width, height, padding) {
-  const max = Math.max(...data);
+  if (!data || data.length === 0) {
+    return "0,0";
+  }
+  const max = Math.max(...data, 1);
   return data
     .map((v, i) => {
-      const x = padding + (i * (width - padding * 2)) / (data.length - 1);
+      const x = padding + (i * (width - padding * 2)) / (data.length - 1 || 1);
       const y = height - padding - (v / max) * (height - padding * 2);
       return `${x},${y}`;
     })
@@ -40,12 +30,15 @@ function generateLinePoints(data, width, height, padding) {
 }
 
 function generatePieSegments(data, radius, cx = 110, cy = 110) {
-  const total = data.reduce((s, d) => s + d.value, 0);
+  const validData = data.filter(item => (Number(item.tickets_sold) || 0) > 0);
+  const total = validData.reduce((s, d) => s + (Number(d.tickets_sold) || 0), 0);
+  if (total <= 0) return [];
   let angle = 0;
-  return data.map((item) => {
-    const slice = (item.value / total) * 360;
+  const colors = ["#7c61ff", "#5bcad4", "#f2917a", "#f3c74b"];
+  return validData.map((item, index) => {
+    const slice = ((Number(item.tickets_sold) / total) * 360);
     const start = angle;
-    const end   = angle + slice;
+    const end = angle + slice;
     const large = slice > 180 ? 1 : 0;
     const toRad = (deg) => ((deg - 90) * Math.PI) / 180;
     const sx = cx + radius * Math.cos(toRad(start));
@@ -53,26 +46,103 @@ function generatePieSegments(data, radius, cx = 110, cy = 110) {
     const ex = cx + radius * Math.cos(toRad(end));
     const ey = cy + radius * Math.sin(toRad(end));
     angle = end;
-    return { ...item, path: `M ${cx} ${cy} L ${sx} ${sy} A ${radius} ${radius} 0 ${large} 1 ${ex} ${ey} Z`, percent: Math.round((item.value / total) * 100) };
+    return {
+      name: item.seat_type,
+      value: Number(item.tickets_sold),
+      color: colors[index % colors.length],
+      path: `M ${cx} ${cy} L ${sx} ${sy} A ${radius} ${radius} 0 ${large} 1 ${ex} ${ey} Z`,
+      percent: Math.round((Number(item.tickets_sold) / total) * 100),
+    };
   });
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [statisticsData, setStatisticsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [dashboard, statistics] = await Promise.all([
+        adminDashboardService.getDashboardStats(),
+        adminStatisticsService.getStatistics(),
+      ]);
+      setDashboardStats(dashboard);
+      setStatisticsData(statistics);
+    } catch (err) {
+      console.error("Failed to load dashboard data:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="admin-dashboard">
+        <div className="admin-statistics loading">
+          <div className="loading-spinner">Đang tải trang tổng quan...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-dashboard">
+        <div className="admin-statistics error">
+          <div className="error-message">
+            <h3>Lỗi</h3>
+            <p>{error}</p>
+            <button onClick={loadData}>Thử lại</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const chartLabels = statisticsData?.revenueByDay?.map((item) => new Date(item.date).toLocaleDateString("vi-VN", { weekday: "short" })) || ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+  const revenueData = statisticsData?.revenueByDay?.map((item) => Math.round(Number(item.revenue) / 1000000)) || [0, 0, 0, 0, 0, 0, 0];
+  const visitsData = statisticsData?.revenueByDay?.map((item) => Number(item.bookings)) || [0, 0, 0, 0, 0, 0, 0];
+  const ticketData = statisticsData?.ticketSalesByType || [];
+  const monthlyTopTickets = statisticsData?.ticketSalesByType?.map((item, i, arr) => {
+    const max = Math.max(...arr.map((x) => Number(x.tickets_sold)), 1);
+    return {
+      label: item.seat_type,
+      sold: Number(item.tickets_sold),
+      max,
+    };
+  }) || [];
+  const totalTicketsSold = ticketData.reduce((sum, item) => sum + Number(item.tickets_sold), 0);
+
   const revenuePoints = generateLinePoints(revenueData, 520, 220, 24);
-  const visitsPoints  = generateLinePoints(visitsData,  520, 220, 24);
-  const pieSegments   = generatePieSegments(ticketData, 92);
+  const visitsPoints = generateLinePoints(visitsData, 520, 220, 24);
+  const pieSegments = generatePieSegments(ticketData, 92);
+
+  const recentActivity = [
+    { time: "08:32", text: "Người dùng đặt vé phim", type: "booking" },
+    { time: "08:15", text: "Người dùng đăng ký tài khoản mới", type: "user" },
+    { time: "07:58", text: "Đơn hàng đã thanh toán thành công", type: "payment" },
+  ];
+
+  const ACTIVITY_ICON = { booking: "🎟", user: "👤", payment: "💳", movie: "🎬", refund: "↩" };
 
   return (
     <div className="admin-dashboard">
-
       {/* ── Stat cards ── */}
       <div className="stats-grid">
         {[
-          { title: "Người dùng",  sub: "Tài khoản hoạt động", value: "1.482", icon: "👤", color: "#7c61ff" },
-          { title: "Phim",        sub: "Đang được liệt kê",   value: "86",    icon: "🎬", color: "#5bcad4" },
-          { title: "Đặt vé",      sub: "Xác nhận hôm nay",    value: "219",   icon: "🎟", color: "#4ade80" },
-          { title: "Doanh thu",   sub: "Dự đoán tháng",       value: "24.8M", icon: "💰", color: "#fbbf24" },
+          { title: "Người dùng", sub: "Tài khoản hoạt động", value: formatNumber(dashboardStats?.total_customers || 0), icon: "👤", color: "#7c61ff" },
+          { title: "Phim", sub: "Đang được liệt kê", value: formatNumber(dashboardStats?.total_movies || 0), icon: "🎬", color: "#5bcad4" },
+          { title: "Đặt vé", sub: "Xác nhận hôm nay", value: formatNumber(dashboardStats?.total_bookings || 0), icon: "🎟", color: "#4ade80" },
+          { title: "Doanh thu", sub: "Dự đoán tháng", value: formatCurrency(dashboardStats?.total_revenue || 0), icon: "💰", color: "#fbbf24" },
         ].map((s) => (
           <div className="stat-card" key={s.title}>
             <div className="stat-card-top">
@@ -97,27 +167,28 @@ export default function AdminDashboard() {
               <h3>Doanh thu</h3>
               <p>Báo cáo doanh thu theo ngày trong tuần.</p>
             </div>
-            <span className="chart-badge">Tăng 14%</span>
           </div>
           <div className="chart-graph">
             <svg viewBox="0 0 520 220" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="lineGradient" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%"   stopColor="rgba(124,97,255,0.85)" />
+                  <stop offset="0%" stopColor="rgba(124,97,255,0.85)" />
                   <stop offset="100%" stopColor="rgba(124,97,255,0.12)" />
                 </linearGradient>
               </defs>
               <polyline className="chart-line-path" fill="none" stroke="url(#lineGradient)" strokeWidth="4" points={revenuePoints} />
               {revenueData.map((v, i) => {
-                const x   = 24 + (i * 472) / (revenueData.length - 1);
-                const max = Math.max(...revenueData);
-                const y   = 220 - 24 - (v / max) * 172;
+                const max = Math.max(...revenueData, 1);
+                const x = 24 + (i * 472) / (revenueData.length - 1 || 1);
+                const y = 220 - 24 - (v / max) * 172;
                 return <circle key={i} cx={x} cy={y} r="6" fill="#7c61ff" stroke="#fff" strokeWidth="2" />;
               })}
-              {chartLabels.map((lb, i) => (
-                <text key={lb} x={24 + (i * 472) / (chartLabels.length - 1)} y="214" textAnchor="middle" className="chart-axis-label">{lb}</text>
-              ))}
             </svg>
+            <div className="chart-labels">
+              {chartLabels.map((lb, i) => (
+                <span key={i}>{lb}</span>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -125,23 +196,25 @@ export default function AdminDashboard() {
         <section className="activity-panel chart-card">
           <div className="chart-panel-header">
             <div>
-              <h3>Lượt truy cập</h3>
-              <p>Biểu đồ lượt truy cập và tương tác.</p>
+              <h3>Số đơn hàng</h3>
+              <p>Biểu đồ số đơn hàng theo ngày.</p>
             </div>
-            <span className="chart-badge chart-badge-light">Ổn định</span>
           </div>
           <div className="chart-bar-grid">
             {visitsData.map((v, i) => {
-              const max = Math.max(...visitsData);
+              const max = Math.max(...visitsData, 1);
               return (
                 <div key={i} className="chart-bar-item">
-                  <div className="chart-bar-fill" style={{ height: `${(v / max) * 160}px`, animationDelay: `${i * 70}ms` }} />
+                  <div className="chart-bar-fill" style={{ height: `${(v / max) * 160}px` }} />
                   <span>{chartLabels[i]}</span>
                 </div>
               );
             })}
           </div>
-          <div className="chart-bar-values"><span>980</span><span>1920</span></div>
+          <div className="chart-bar-values">
+            <span>{Math.min(...visitsData, 0)}</span>
+            <span>{Math.max(...visitsData, 0)}</span>
+          </div>
         </section>
       </div>
 
@@ -154,9 +227,9 @@ export default function AdminDashboard() {
             <h3>Hiệu suất bán vé tháng</h3>
           </div>
           <div className="ticket-sales-summary">
-            <div><span>Tổng vé bán</span><strong>1.500</strong></div>
-            <div><span>Doanh thu</span><strong>1.26 tỷ</strong></div>
-            <div><span>Tăng trưởng</span><strong>+18%</strong></div>
+            <div><span>Tổng vé bán</span><strong>{formatNumber(totalTicketsSold)}</strong></div>
+            <div><span>Doanh thu</span><strong>{formatCurrency(dashboardStats?.total_revenue || 0)}</strong></div>
+            <div><span>Tăng trưởng</span><strong>+0%</strong></div>
           </div>
         </div>
 
@@ -214,7 +287,17 @@ export default function AdminDashboard() {
       <div className="db-section-label">Hoạt động gần đây</div>
       <section className="db-activity-card">
         <ul className="db-activity-list">
-          {recentActivity.map((a, i) => (
+          {dashboardStats?.recent_bookings?.map((booking) => (
+            <li key={booking.booking_id} className="db-activity-item">
+              <span className="db-activity-icon">🎟</span>
+              <span className="db-activity-text">
+                {booking.full_name} đã đặt vé {booking.title || ""}
+              </span>
+              <span className="db-activity-time">
+                {new Date(booking.created_at).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </li>
+          )) || recentActivity.map((a, i) => (
             <li key={i} className="db-activity-item">
               <span className="db-activity-icon">{ACTIVITY_ICON[a.type]}</span>
               <span className="db-activity-text">{a.text}</span>

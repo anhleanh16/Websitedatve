@@ -4,6 +4,30 @@ const DEFAULT_SEAT_STATUS = "active";
 let ensureRoomSeatGapsTablePromise;
 const ALLOWED_ROOM_STATUSES = new Set(["active", "inactive", "maintenance"]);
 const ALLOWED_CINEMA_STATUSES = new Set(["active", "inactive"]);
+let schemaCapabilitiesPromise;
+
+const getSchemaCapabilities = async () => {
+  if (schemaCapabilitiesPromise) return schemaCapabilitiesPromise;
+
+  schemaCapabilitiesPromise = (async () => {
+    const [cinemaCols] = await db.query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Cinemas'",
+    );
+    const [roomCols] = await db.query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Rooms'",
+    );
+
+    const cinemaSet = new Set(cinemaCols.map((c) => c.COLUMN_NAME));
+    const roomSet = new Set(roomCols.map((c) => c.COLUMN_NAME));
+
+    return {
+      cinemas: { hasStatus: cinemaSet.has("status") },
+      rooms: { hasStatus: roomSet.has("status") },
+    };
+  })();
+
+  return schemaCapabilitiesPromise;
+};
 
 const buildAppError = (message, statusCode = 400) => {
   const error = new Error(message);
@@ -244,6 +268,7 @@ const syncSeats = async (connection, roomId, roomData) => {
 };
 
 const syncRooms = async (connection, cinemaId, rooms = []) => {
+  const caps = await getSchemaCapabilities();
   const [existingRooms] = await connection.query(
     "SELECT room_id, room_name FROM Rooms WHERE cinema_id = ?",
     [cinemaId],
@@ -269,15 +294,27 @@ const syncRooms = async (connection, cinemaId, rooms = []) => {
     let currentRoomId = roomId;
 
     if (roomId && existingRoomIds.has(roomId)) {
-      await connection.query(
-        "UPDATE Rooms SET room_name = ?, room_type = ?, total_seat = ?, status = ? WHERE room_id = ? AND cinema_id = ?",
-        [roomName, roomType, totalSeat, roomStatus, roomId, cinemaId],
-      );
+      if (caps.rooms.hasStatus) {
+        await connection.query(
+          "UPDATE Rooms SET room_name = ?, room_type = ?, total_seat = ?, status = ? WHERE room_id = ? AND cinema_id = ?",
+          [roomName, roomType, totalSeat, roomStatus, roomId, cinemaId],
+        );
+      } else {
+        await connection.query(
+          "UPDATE Rooms SET room_name = ?, room_type = ?, total_seat = ? WHERE room_id = ? AND cinema_id = ?",
+          [roomName, roomType, totalSeat, roomId, cinemaId],
+        );
+      }
     } else {
-      const [result] = await connection.query(
-        "INSERT INTO Rooms (cinema_id, room_name, room_type, total_seat, status) VALUES (?, ?, ?, ?, ?)",
-        [cinemaId, roomName, roomType, totalSeat, roomStatus],
-      );
+      const [result] = caps.rooms.hasStatus
+        ? await connection.query(
+            "INSERT INTO Rooms (cinema_id, room_name, room_type, total_seat, status) VALUES (?, ?, ?, ?, ?)",
+            [cinemaId, roomName, roomType, totalSeat, roomStatus],
+          )
+        : await connection.query(
+            "INSERT INTO Rooms (cinema_id, room_name, room_type, total_seat) VALUES (?, ?, ?, ?)",
+            [cinemaId, roomName, roomType, totalSeat],
+          );
       currentRoomId = result.insertId;
     }
 
@@ -347,14 +384,22 @@ export const create = async (cinemaData) => {
   const connection = await db.getConnection();
 
   try {
+    const caps = await getSchemaCapabilities();
     await ensureRoomSeatGapsTable();
     await connection.beginTransaction();
 
     const { cinema_name, address, city, phone, image, status, rooms = [] } = cinemaData;
     const cinemaStatus = normalizeCinemaStatus(status, rooms.length);
+    const cinemaColumns = ["cinema_name", "address", "city", "phone", "image"];
+    const cinemaParams = [cinema_name, address, city, phone, image];
+    if (caps.cinemas.hasStatus) {
+      cinemaColumns.push("status");
+      cinemaParams.push(cinemaStatus);
+    }
+    const cinemaPlaceholders = cinemaColumns.map(() => "?").join(", ");
     const [result] = await connection.query(
-      "INSERT INTO Cinemas (cinema_name, address, city, phone, image, status) VALUES (?, ?, ?, ?, ?, ?)",
-      [cinema_name, address, city, phone, image, cinemaStatus],
+      `INSERT INTO Cinemas (${cinemaColumns.join(", ")}) VALUES (${cinemaPlaceholders})`,
+      cinemaParams,
     );
 
     await syncRooms(connection, result.insertId, rooms);
@@ -373,14 +418,28 @@ export const update = async (id, cinemaData) => {
   const connection = await db.getConnection();
 
   try {
+    const caps = await getSchemaCapabilities();
     await ensureRoomSeatGapsTable();
     await connection.beginTransaction();
 
     const { cinema_name, address, city, phone, image, status, rooms = [] } = cinemaData;
     const cinemaStatus = normalizeCinemaStatus(status, rooms.length);
+    const setParts = [
+      "cinema_name = ?",
+      "address = ?",
+      "city = ?",
+      "phone = ?",
+      "image = ?",
+    ];
+    const params = [cinema_name, address, city, phone, image];
+    if (caps.cinemas.hasStatus) {
+      setParts.push("status = ?");
+      params.push(cinemaStatus);
+    }
+    params.push(id);
     const [result] = await connection.query(
-      "UPDATE Cinemas SET cinema_name = ?, address = ?, city = ?, phone = ?, image = ?, status = ? WHERE cinemas_id = ?",
-      [cinema_name, address, city, phone, image, cinemaStatus, id],
+      `UPDATE Cinemas SET ${setParts.join(", ")} WHERE cinemas_id = ?`,
+      params,
     );
 
     await syncRooms(connection, id, rooms);
@@ -431,8 +490,12 @@ export const remove = async (id) => {
 };
 
 export const getRoomsByCinemaId = async (cinemaId) => {
+  const caps = await getSchemaCapabilities();
+  const selectColumns = caps.rooms.hasStatus
+    ? "room_id, cinema_id, room_name, room_type, total_seat, status"
+    : "room_id, cinema_id, room_name, room_type, total_seat";
   const [rooms] = await db.query(
-    "SELECT room_id, cinema_id, room_name, room_type, total_seat, status FROM Rooms WHERE cinema_id = ? ORDER BY room_id DESC",
+    `SELECT ${selectColumns} FROM Rooms WHERE cinema_id = ? ORDER BY room_id DESC`,
     [cinemaId],
   );
   return rooms;

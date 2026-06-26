@@ -1,5 +1,115 @@
 import { db } from "../../../config/db.js";
 
+const UNIT_PRICE_BY_TYPE = {
+  regular: 80000,
+  vip: 100000,
+  couple: 120000,
+};
+
+let bookingSchemaPromise = null;
+
+const buildBookingError = (message, statusCode = 400) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+const normalizeSeatUnitType = (value) => {
+  const type = String(value || "regular").trim().toLowerCase();
+  if (type === "vip") return "vip";
+  if (type === "couple") return "couple";
+  return "regular";
+};
+
+const normalizeSeatUnits = (seatUnits = []) => {
+  const byId = new Map();
+
+  (Array.isArray(seatUnits) ? seatUnits : []).forEach((unit) => {
+    const id = String(unit?.id || unit?.label || "").trim();
+    const seatCodes = Array.from(
+      new Set(
+        (Array.isArray(unit?.seatCodes) ? unit.seatCodes : [])
+          .map((seatCode) => String(seatCode || "").trim().toUpperCase())
+          .filter(Boolean),
+      ),
+    );
+
+    if (!id || seatCodes.length === 0) return;
+
+    byId.set(id, {
+      id,
+      label: String(unit?.label || id).trim(),
+      type: normalizeSeatUnitType(unit?.type),
+      seatCodes,
+    });
+  });
+
+  return Array.from(byId.values());
+};
+
+const normalizeFoodItems = (foodItems = []) => {
+  const groups = new Map();
+
+  (Array.isArray(foodItems) ? foodItems : []).forEach((item) => {
+    const comboId = Number(item?.comboId || item?.combo_id || 0);
+    const quantity = Math.max(0, Number(item?.quantity || 0) || 0);
+    if (!comboId || quantity <= 0) return;
+
+    const popcornType = String(item?.popcornType || item?.selected_popcorn_type || "").trim();
+    const drinkType = String(item?.drinkType || item?.selected_drink_type || "").trim();
+    const groupKey = `${comboId}__${popcornType}__${drinkType}`;
+
+    groups.set(groupKey, {
+      comboId,
+      quantity: quantity + Number(groups.get(groupKey)?.quantity || 0),
+      popcornType,
+      drinkType,
+    });
+  });
+
+  return Array.from(groups.values());
+};
+
+const generateBookingCode = () =>
+  `LNX${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+const ensureBookingSchema = async () => {
+  if (bookingSchemaPromise) return bookingSchemaPromise;
+
+  bookingSchemaPromise = (async () => {
+    const [orderComboColumns] = await db.query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Order_Combos'",
+    );
+    const columnSet = new Set(orderComboColumns.map((column) => column.COLUMN_NAME));
+    const alterStatements = [];
+
+    if (!columnSet.has("selected_popcorn_type")) {
+      alterStatements.push(
+        "ALTER TABLE Order_Combos ADD COLUMN selected_popcorn_type VARCHAR(100) NULL AFTER quantity",
+      );
+    }
+
+    if (!columnSet.has("selected_drink_type")) {
+      alterStatements.push(
+        "ALTER TABLE Order_Combos ADD COLUMN selected_drink_type VARCHAR(100) NULL AFTER selected_popcorn_type",
+      );
+    }
+
+    for (const statement of alterStatements) {
+      await db.query(statement);
+    }
+
+    return {
+      orderCombos: {
+        hasSelectedPopcornType: true,
+        hasSelectedDrinkType: true,
+      },
+    };
+  })();
+
+  return bookingSchemaPromise;
+};
+
 export const BookingModel = {
   /**
    * Lấy danh sách booking với các tùy chọn filter và search.
@@ -16,13 +126,21 @@ export const BookingModel = {
         o.created_at,
         u.full_name,
         u.email,
+        u.phone,
         MIN(m.title) AS movie_title,
-        MIN(s.start_time) AS start_time
+        MIN(s.start_time) AS start_time,
+        MIN(c.cinema_name) AS cinema_name,
+        MIN(r.room_name) AS room_name,
+        GROUP_CONCAT(DISTINCT seat.seat_code ORDER BY seat.seat_code SEPARATOR ', ') AS seat_codes,
+        MAX(t.check_in_time) AS check_in_time
       FROM Orders o
       JOIN User u ON o.user_id = u.id
       LEFT JOIN Tickets t ON t.order_id = o.order_id
       LEFT JOIN Showtimes s ON t.showtime_id = s.showtime_id
       LEFT JOIN Movies m ON s.movie_id = m.movie_id
+      LEFT JOIN Rooms r ON s.room_id = r.room_id
+      LEFT JOIN Cinemas c ON r.cinema_id = c.cinemas_id
+      LEFT JOIN Seats seat ON seat.seat_id = t.seat_id
     `;
 
     const queryParams = [];
@@ -55,7 +173,8 @@ export const BookingModel = {
         o.status,
         o.created_at,
         u.full_name,
-        u.email
+        u.email,
+        u.phone
       ORDER BY o.created_at DESC
     `;
 
@@ -86,7 +205,9 @@ export const BookingModel = {
         MIN(m.title) AS movie_title,
         MIN(m.poster) AS poster,
         MIN(c.cinema_name) AS cinema_name,
-        MIN(r.room_name) AS room_name
+        MIN(r.room_name) AS room_name,
+        MIN(t.qr_code) AS primary_qr_code,
+        MAX(t.check_in_time) AS check_in_time
       FROM Orders o
       JOIN User u ON o.user_id = u.id
       LEFT JOIN Tickets t ON t.order_id = o.order_id
@@ -116,7 +237,7 @@ export const BookingModel = {
 
     const [seats] = await db.query(
       `
-      SELECT s.seat_code
+      SELECT s.seat_code, t.qr_code, t.ticket_status, t.check_in_time
       FROM Tickets t
       JOIN Seats s ON s.seat_id = t.seat_id
       WHERE t.order_id = ?
@@ -125,10 +246,20 @@ export const BookingModel = {
       [id],
     );
     booking.seats = seats.map((s) => s.seat_code);
+    booking.qr_codes = seats.map((s) => s.qr_code).filter(Boolean);
+    booking.primary_qr_code =
+      booking.primary_qr_code || booking.qr_codes[0] || booking.booking_code;
+    booking.check_in_time =
+      booking.check_in_time || seats.find((seat) => seat.check_in_time)?.check_in_time || null;
 
     const [combos] = await db.query(
       `
-      SELECT c.combo_name, oc.quantity, c.price
+      SELECT
+        c.combo_name,
+        oc.quantity,
+        c.price,
+        oc.selected_popcorn_type,
+        oc.selected_drink_type
       FROM Order_Combos oc
       JOIN Combos c ON c.combo_id = oc.combo_id
       WHERE oc.order_id = ?
@@ -152,16 +283,17 @@ export const BookingModel = {
         o.status,
         u.full_name,
         MIN(m.title) AS movie_title,
-        MIN(s.start_time) AS start_time
+        MIN(s.start_time) AS start_time,
+        MAX(t.check_in_time) AS check_in_time
       FROM Orders o
       JOIN User u ON o.user_id = u.id
       LEFT JOIN Tickets t ON t.order_id = o.order_id
       LEFT JOIN Showtimes s ON t.showtime_id = s.showtime_id
       LEFT JOIN Movies m ON s.movie_id = m.movie_id
-      WHERE o.booking_code = ?
+      WHERE o.booking_code = ? OR t.qr_code = ?
       GROUP BY o.order_id, o.booking_code, o.status, u.full_name
     `,
-      [code],
+      [code, code],
     );
     return bookingDetails[0] || null;
   },
@@ -175,5 +307,280 @@ export const BookingModel = {
       [status, id],
     );
     return result.affectedRows > 0;
+  },
+
+  async checkIn(id) {
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [[order]] = await connection.query(
+        "SELECT order_id, status FROM Orders WHERE order_id = ? FOR UPDATE",
+        [id],
+      );
+
+      if (!order) {
+        await connection.rollback();
+        return false;
+      }
+
+      await connection.query(
+        `
+        UPDATE Tickets
+        SET ticket_status = 'used',
+            check_in_time = COALESCE(check_in_time, NOW())
+        WHERE order_id = ?
+      `,
+        [id],
+      );
+
+      await connection.query(
+        "UPDATE Orders SET status = 'completed' WHERE order_id = ?",
+        [id],
+      );
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  async createUserBooking({
+    userId,
+    showtimeId,
+    seatUnits = [],
+    foodItems = [],
+    paymentMethod = "momo",
+  }) {
+    await ensureBookingSchema();
+
+    const normalizedUserId = Number(userId || 0);
+    const normalizedShowtimeId = Number(showtimeId || 0);
+    const normalizedSeatUnits = normalizeSeatUnits(seatUnits);
+    const normalizedFoodItems = normalizeFoodItems(foodItems);
+
+    if (!normalizedUserId) {
+      throw buildBookingError("Không xác định được người dùng đặt vé.");
+    }
+
+    if (!normalizedShowtimeId) {
+      throw buildBookingError("Không xác định được suất chiếu.");
+    }
+
+    if (normalizedSeatUnits.length === 0) {
+      throw buildBookingError("Bạn chưa chọn ghế.");
+    }
+
+    const requestedSeatCodes = Array.from(
+      new Set(normalizedSeatUnits.flatMap((unit) => unit.seatCodes)),
+    );
+
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [[showtime]] = await connection.query(
+        `
+        SELECT showtime_id, room_id, available_seats, status
+        FROM Showtimes
+        WHERE showtime_id = ?
+        FOR UPDATE
+      `,
+        [normalizedShowtimeId],
+      );
+
+      if (!showtime || showtime.status !== "active") {
+        throw buildBookingError("Suất chiếu không tồn tại hoặc đã ngừng bán.", 404);
+      }
+
+      if (
+        showtime.available_seats !== null &&
+        Number(showtime.available_seats || 0) < requestedSeatCodes.length
+      ) {
+        throw buildBookingError("Số ghế trống không đủ cho lựa chọn hiện tại.");
+      }
+
+      const [seatRows] = await connection.query(
+        `
+        SELECT seat_id, seat_code, seat_type, status
+        FROM Seats
+        WHERE room_id = ?
+          AND seat_code IN (${requestedSeatCodes.map(() => "?").join(", ")})
+        FOR UPDATE
+      `,
+        [showtime.room_id, ...requestedSeatCodes],
+      );
+
+      if (seatRows.length !== requestedSeatCodes.length) {
+        throw buildBookingError("Có ghế không thuộc phòng chiếu của suất này.");
+      }
+
+      const seatByCode = new Map(
+        seatRows.map((seat) => [String(seat.seat_code || "").trim().toUpperCase(), seat]),
+      );
+
+      const invalidSeat = seatRows.find((seat) => seat.status !== "active");
+      if (invalidSeat) {
+        throw buildBookingError(`Ghế ${invalidSeat.seat_code} hiện không thể đặt.`);
+      }
+
+      const [soldSeats] = await connection.query(
+        `
+        SELECT s.seat_code
+        FROM Tickets t
+        JOIN Seats s ON s.seat_id = t.seat_id
+        JOIN Orders o ON o.order_id = t.order_id
+        WHERE t.showtime_id = ?
+          AND s.seat_code IN (${requestedSeatCodes.map(() => "?").join(", ")})
+          AND t.ticket_status <> 'cancelled'
+          AND o.status <> 'cancelled'
+      `,
+        [normalizedShowtimeId, ...requestedSeatCodes],
+      );
+
+      if (soldSeats.length > 0) {
+        throw buildBookingError(
+          `Ghế ${soldSeats.map((seat) => seat.seat_code).join(", ")} đã được đặt.`,
+        );
+      }
+
+      const seatTotal = normalizedSeatUnits.reduce(
+        (sum, unit) => sum + Number(UNIT_PRICE_BY_TYPE[normalizeSeatUnitType(unit.type)] || 0),
+        0,
+      );
+
+      let comboRows = [];
+      if (normalizedFoodItems.length > 0) {
+        const comboIds = Array.from(
+          new Set(normalizedFoodItems.map((item) => item.comboId).filter(Boolean)),
+        );
+
+        [comboRows] = await connection.query(
+          `
+          SELECT combo_id, combo_name, price, is_active
+          FROM Combos
+          WHERE combo_id IN (${comboIds.map(() => "?").join(", ")})
+        `,
+          comboIds,
+        );
+
+        if (comboRows.length !== comboIds.length) {
+          throw buildBookingError("Một số combo đã chọn không còn tồn tại.");
+        }
+
+        const inactiveCombo = comboRows.find((combo) => Number(combo.is_active || 0) !== 1);
+        if (inactiveCombo) {
+          throw buildBookingError(`Combo "${inactiveCombo.combo_name}" hiện đã ngừng bán.`);
+        }
+      }
+
+      const comboById = new Map(
+        comboRows.map((combo) => [Number(combo.combo_id), Number(combo.price || 0)]),
+      );
+      const foodTotal = normalizedFoodItems.reduce(
+        (sum, item) => sum + Number(comboById.get(item.comboId) || 0) * item.quantity,
+        0,
+      );
+      const totalAmount = seatTotal + foodTotal;
+
+      let bookingCode = generateBookingCode();
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const [[existing]] = await connection.query(
+          "SELECT order_id FROM Orders WHERE booking_code = ? LIMIT 1",
+          [bookingCode],
+        );
+        if (!existing) break;
+        bookingCode = generateBookingCode();
+      }
+
+      const [orderResult] = await connection.query(
+        `
+        INSERT INTO Orders (
+          user_id,
+          total_amount,
+          payment_method,
+          payment_status,
+          order_date,
+          booking_code,
+          status
+        )
+        VALUES (?, ?, ?, 'paid', NOW(), ?, 'confirmed')
+      `,
+        [normalizedUserId, totalAmount, String(paymentMethod || "momo").trim(), bookingCode],
+      );
+
+      const orderId = Number(orderResult.insertId);
+
+      for (const unit of normalizedSeatUnits) {
+        for (const seatCode of unit.seatCodes) {
+          const seat = seatByCode.get(seatCode);
+          if (!seat) continue;
+
+          await connection.query(
+            `
+            INSERT INTO Tickets (
+              order_id,
+              showtime_id,
+              seat_id,
+              qr_code,
+              ticket_status
+            )
+            VALUES (?, ?, ?, ?, 'unused')
+          `,
+            [
+              orderId,
+              normalizedShowtimeId,
+              seat.seat_id,
+              `${bookingCode}-${seatCode}`,
+            ],
+          );
+        }
+      }
+
+      for (const item of normalizedFoodItems) {
+        await connection.query(
+          `
+          INSERT INTO Order_Combos (
+            order_id,
+            combo_id,
+            quantity,
+            selected_popcorn_type,
+            selected_drink_type
+          )
+          VALUES (?, ?, ?, ?, ?)
+        `,
+          [
+            orderId,
+            item.comboId,
+            item.quantity,
+            item.popcornType || null,
+            item.drinkType || null,
+          ],
+        );
+      }
+
+      await connection.query(
+        `
+        UPDATE Showtimes
+        SET available_seats = GREATEST(0, COALESCE(available_seats, 0) - ?)
+        WHERE showtime_id = ?
+      `,
+        [requestedSeatCodes.length, normalizedShowtimeId],
+      );
+
+      await connection.commit();
+      return this.findById(orderId);
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   },
 };

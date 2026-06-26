@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./Booking.css";
+import { userComboService } from "../../services/userApi";
 
 const parseSeatCode = (seatCode) => {
   const match = String(seatCode || "")
@@ -261,34 +262,123 @@ const validateSeatSelectionRules = (selectedSeatIds, selectionMeta) => {
   return "";
 };
 
-const comboItems = [
-  {
-    key: "couple",
-    label: "Combo Couple",
-    description: "1 bắp + 2 nước",
-    price: 150000,
-    icon: "💑",
-  },
-  {
-    key: "friends",
-    label: "Combo Friends",
-    description: "2 bắp + 2 nước",
-    price: 180000,
-    icon: "👯",
-  },
-  {
-    key: "family",
-    label: "Combo Family",
-    description: "3 bắp + 4 nước",
-    price: 260000,
-    icon: "👪",
-  },
-];
+const getFoodKey = (item) => String(item?.combo_id ?? item?.key ?? "");
 
-const snackItems = [
-  { key: "corn", label: "Bắp", price: 50000, icon: "🍿" },
-  { key: "drink", label: "Nước", price: 30000, icon: "🥤" },
-];
+const getFoodIcon = (item) => {
+  const popcornQty = Number(item?.popcorn_quantity || 0);
+  const drinkQty = Number(item?.drink_quantity || 0);
+
+  if (item?.category === "single" && popcornQty > 0 && drinkQty === 0) return "🍿";
+  if (item?.category === "single" && drinkQty > 0 && popcornQty === 0) return "🥤";
+  if (drinkQty >= 4 || String(item?.combo_name || "").includes("4 Người")) return "👨‍👩‍👧‍👦";
+  if (popcornQty >= 2 || drinkQty >= 2) return "🎉";
+  return "🎁";
+};
+
+const getFoodSummary = (item) => {
+  const parts = [];
+  const popcornQty = Number(item?.popcorn_quantity || 0);
+  const drinkQty = Number(item?.drink_quantity || 0);
+
+  if (popcornQty > 0) parts.push(`${popcornQty} bắp`);
+  if (drinkQty > 0) parts.push(`${drinkQty} nước`);
+
+  return parts.join(" + ") || String(item?.description || "").trim() || "Tùy chỉnh";
+};
+
+const buildSelectedFoodItems = (items, counts, selections) =>
+  items
+    .map((item) => {
+      const key = getFoodKey(item);
+      const quantity = Number(counts[key] || 0);
+      if (quantity <= 0) return null;
+
+      return {
+        comboId: item.combo_id,
+        key,
+        name: item.combo_name,
+        category: item.category,
+        quantity,
+        unitPrice: Number(item.price || 0),
+        totalPrice: Number(item.price || 0) * quantity,
+        popcornType: selections[key]?.popcornType || "",
+        drinkType: selections[key]?.drinkType || "",
+      };
+    })
+    .filter(Boolean);
+
+const formatMoney = (value) => `${Number(value || 0).toLocaleString("vi-VN")}đ`;
+
+function FoodSelectionCard({
+  item,
+  count,
+  selection,
+  onDecrease,
+  onIncrease,
+  onSelectOption,
+}) {
+  const key = getFoodKey(item);
+  const popcornOptions = Array.isArray(item.popcorn_options) ? item.popcorn_options : [];
+  const drinkOptions = Array.isArray(item.drink_options) ? item.drink_options : [];
+
+  return (
+    <div className="combo-card" key={key}>
+      <div className="combo-info">
+        <span className="item-icon" aria-hidden>
+          {getFoodIcon(item)}
+        </span>
+        <div>
+          <h4>{item.combo_name}</h4>
+          <p>{getFoodSummary(item)}</p>
+          <span className="combo-price-line">
+            {Number(item.price || 0).toLocaleString("vi-VN")}đ
+          </span>
+          {popcornOptions.length > 0 && (
+            <label className="combo-option-row">
+              <span>Loại bắp</span>
+              <select
+                className="combo-option-select"
+                value={selection?.popcornType || popcornOptions[0] || ""}
+                onChange={(event) => onSelectOption(key, "popcornType", event.target.value)}
+              >
+                {popcornOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {drinkOptions.length > 0 && (
+            <label className="combo-option-row">
+              <span>Loại nước</span>
+              <select
+                className="combo-option-select"
+                value={selection?.drinkType || drinkOptions[0] || ""}
+                onChange={(event) => onSelectOption(key, "drinkType", event.target.value)}
+              >
+                {drinkOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      </div>
+      <div className="combo-control">
+        <button type="button" className="combo-button" onClick={() => onDecrease(key)}>
+          -
+        </button>
+        <span className="combo-count">{count || 0}</span>
+        <button type="button" className="combo-button" onClick={() => onIncrease(key)}>
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Booking() {
   const location = useLocation();
@@ -299,6 +389,7 @@ export default function Booking() {
     ageLimit = 0,
     cinema = "Lunexa Movix Đà Nẵng",
     cinemaId = null,
+    showtimeId = null,
     roomId: initialRoomId = null,
     roomName: initialRoomName = "",
     roomType: initialRoomType = "",
@@ -316,12 +407,12 @@ export default function Booking() {
     },
   };
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [comboCounts, setComboCounts] = useState({
-    couple: 0,
-    friends: 0,
-    family: 0,
-  });
-  const [snackCounts, setSnackCounts] = useState({ corn: 0, drink: 0 });
+  const [comboCatalog, setComboCatalog] = useState([]);
+  const [comboLoading, setComboLoading] = useState(true);
+  const [comboError, setComboError] = useState("");
+  const [comboCounts, setComboCounts] = useState({});
+  const [snackCounts, setSnackCounts] = useState({});
+  const [foodSelections, setFoodSelections] = useState({});
   const [openDropdown, setOpenDropdown] = useState("snacks"); // ensure snacks open by default
   const [mobileStep, setMobileStep] = useState(1); // 1=ghế, 2=combo, 3=thanh toán
   const [cinemaDetail, setCinemaDetail] = useState(null);
@@ -423,10 +514,88 @@ export default function Booking() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => {
+    let ignore = false;
+
+    const fetchCombos = async () => {
+      setComboLoading(true);
+      setComboError("");
+
+      try {
+        const data = await userComboService.getAll();
+        if (ignore) return;
+        setComboCatalog(Array.isArray(data?.combos) ? data.combos : []);
+      } catch (error) {
+        if (ignore) return;
+        console.error(error);
+        setComboCatalog([]);
+        setComboError(error.message || "Không thể tải combo từ cơ sở dữ liệu.");
+      } finally {
+        if (!ignore) setComboLoading(false);
+      }
+    };
+
+    fetchCombos();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const snackItems = useMemo(
+    () => comboCatalog.filter((item) => item.category === "single"),
+    [comboCatalog],
+  );
+  const comboItems = useMemo(
+    () => comboCatalog.filter((item) => item.category !== "single"),
+    [comboCatalog],
+  );
+
+  useEffect(() => {
+    if (comboCatalog.length === 0) return;
+
+    setComboCounts((prev) =>
+      comboItems.reduce((acc, item) => {
+        const key = getFoodKey(item);
+        acc[key] = prev[key] || 0;
+        return acc;
+      }, {}),
+    );
+
+    setSnackCounts((prev) =>
+      snackItems.reduce((acc, item) => {
+        const key = getFoodKey(item);
+        acc[key] = prev[key] || 0;
+        return acc;
+      }, {}),
+    );
+
+    setFoodSelections((prev) =>
+      comboCatalog.reduce((acc, item) => {
+        const key = getFoodKey(item);
+        acc[key] = prev[key] || {
+          popcornType: item.popcorn_options?.[0] || "",
+          drinkType: item.drink_options?.[0] || "",
+        };
+        return acc;
+      }, {}),
+    );
+  }, [comboCatalog, comboItems, snackItems]);
+
   const updateCombo = (key, delta) => {
     setComboCounts((prev) => ({
       ...prev,
       [key]: Math.max(0, prev[key] + delta),
+    }));
+  };
+
+  const updateFoodSelection = (key, field, value) => {
+    setFoodSelections((prev) => ({
+      ...prev,
+      [key]: {
+        ...(prev[key] || {}),
+        [field]: value,
+      },
     }));
   };
 
@@ -515,21 +684,77 @@ export default function Booking() {
       .find((item) => item.id === seatId);
     return unit?.label || seatId;
   });
+  const selectedSeatUnits = useMemo(
+    () =>
+      selectedSeats
+        .map((seatId) =>
+          seatLayout.rows
+            .flatMap((row) => row.units)
+            .find((item) => item.id === seatId),
+        )
+        .filter(Boolean)
+        .map((unit) => ({
+          id: unit.id,
+          label: unit.label,
+          seatCodes: Array.isArray(unit.seatCodes) ? unit.seatCodes : [],
+          type: unit.type,
+        })),
+    [seatLayout.rows, selectedSeats],
+  );
 
   const seatTotal = selectedSeats.reduce((sum, seatId) => {
     const type = getSelectedSeatType(seatId);
     return sum + seatPrices[type];
   }, 0);
   const comboTotal = comboItems.reduce(
-    (sum, item) => sum + item.price * comboCounts[item.key],
+    (sum, item) => sum + Number(item.price || 0) * Number(comboCounts[getFoodKey(item)] || 0),
     0,
   );
   const snackTotal = snackItems.reduce(
-    (sum, item) => sum + item.price * (snackCounts[item.key] || 0),
+    (sum, item) => sum + Number(item.price || 0) * Number(snackCounts[getFoodKey(item)] || 0),
     0,
   );
   const total = seatTotal + comboTotal;
   const totalWithSnacks = seatTotal + comboTotal + snackTotal;
+  const selectedComboDetails = useMemo(
+    () => buildSelectedFoodItems(comboItems, comboCounts, foodSelections),
+    [comboCounts, comboItems, foodSelections],
+  );
+  const selectedSnackDetails = useMemo(
+    () => buildSelectedFoodItems(snackItems, snackCounts, foodSelections),
+    [foodSelections, snackCounts, snackItems],
+  );
+  const selectedFoodItems = useMemo(
+    () => [...selectedSnackDetails, ...selectedComboDetails],
+    [selectedComboDetails, selectedSnackDetails],
+  );
+  const hasSelectedFood = selectedFoodItems.length > 0;
+  const handleCheckout = () =>
+    navigate("/payment", {
+      state: {
+        movieId,
+        showtimeId,
+        movieTitle,
+        cinema,
+        roomName: selectedRoomDisplayName,
+        roomType: selectedRoomDisplayType,
+        day,
+        time,
+        selectedSeats,
+        selectedSeatLabels,
+        selectedSeatUnits,
+        seatTotal,
+        comboTotal,
+        snackTotal,
+        total,
+        totalWithSnacks,
+        comboCounts,
+        snackCounts,
+        selectedComboDetails,
+        selectedSnackDetails,
+        foodItems: selectedFoodItems,
+      },
+    });
   const handleBreadcrumbSectionClick = () => {
     if (hasMovieSelection) {
       navigate("/Films/Film", { state: movieSelectionState });
@@ -894,38 +1119,28 @@ export default function Booking() {
             </div>
             {openDropdown === "snacks" && (
               <div className="dropdown-body">
-                {snackItems.map((item) => (
-                  <div className="combo-card" key={item.key}>
-                    <div className="combo-info">
-                      <span className="item-icon" aria-hidden>
-                        {item.icon}
-                      </span>
-                      <div>
-                        <h4>{item.label}</h4>
-                        <p>{item.price.toLocaleString("vi-VN")}đ</p>
-                      </div>
-                    </div>
-                    <div className="combo-control">
-                      <button
-                        type="button"
-                        className="combo-button"
-                        onClick={() => updateSnack(item.key, -1)}
-                      >
-                        -
-                      </button>
-                      <span className="combo-count">
-                        {snackCounts[item.key]}
-                      </span>
-                      <button
-                        type="button"
-                        className="combo-button"
-                        onClick={() => updateSnack(item.key, 1)}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                {comboLoading ? (
+                  <div className="booking-seat-feedback">Đang tải danh sách bắp và nước...</div>
+                ) : comboError ? (
+                  <div className="booking-seat-feedback error">{comboError}</div>
+                ) : snackItems.length === 0 ? (
+                  <div className="booking-seat-feedback">Chưa có món lẻ nào đang bán.</div>
+                ) : (
+                  snackItems.map((item) => {
+                    const key = getFoodKey(item);
+                    return (
+                      <FoodSelectionCard
+                        key={key}
+                        item={item}
+                        count={snackCounts[key]}
+                        selection={foodSelections[key]}
+                        onDecrease={() => updateSnack(key, -1)}
+                        onIncrease={() => updateSnack(key, 1)}
+                        onSelectOption={updateFoodSelection}
+                      />
+                    );
+                  })
+                )}
               </div>
             )}
           </div>
@@ -947,38 +1162,28 @@ export default function Booking() {
             </div>
             {openDropdown === "combo" && (
               <div className="dropdown-body">
-                {comboItems.map((item) => (
-                  <div className="combo-card" key={item.key}>
-                    <div className="combo-info">
-                      <span className="item-icon" aria-hidden>
-                        {item.icon}
-                      </span>
-                      <div>
-                        <h4>{item.label}</h4>
-                        <p>{item.description}</p>
-                      </div>
-                    </div>
-                    <div className="combo-control">
-                      <button
-                        type="button"
-                        className="combo-button"
-                        onClick={() => updateCombo(item.key, -1)}
-                      >
-                        -
-                      </button>
-                      <span className="combo-count">
-                        {comboCounts[item.key]}
-                      </span>
-                      <button
-                        type="button"
-                        className="combo-button"
-                        onClick={() => updateCombo(item.key, 1)}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                {comboLoading ? (
+                  <div className="booking-seat-feedback">Đang tải danh sách combo...</div>
+                ) : comboError ? (
+                  <div className="booking-seat-feedback error">{comboError}</div>
+                ) : comboItems.length === 0 ? (
+                  <div className="booking-seat-feedback">Chưa có combo nào đang bán.</div>
+                ) : (
+                  comboItems.map((item) => {
+                    const key = getFoodKey(item);
+                    return (
+                      <FoodSelectionCard
+                        key={key}
+                        item={item}
+                        count={comboCounts[key]}
+                        selection={foodSelections[key]}
+                        onDecrease={() => updateCombo(key, -1)}
+                        onIncrease={() => updateCombo(key, 1)}
+                        onSelectOption={updateFoodSelection}
+                      />
+                    );
+                  })
+                )}
               </div>
             )}
           </div>
@@ -1000,26 +1205,25 @@ export default function Booking() {
               <span>Tổng tiền</span>
               <strong>{totalWithSnacks.toLocaleString("vi-VN")}đ</strong>
             </div>
+            {hasSelectedFood && (
+              <div className="booking-selected-food-list">
+                {selectedFoodItems.map((item) => (
+                  <div className="booking-selected-food-row" key={`${item.key}-${item.quantity}`}>
+                    <span>
+                      {item.quantity}x {item.name}
+                      {item.popcornType ? ` • ${item.popcornType}` : ""}
+                      {item.drinkType ? ` • ${item.drinkType}` : ""}
+                    </span>
+                    <strong>{formatMoney(item.totalPrice)}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
             <button
               type="button"
               className="checkout-button"
               disabled={selectedSeats.length === 0}
-              onClick={() =>
-                navigate("/payment", {
-                  state: {
-                    movieTitle,
-                    cinema,
-                    roomName: selectedRoomDisplayName,
-                    roomType: selectedRoomDisplayType,
-                    day,
-                    time,
-                    selectedSeats,
-                    selectedSeatLabels,
-                    comboCounts,
-                    total: totalWithSnacks,
-                  },
-                })
-              }
+              onClick={handleCheckout}
             >
               Tiếp tục thanh toán →
             </button>
@@ -1033,69 +1237,53 @@ export default function Booking() {
       >
         <div className="mobile-combo-section">
           <div className="mobile-combo-heading">🍿 Bắp &amp; Nước</div>
-          {snackItems.map((item) => (
-            <div className="combo-card" key={item.key}>
-              <div className="combo-info">
-                <span className="item-icon" aria-hidden>
-                  {item.icon}
-                </span>
-                <div>
-                  <h4>{item.label}</h4>
-                  <p>{item.price.toLocaleString("vi-VN")}đ</p>
-                </div>
-              </div>
-              <div className="combo-control">
-                <button
-                  type="button"
-                  className="combo-button"
-                  onClick={() => updateSnack(item.key, -1)}
-                >
-                  -
-                </button>
-                <span className="combo-count">{snackCounts[item.key]}</span>
-                <button
-                  type="button"
-                  className="combo-button"
-                  onClick={() => updateSnack(item.key, 1)}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          ))}
+          {comboLoading ? (
+            <div className="booking-seat-feedback">Đang tải danh sách bắp và nước...</div>
+          ) : comboError ? (
+            <div className="booking-seat-feedback error">{comboError}</div>
+          ) : snackItems.length === 0 ? (
+            <div className="booking-seat-feedback">Chưa có món lẻ nào đang bán.</div>
+          ) : (
+            snackItems.map((item) => {
+              const key = getFoodKey(item);
+              return (
+                <FoodSelectionCard
+                  key={key}
+                  item={item}
+                  count={snackCounts[key]}
+                  selection={foodSelections[key]}
+                  onDecrease={() => updateSnack(key, -1)}
+                  onIncrease={() => updateSnack(key, 1)}
+                  onSelectOption={updateFoodSelection}
+                />
+              );
+            })
+          )}
         </div>
         <div className="mobile-combo-section">
           <div className="mobile-combo-heading">🎁 Combo</div>
-          {comboItems.map((item) => (
-            <div className="combo-card" key={item.key}>
-              <div className="combo-info">
-                <span className="item-icon" aria-hidden>
-                  {item.icon}
-                </span>
-                <div>
-                  <h4>{item.label}</h4>
-                  <p>{item.description}</p>
-                </div>
-              </div>
-              <div className="combo-control">
-                <button
-                  type="button"
-                  className="combo-button"
-                  onClick={() => updateCombo(item.key, -1)}
-                >
-                  -
-                </button>
-                <span className="combo-count">{comboCounts[item.key]}</span>
-                <button
-                  type="button"
-                  className="combo-button"
-                  onClick={() => updateCombo(item.key, 1)}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          ))}
+          {comboLoading ? (
+            <div className="booking-seat-feedback">Đang tải danh sách combo...</div>
+          ) : comboError ? (
+            <div className="booking-seat-feedback error">{comboError}</div>
+          ) : comboItems.length === 0 ? (
+            <div className="booking-seat-feedback">Chưa có combo nào đang bán.</div>
+          ) : (
+            comboItems.map((item) => {
+              const key = getFoodKey(item);
+              return (
+                <FoodSelectionCard
+                  key={key}
+                  item={item}
+                  count={comboCounts[key]}
+                  selection={foodSelections[key]}
+                  onDecrease={() => updateCombo(key, -1)}
+                  onIncrease={() => updateCombo(key, 1)}
+                  onSelectOption={updateFoodSelection}
+                />
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -1173,22 +1361,7 @@ export default function Booking() {
             <button
               type="button"
               className="mobile-checkout-btn"
-              onClick={() =>
-                navigate("/payment", {
-                  state: {
-                    movieTitle,
-                    cinema,
-                    roomName: selectedRoomDisplayName,
-                    roomType: selectedRoomDisplayType,
-                    day,
-                    time,
-                    selectedSeats,
-                    selectedSeatLabels,
-                    comboCounts,
-                    total: totalWithSnacks,
-                  },
-                })
-              }
+              onClick={handleCheckout}
             >
               Thanh toán
             </button>

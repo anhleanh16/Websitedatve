@@ -1,5 +1,25 @@
 import { ShowtimeModel } from "../models/showtimeModel.js";
 
+const DEBUG_SERVER_URL = "http://127.0.0.1:7777/event";
+const DEBUG_SESSION_ID = "admin-showtimes-500";
+const DEBUG_RUN_ID = "post-fix";
+
+const reportDebugEvent = (payload) => {
+  try {
+    if (typeof fetch !== "function") return;
+    fetch(DEBUG_SERVER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: DEBUG_SESSION_ID,
+        runId: DEBUG_RUN_ID,
+        ts: Date.now(),
+        ...payload,
+      }),
+    }).catch(() => {});
+  } catch {}
+};
+
 const normalizeShowtimePayload = (body = {}) => ({
   movie_id: body.movie_id ?? body.movieId,
   room_id: body.room_id ?? body.roomId,
@@ -15,10 +35,32 @@ const normalizeShowtimePayload = (body = {}) => ({
 
 export const getShowtimes = async (req, res) => {
   try {
+    // #region debug-point A:getShowtimes-entry
+    reportDebugEvent({
+      hypothesisId: "A",
+      location: "showtimeController.js:getShowtimes",
+      msg: "[DEBUG] getShowtimes entry",
+    });
+    // #endregion
     const showtimes = await ShowtimeModel.findAll();
     res.json({ showtimes });
   } catch (err) {
     console.error("Error in getShowtimes:", err);
+    // #region debug-point A:getShowtimes-error
+    reportDebugEvent({
+      hypothesisId: "A",
+      location: "showtimeController.js:getShowtimes",
+      msg: "[DEBUG] getShowtimes error",
+      data: {
+        message: err?.message,
+        code: err?.code,
+        errno: err?.errno,
+        sqlState: err?.sqlState,
+        sqlMessage: err?.sqlMessage,
+        sql: err?.sql,
+      },
+    });
+    // #endregion
     res.status(500).json({ message: "Error getting showtimes" });
   }
 };
@@ -172,10 +214,34 @@ export const getShowtimeCinemas = async (req, res) => {
 export const getShowtimeRooms = async (req, res) => {
   try {
     const { cinemaId } = req.query;
+    // #region debug-point B:getShowtimeRooms-entry
+    reportDebugEvent({
+      hypothesisId: "B",
+      location: "showtimeController.js:getShowtimeRooms",
+      msg: "[DEBUG] getShowtimeRooms entry",
+      data: { cinemaId },
+    });
+    // #endregion
     const rooms = await ShowtimeModel.getRoomsByCinema(cinemaId);
     res.json({ rooms });
   } catch (err) {
     console.error("Error in getShowtimeRooms:", err);
+    // #region debug-point B:getShowtimeRooms-error
+    reportDebugEvent({
+      hypothesisId: "B",
+      location: "showtimeController.js:getShowtimeRooms",
+      msg: "[DEBUG] getShowtimeRooms error",
+      data: {
+        cinemaId: req?.query?.cinemaId,
+        message: err?.message,
+        code: err?.code,
+        errno: err?.errno,
+        sqlState: err?.sqlState,
+        sqlMessage: err?.sqlMessage,
+        sql: err?.sql,
+      },
+    });
+    // #endregion
     res.status(500).json({ message: "Error getting rooms" });
   }
 };

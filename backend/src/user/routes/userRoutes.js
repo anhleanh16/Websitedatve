@@ -6,6 +6,7 @@ import {
   userGetMovies,
   userGetShowtimes,
   userGetMovieById,
+  userGetCombos,
   userUpdateProfile,
   userGetBookings,
   userCreateBooking,
@@ -15,6 +16,7 @@ import {
   userDeleteNotification,
   userClearNotifications,
   userGetPromotions,
+  userGetTodayPromotions,
   userGetNews,
   userGetNewsBySlug,
 } from '../controllers/userController.js';
@@ -27,7 +29,9 @@ router.get('/cinemas', getPublicCinemas);
 router.get('/cinemas/:id', getPublicCinemaById);
 router.get('/movies', userGetMovies);
 router.get('/showtimes', userGetShowtimes);
+router.get('/combos', userGetCombos);
 router.get('/movies/:id', userGetMovieById);
+router.get('/promotions/today', userGetTodayPromotions);
 router.get('/news', userGetNews);
 router.get('/news/:slug', userGetNewsBySlug);
 
@@ -42,7 +46,7 @@ router.delete('/:userId/notifications', authMiddleware, selfOrAdminOnly, userCle
 router.get('/:userId/promotions', authMiddleware, selfOrAdminOnly, userGetPromotions);
 
 // Bookings
-router.get('/:userId/bookings', userGetBookings);
-router.post('/:userId/bookings', userCreateBooking);
+router.get('/:userId/bookings', authMiddleware, selfOrAdminOnly, userGetBookings);
+router.post('/:userId/bookings', authMiddleware, selfOrAdminOnly, userCreateBooking);
 
 export default router;

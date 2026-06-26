@@ -45,29 +45,18 @@ export const verifyBookingCode = async (req, res) => {
 };
 
 export const refundBooking = async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    // Thêm logic kiểm tra xem vé có đủ điều kiện hoàn không
-    const success = await BookingModel.updateStatus(orderId, "refunded");
-    if (success) {
-      // Thêm logic hoàn tiền vào tài khoản người dùng nếu cần
-      res.json({ message: "Booking refunded successfully" });
-    } else {
-      res.status(404).json({ message: "Booking not found" });
-    }
-  } catch (err) {
-    console.error("Error in refundBooking:", err);
-    res.status(500).json({ message: "Failed to refund booking" });
-  }
+  return res.status(403).json({
+    message: "Chuc nang hoan ve da bi tat. Ve da dat khong duoc hoan.",
+  });
 };
 
 export const checkInBooking = async (req, res) => {
   try {
     const { orderId } = req.params;
-    // Thêm logic kiểm tra xem vé đã được check-in chưa, hoặc có hợp lệ không
-    const success = await BookingModel.updateStatus(orderId, "completed");
+    const success = await BookingModel.checkIn(orderId);
     if (success) {
-      res.json({ message: "Check-in successful" });
+      const booking = await BookingModel.findById(orderId);
+      res.json({ message: "Check-in successful", booking });
     } else {
       res.status(404).json({ message: "Booking not found" });
     }

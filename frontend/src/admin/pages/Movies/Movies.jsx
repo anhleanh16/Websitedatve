@@ -29,6 +29,13 @@ const formatDisplayDate = (value) => {
   return `${day}/${month}/${year}`;
 };
 
+const formatDateInput = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const snakeToCamelMovie = (obj) => {
   return {
     id: obj.movie_id,
@@ -313,28 +320,11 @@ function MovieForm({ movie, categories, onClose, onSave }) {
   const [posterDrag, setPosterDrag] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Tính toán giới hạn ngày (min: hôm nay +10, max: hôm nay +50)
-  const today = new Date();
-  const minDate = new Date(today);
-  minDate.setDate(today.getDate() + 10);
-  const maxDate = new Date(today);
-  maxDate.setDate(today.getDate() + 50);
-  
-  const formatDate = (date) => {
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  };
-  
-  const minDateStr = formatDate(minDate);
-  const maxDateStr = formatDate(maxDate);
+  const todayStr = formatDateInput(new Date());
+  const minDateStr = todayStr;
   const effectiveMinDateStr = isEdit && form.releaseDate && form.releaseDate < minDateStr
     ? form.releaseDate
     : minDateStr;
-  const effectiveMaxDateStr = isEdit && form.releaseDate && form.releaseDate > maxDateStr
-    ? form.releaseDate
-    : maxDateStr;
 
   useEffect(() => {
     if (movie) {
@@ -348,6 +338,12 @@ function MovieForm({ movie, categories, onClose, onSave }) {
       }));
     }
   }, [movie]);
+
+  useEffect(() => {
+    if (form.status === "now_showing" && (!form.releaseDate || form.releaseDate > todayStr)) {
+      setForm((prev) => ({ ...prev, releaseDate: todayStr }));
+    }
+  }, [form.status, form.releaseDate, todayStr]);
 
   const set = (field, val) => {
     setForm((f) => ({ ...f, [field]: val }));
@@ -536,7 +532,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
               <div className="mv-field-row">
                 <div className="mv-field">
                   <label>Ngày khởi chiếu *</label>
-                  <input type="date" className={errors.releaseDate ? "error" : ""} value={form.releaseDate} onChange={(e) => set("releaseDate", e.target.value)} min={effectiveMinDateStr} max={effectiveMaxDateStr} />
+                  <input type="date" className={errors.releaseDate ? "error" : ""} value={form.releaseDate} onChange={(e) => set("releaseDate", e.target.value)} min={effectiveMinDateStr} />
                   {errors.releaseDate && <span className="mv-error">{errors.releaseDate}</span>}
                 </div>
                 <div className="mv-field">

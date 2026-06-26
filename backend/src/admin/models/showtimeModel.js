@@ -5,6 +5,37 @@ const ACTIVE_SHOWTIME_STATUS = "active";
 const ENDED_SHOWTIME_STATUS = "ended";
 const CANCELLED_SHOWTIME_STATUS = "cancelled";
 
+let schemaCapabilitiesPromise = null;
+
+const getSchemaCapabilities = async () => {
+  if (schemaCapabilitiesPromise) return schemaCapabilitiesPromise;
+
+  schemaCapabilitiesPromise = (async () => {
+    const [showtimeCols] = await db.query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Showtimes'",
+    );
+    const [roomCols] = await db.query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Rooms'",
+    );
+
+    const showtimeSet = new Set(showtimeCols.map((c) => c.COLUMN_NAME));
+    const roomSet = new Set(roomCols.map((c) => c.COLUMN_NAME));
+
+    return {
+      showtimes: {
+        hasPriceStandard: showtimeSet.has("price_standard"),
+        hasPriceVip: showtimeSet.has("price_vip"),
+        hasPriceCouple: showtimeSet.has("price_couple"),
+      },
+      rooms: {
+        hasStatus: roomSet.has("status"),
+      },
+    };
+  })();
+
+  return schemaCapabilitiesPromise;
+};
+
 const buildAppError = (message, statusCode = 400) => {
   const error = new Error(message);
   error.statusCode = statusCode;
@@ -45,6 +76,17 @@ export const ShowtimeModel = {
    * Lấy tất cả lịch chiếu, kết hợp thông tin phim, rạp và phòng chiếu.
    */
   async findAll() {
+    const caps = await getSchemaCapabilities();
+    const priceStandardExpr = caps.showtimes.hasPriceStandard
+      ? "COALESCE(s.price_standard, s.price)"
+      : "s.price";
+    const priceVipExpr = caps.showtimes.hasPriceVip
+      ? "COALESCE(s.price_vip, s.price)"
+      : priceStandardExpr;
+    const priceCoupleExpr = caps.showtimes.hasPriceCouple
+      ? "COALESCE(s.price_couple, s.price)"
+      : priceStandardExpr;
+
     const [showtimes] = await db.query(`
       SELECT 
         s.showtime_id,
@@ -53,10 +95,10 @@ export const ShowtimeModel = {
         r.cinema_id,
         s.start_time,
         s.end_time,
-        COALESCE(s.price_standard, s.price) AS price_standard,
-        COALESCE(s.price_vip, s.price) AS price_vip,
-        COALESCE(s.price_couple, s.price) AS price_couple,
-        COALESCE(s.price_standard, s.price) AS price,
+        ${priceStandardExpr} AS price_standard,
+        ${priceVipExpr} AS price_vip,
+        ${priceCoupleExpr} AS price_couple,
+        ${priceStandardExpr} AS price,
         s.available_seats,
         ${buildComputedStatusSql()} AS status,
         s.status AS raw_status,
@@ -79,14 +121,25 @@ export const ShowtimeModel = {
    * Lấy thông tin chi tiết của một lịch chiếu.
    */
   async findById(id) {
+    const caps = await getSchemaCapabilities();
+    const priceStandardExpr = caps.showtimes.hasPriceStandard
+      ? "COALESCE(s.price_standard, s.price)"
+      : "s.price";
+    const priceVipExpr = caps.showtimes.hasPriceVip
+      ? "COALESCE(s.price_vip, s.price)"
+      : priceStandardExpr;
+    const priceCoupleExpr = caps.showtimes.hasPriceCouple
+      ? "COALESCE(s.price_couple, s.price)"
+      : priceStandardExpr;
+
     const [rows] = await db.query(
       `
       SELECT 
         s.*,
         ${buildComputedStatusSql()} AS computed_status,
-        COALESCE(s.price_standard, s.price) AS normalized_price_standard,
-        COALESCE(s.price_vip, s.price) AS normalized_price_vip,
-        COALESCE(s.price_couple, s.price) AS normalized_price_couple,
+        ${priceStandardExpr} AS normalized_price_standard,
+        ${priceVipExpr} AS normalized_price_vip,
+        ${priceCoupleExpr} AS normalized_price_couple,
         m.title AS movie_title,
         m.duration,
         c.cinema_name,
@@ -109,6 +162,7 @@ export const ShowtimeModel = {
    * Tạo một lịch chiếu mới.
    */
   async create(showtimeData) {
+    const caps = await getSchemaCapabilities();
     const {
       movie_id,
       room_id,
@@ -137,20 +191,44 @@ export const ShowtimeModel = {
     const standardPrice = price_standard ?? price ?? 0;
     const vipPrice = price_vip ?? standardPrice;
     const couplePrice = price_couple ?? standardPrice;
+    const columns = [
+      "movie_id",
+      "room_id",
+      "start_time",
+      "end_time",
+      "price",
+      "available_seats",
+      "status",
+    ];
+    const params = [
+      movie_id,
+      room_id,
+      normalizedStartTime,
+      calculatedEndTime,
+      standardPrice,
+      available_seats ?? room.total_seat ?? 0,
+      normalizedStatus,
+    ];
+
+    if (caps.showtimes.hasPriceStandard) {
+      columns.splice(5, 0, "price_standard");
+      params.splice(5, 0, standardPrice);
+    }
+    if (caps.showtimes.hasPriceVip) {
+      const insertIndex = columns.indexOf("price") + 1;
+      columns.splice(insertIndex, 0, "price_vip");
+      params.splice(insertIndex, 0, vipPrice);
+    }
+    if (caps.showtimes.hasPriceCouple) {
+      const insertIndex = columns.indexOf("price") + 1;
+      columns.splice(insertIndex, 0, "price_couple");
+      params.splice(insertIndex, 0, couplePrice);
+    }
+
+    const placeholders = columns.map(() => "?").join(", ");
     const [result] = await db.query(
-      "INSERT INTO Showtimes (movie_id, room_id, start_time, end_time, price, price_standard, price_vip, price_couple, available_seats, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [
-        movie_id,
-        room_id,
-        normalizedStartTime,
-        calculatedEndTime,
-        standardPrice,
-        standardPrice,
-        vipPrice,
-        couplePrice,
-        available_seats ?? room.total_seat ?? 0,
-        normalizedStatus,
-      ],
+      `INSERT INTO Showtimes (${columns.join(", ")}) VALUES (${placeholders})`,
+      params,
     );
     return result.insertId;
   },
@@ -241,6 +319,7 @@ export const ShowtimeModel = {
    * Cập nhật một lịch chiếu.
    */
   async update(id, showtimeData) {
+    const caps = await getSchemaCapabilities();
     const {
       movie_id,
       room_id,
@@ -270,21 +349,44 @@ export const ShowtimeModel = {
     const standardPrice = price_standard ?? price ?? 0;
     const vipPrice = price_vip ?? standardPrice;
     const couplePrice = price_couple ?? standardPrice;
+    const setClauses = [
+      "movie_id = ?",
+      "room_id = ?",
+      "start_time = ?",
+      "end_time = ?",
+      "price = ?",
+      "available_seats = ?",
+      "status = ?",
+    ];
+    const params = [
+      movie_id,
+      room_id,
+      normalizedStartTime,
+      calculatedEndTime,
+      standardPrice,
+      available_seats ?? room.total_seat ?? 0,
+      normalizedStatus,
+    ];
+
+    if (caps.showtimes.hasPriceStandard) {
+      setClauses.splice(5, 0, "price_standard = ?");
+      params.splice(5, 0, standardPrice);
+    }
+    if (caps.showtimes.hasPriceVip) {
+      const insertIndex = setClauses.indexOf("price = ?") + 1;
+      setClauses.splice(insertIndex, 0, "price_vip = ?");
+      params.splice(insertIndex, 0, vipPrice);
+    }
+    if (caps.showtimes.hasPriceCouple) {
+      const insertIndex = setClauses.indexOf("price = ?") + 1;
+      setClauses.splice(insertIndex, 0, "price_couple = ?");
+      params.splice(insertIndex, 0, couplePrice);
+    }
+
+    params.push(id);
     const [result] = await db.query(
-      "UPDATE Showtimes SET movie_id = ?, room_id = ?, start_time = ?, end_time = ?, price = ?, price_standard = ?, price_vip = ?, price_couple = ?, available_seats = ?, status = ? WHERE showtime_id = ?",
-      [
-        movie_id,
-        room_id,
-        normalizedStartTime,
-        calculatedEndTime,
-        standardPrice,
-        standardPrice,
-        vipPrice,
-        couplePrice,
-        available_seats ?? room.total_seat ?? 0,
-        normalizedStatus,
-        id,
-      ],
+      `UPDATE Showtimes SET ${setClauses.join(", ")} WHERE showtime_id = ?`,
+      params,
     );
     return result.affectedRows > 0;
   },
@@ -326,9 +428,15 @@ export const ShowtimeModel = {
    * Lấy danh sách phòng chiếu thuộc một rạp cụ thể.
    */
   async getRoomsByCinema(cinemaId) {
+    const caps = await getSchemaCapabilities();
+    const selectColumns = caps.rooms.hasStatus
+      ? "room_id, cinema_id, room_name, room_type, total_seat, status"
+      : "room_id, cinema_id, room_name, room_type, total_seat";
+    const whereStatus = caps.rooms.hasStatus ? " AND status = 'active'" : "";
+
     const sql = cinemaId
-      ? "SELECT room_id, cinema_id, room_name, room_type, total_seat, status FROM Rooms WHERE cinema_id = ? AND status = 'active' ORDER BY room_name ASC"
-      : "SELECT room_id, cinema_id, room_name, room_type, total_seat, status FROM Rooms WHERE status = 'active' ORDER BY room_name ASC";
+      ? `SELECT ${selectColumns} FROM Rooms WHERE cinema_id = ?${whereStatus} ORDER BY room_name ASC`
+      : `SELECT ${selectColumns} FROM Rooms WHERE 1=1${whereStatus} ORDER BY room_name ASC`;
     const [rooms] = await db.query(sql, cinemaId ? [cinemaId] : []);
     return rooms;
   },

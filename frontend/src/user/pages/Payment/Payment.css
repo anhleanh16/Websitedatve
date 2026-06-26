@@ -784,6 +784,30 @@
   gap: 8px;
 }
 
+.order-food-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-food-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.order-food-row span {
+  color: #aab8ff;
+  line-height: 1.5;
+}
+
+.order-food-row strong {
+  color: #dbe6ff;
+  white-space: nowrap;
+}
+
 .order-price-row {
   display: flex;
   justify-content: space-between;
@@ -939,6 +963,12 @@
   font-weight: 600;
   text-align: right;
   max-width: 240px;
+}
+
+.success-ticket-food {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .total-row span {

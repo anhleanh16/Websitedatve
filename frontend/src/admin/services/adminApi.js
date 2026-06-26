@@ -167,6 +167,30 @@ export const adminNewsService = {
   delete: (id) => apiFetch(`/admin/news/${id}`, { method: "DELETE" }),
 };
 
+// ─── Combos ───────────────────────────────────────────────────────────────────
+export const adminComboService = {
+  getAll: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+      ),
+    ).toString();
+    return apiFetch(`/admin/combos${q ? `?${q}` : ""}`);
+  },
+  getById: (id) => apiFetch(`/admin/combos/${id}`),
+  create: (data) =>
+    apiFetch("/admin/combos", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id, data) =>
+    apiFetch(`/admin/combos/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id) => apiFetch(`/admin/combos/${id}`, { method: "DELETE" }),
+};
+
 // ─── Bookings ─────────────────────────────────────────────────────────────────
 export const adminBookingService = {
   /**
@@ -185,18 +209,11 @@ export const adminBookingService = {
   /** Chi tiết vé */
   getBookingDetail: (orderId) => apiFetch(`/admin/bookings/${orderId}`),
 
-  /** Hoàn vé */
-  refundBooking: (orderId, { reason, refundMethod }) =>
-    apiFetch(`/admin/bookings/${orderId}/refund`, {
-      method: "PUT",
-      body: JSON.stringify({ reason, refundMethod }),
-    }),
-
   /** Kiểm tra & check-in vé */
-  checkInBooking: (orderId, code) =>
+  checkInBooking: (orderId, payload = {}) =>
     apiFetch(`/admin/bookings/${orderId}/check-in`, {
       method: "PUT",
-      body: JSON.stringify({ code }),
+      body: JSON.stringify(payload),
     }),
 
   /** Xác minh mã vé / QR */
@@ -207,6 +224,18 @@ export const adminBookingService = {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export const adminDashboardService = {
   getDashboardStats: () => apiFetch("/admin/dashboard"),
+};
+
+// ─── Statistics ───────────────────────────────────────────────────────────────
+export const adminStatisticsService = {
+  getStatistics: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+      ),
+    ).toString();
+    return apiFetch(`/admin/statistics${q ? `?${q}` : ""}`);
+  },
 };
 
 // ─── Showtimes ────────────────────────────────────────────────────────────────

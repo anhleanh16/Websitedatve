@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useSelector } from 'react-redux'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import {
-  FaCreditCard, FaUniversity, FaWallet, FaMobileAlt,
+  FaCreditCard, FaUniversity, FaMobileAlt,
   FaLock, FaCheckCircle, FaTicketAlt, FaTag, FaChevronDown, FaChevronUp
 } from 'react-icons/fa'
 import './Payment.css'
+import { userBookingService } from '../../services/userApi'
 
 const PAYMENT_METHODS = [
   {
@@ -35,34 +37,65 @@ const BANKS = [
   'Vietcombank', 'Techcombank', 'BIDV', 'Agribank', 'VPBank', 'MB Bank', 'Sacombank',
 ]
 
+const formatMoney = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`
+
+const buildFoodLabel = (item) => {
+  const parts = [`${item.quantity}x ${item.name}`]
+  if (item.popcornType) parts.push(item.popcornType)
+  if (item.drinkType) parts.push(item.drinkType)
+  return parts.join(' • ')
+}
+
 export default function Payment() {
   const location = useLocation()
   const navigate = useNavigate()
 
   const {
+    movieId = null,
+    showtimeId = null,
     movieTitle = 'Doraemon: Nobita và Cuộc Chiến Vũ Trụ Tí Hon',
     cinema = 'Lunexa Movix Đà Nẵng',
+    roomName = '',
+    roomType = '',
     day = 'Hôm nay',
     time = '10:00 - 2D',
     selectedSeats = ['B3', 'B4'],
-    comboCounts = { couple: 1, friends: 0, family: 0 },
+    selectedSeatLabels = [],
+    selectedSeatUnits = [],
+    seatTotal = 0,
+    comboTotal = 0,
+    snackTotal = 0,
+    totalWithSnacks,
+    foodItems = [],
     total = 310000,
   } = location.state ?? {}
 
+  const currentUser = useSelector((state) => state.user?.profile)
   const [method, setMethod] = useState('momo')
   const [promoCode, setPromoCode] = useState('')
   const [promoApplied, setPromoApplied] = useState(false)
   const [promoError, setPromoError] = useState('')
+  const [bookingError, setBookingError] = useState('')
   const [showOrderDetail, setShowOrderDetail] = useState(true)
   const [cardInfo, setCardInfo] = useState({ number: '', name: '', expiry: '', cvv: '' })
   const [selectedBank, setSelectedBank] = useState('')
   const [agreed, setAgreed] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [paid, setPaid] = useState(false)
+  const [createdBooking, setCreatedBooking] = useState(null)
 
-  const discount = promoApplied ? Math.round(total * 0.1) : 0
+  const displaySeats = selectedSeatLabels.length > 0 ? selectedSeatLabels : selectedSeats
+  const effectiveSeatTotal = Number(seatTotal || 0)
+  const effectiveSnackTotal = Number(snackTotal || 0)
+  const effectiveComboTotal = Number(comboTotal || 0)
+  const baseTotal = Number(totalWithSnacks ?? (effectiveSeatTotal + effectiveSnackTotal + effectiveComboTotal) ?? total)
+  const groupedFoodItems = useMemo(
+    () => (Array.isArray(foodItems) ? foodItems.filter((item) => Number(item?.quantity || 0) > 0) : []),
+    [foodItems],
+  )
+  const discount = promoApplied ? Math.round(baseTotal * 0.1) : 0
   const serviceFee = 5000
-  const finalTotal = total + serviceFee - discount
+  const finalTotal = baseTotal + serviceFee - discount
 
   const applyPromo = () => {
     if (promoCode.trim().toUpperCase() === 'LUNEXA10') {
@@ -74,13 +107,49 @@ export default function Payment() {
     }
   }
 
-  const handlePay = () => {
-    if (!agreed) return
+  const handlePay = async () => {
+    if (!agreed || processing) return
+
+    if (!currentUser?.id) {
+      setBookingError('Vui lòng đăng nhập trước khi thanh toán.')
+      navigate('/login')
+      return
+    }
+
+    if (!showtimeId) {
+      setBookingError('Không xác định được suất chiếu để tạo đơn.')
+      return
+    }
+
+    if (!Array.isArray(selectedSeatUnits) || selectedSeatUnits.length === 0) {
+      setBookingError('Bạn chưa chọn ghế hợp lệ.')
+      return
+    }
+
     setProcessing(true)
-    setTimeout(() => {
-      setProcessing(false)
+    setBookingError('')
+
+    try {
+      const paymentMethod =
+        method === 'banking' && selectedBank
+          ? `${method}:${selectedBank}`
+          : method
+
+      const response = await userBookingService.create(currentUser.id, {
+        movieId,
+        showtimeId,
+        seatUnits: selectedSeatUnits,
+        foodItems: groupedFoodItems,
+        paymentMethod,
+      })
+
+      setCreatedBooking(response?.booking || null)
       setPaid(true)
-    }, 2200)
+    } catch (error) {
+      setBookingError(error.message || 'Không thể lưu đơn thanh toán.')
+    } finally {
+      setProcessing(false)
+    }
   }
 
   /* ── Success screen ── */
@@ -95,6 +164,12 @@ export default function Payment() {
           <p>Vé của bạn đã được xác nhận. Kiểm tra email để nhận mã QR.</p>
 
           <div className="success-ticket">
+            {createdBooking?.booking_code && (
+              <div className="success-ticket-row">
+                <span>Mã đặt vé</span>
+                <strong>{createdBooking.booking_code}</strong>
+              </div>
+            )}
             <div className="success-ticket-row">
               <span>Phim</span>
               <strong>{movieTitle}</strong>
@@ -113,8 +188,18 @@ export default function Payment() {
             </div>
             <div className="success-ticket-row">
               <span>Ghế</span>
-              <strong>{selectedSeats.join(', ')}</strong>
+              <strong>{displaySeats.join(', ')}</strong>
             </div>
+            {groupedFoodItems.length > 0 && (
+              <div className="success-ticket-food">
+                {groupedFoodItems.map((item) => (
+                  <div className="success-ticket-row" key={`${item.key}-${item.quantity}`}>
+                    <span>{item.category === 'single' ? 'Món thêm' : 'Combo'}</span>
+                    <strong>{buildFoodLabel(item)}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="success-ticket-divider">
               <span className="notch left" />
               <span className="dashed" />
@@ -129,7 +214,7 @@ export default function Payment() {
           <div className="success-qr">
             <div className="qr-placeholder">
               <span>📱</span>
-              <p>Mã QR vé</p>
+                <p>{createdBooking?.primary_qr_code || 'Mã QR vé'}</p>
             </div>
           </div>
 
@@ -370,6 +455,7 @@ export default function Payment() {
               <><FaLock /> Thanh toán {finalTotal.toLocaleString('vi-VN')}đ</>
             )}
           </button>
+          {bookingError && <p className="promo-msg error">{bookingError}</p>}
 
           <div className="secure-notice">
             <FaLock /> Giao dịch được mã hóa SSL 256-bit
@@ -417,34 +503,66 @@ export default function Payment() {
                     <span>🕙 Suất chiếu</span>
                     <strong>{time}</strong>
                   </div>
+                  {roomName && (
+                    <div className="order-row">
+                      <span>🎦 Phòng</span>
+                      <strong>{roomName}{roomType ? ` • ${roomType}` : ''}</strong>
+                    </div>
+                  )}
                   <div className="order-row">
                     <span>💺 Ghế ngồi</span>
-                    <strong>{selectedSeats.join(', ')}</strong>
+                    <strong>{displaySeats.join(', ')}</strong>
                   </div>
                 </div>
 
                 <div className="order-divider" />
 
+                {groupedFoodItems.length > 0 && (
+                  <>
+                    <div className="order-food-list">
+                      {groupedFoodItems.map((item) => (
+                        <div className="order-food-row" key={`${item.key}-${item.quantity}`}>
+                          <span>{buildFoodLabel(item)}</span>
+                          <strong>{formatMoney(item.totalPrice)}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="order-divider" />
+                  </>
+                )}
+
                 <div className="order-price-rows">
                   <div className="order-price-row">
-                    <span>Vé ({selectedSeats.length} ghế)</span>
-                    <span>{total.toLocaleString('vi-VN')}đ</span>
+                    <span>Vé ({displaySeats.length} ghế)</span>
+                    <span>{formatMoney(effectiveSeatTotal)}</span>
                   </div>
+                  {effectiveSnackTotal > 0 && (
+                    <div className="order-price-row">
+                      <span>Bắp &amp; Nước</span>
+                      <span>{formatMoney(effectiveSnackTotal)}</span>
+                    </div>
+                  )}
+                  {effectiveComboTotal > 0 && (
+                    <div className="order-price-row">
+                      <span>Combo</span>
+                      <span>{formatMoney(effectiveComboTotal)}</span>
+                    </div>
+                  )}
                   <div className="order-price-row">
                     <span>Phí dịch vụ</span>
-                    <span>{serviceFee.toLocaleString('vi-VN')}đ</span>
+                    <span>{formatMoney(serviceFee)}</span>
                   </div>
                   {promoApplied && (
                     <div className="order-price-row discount">
                       <span>Giảm giá (10%)</span>
-                      <span>-{discount.toLocaleString('vi-VN')}đ</span>
+                      <span>-{formatMoney(discount)}</span>
                     </div>
                   )}
                 </div>
 
                 <div className="order-total-row">
                   <span>Tổng cộng</span>
-                  <strong>{finalTotal.toLocaleString('vi-VN')}đ</strong>
+                  <strong>{formatMoney(finalTotal)}</strong>
                 </div>
               </div>
             )}
@@ -467,7 +585,7 @@ export default function Payment() {
             </div>
             <div className="policy-item">
               <span>🔄</span>
-              <span>Hoàn vé trước 2 giờ chiếu, áp dụng điều khoản</span>
+              <span>Vé đã thanh toán không hỗ trợ hoàn hoặc hủy</span>
             </div>
             <div className="policy-item">
               <span>📧</span>

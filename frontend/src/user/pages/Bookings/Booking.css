@@ -888,7 +888,7 @@
 
 .combo-info {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
 }
 
@@ -913,6 +913,42 @@
   margin: 0.2rem 0 0;
   color: #64748b;
   font-size: 0.82rem;
+}
+
+.combo-price-line {
+  display: inline-block;
+  margin-top: 0.35rem;
+  color: #c4b5fd;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.combo-option-row {
+  margin-top: 0.65rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.combo-option-row span {
+  font-size: 0.76rem;
+  color: #a5b4fc;
+  font-weight: 600;
+}
+
+.combo-option-select {
+  width: 100%;
+  min-width: 150px;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: #eef2ff;
+  outline: none;
+}
+
+.combo-option-select option {
+  background: #0f172a;
+  color: #eef2ff;
 }
 
 .combo-control {
@@ -983,6 +1019,33 @@
 .summary-total strong {
   color: #a78bfa;
   font-size: 1.2rem;
+}
+
+.booking-selected-food-list {
+  margin: 0.95rem 0 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.booking-selected-food-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  color: #cbd5f5;
+  font-size: 0.85rem;
+}
+
+.booking-selected-food-row span {
+  line-height: 1.5;
+}
+
+.booking-selected-food-row strong {
+  color: #f8fafc;
+  white-space: nowrap;
 }
 
 .checkout-button {

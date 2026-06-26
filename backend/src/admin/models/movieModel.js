@@ -59,6 +59,39 @@ const getUploadedPaths = (files = {}) => {
   return [...posterPaths, ...trailerPaths];
 };
 
+const toDateOnlyString = (value) => {
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === "string" ? value.slice(0, 10) : "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeMovieStatusPayload = ({ release_date, status, ...rest }) => {
+  const today = toDateOnlyString(new Date());
+  let normalizedReleaseDate = toDateOnlyString(release_date);
+  const normalizedStatus = status || "coming_soon";
+
+  if (normalizedStatus === "now_showing" && (!normalizedReleaseDate || normalizedReleaseDate > today)) {
+    normalizedReleaseDate = today;
+  }
+
+  return {
+    ...rest,
+    release_date: normalizedReleaseDate,
+    status: normalizedStatus,
+  };
+};
+
 export const MovieModel = {
   async syncStatuses() {
     await db.query(
@@ -141,6 +174,7 @@ export const MovieModel = {
     try {
       await conn.beginTransaction();
 
+      const normalizedMovieData = normalizeMovieStatusPayload(movieData);
       const {
         title,
         description,
@@ -153,7 +187,7 @@ export const MovieModel = {
         language,
         country,
         categories,
-      } = movieData;
+      } = normalizedMovieData;
 
       let poster = null;
       let posters = [];
@@ -236,6 +270,7 @@ export const MovieModel = {
     try {
       await conn.beginTransaction();
 
+      const normalizedMovieData = normalizeMovieStatusPayload(movieData);
       const {
         title,
         description,
@@ -250,7 +285,7 @@ export const MovieModel = {
         existing_main_poster,
         existing_posters,
         categories,
-      } = movieData;
+      } = normalizedMovieData;
 
       const [existingMovie] = await conn.query(
         "SELECT * FROM Movies WHERE movie_id = ?",

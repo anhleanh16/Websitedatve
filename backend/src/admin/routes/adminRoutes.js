@@ -24,6 +24,7 @@ import {
   getCategoryById,
 } from "../controllers/categoryController.js";
 import { getDashboardStats } from "../controllers/dashboardController.js";
+import { getStatistics } from "../controllers/statisticsController.js";
 import {
   getAdminMovies,
   createMovie,
@@ -71,6 +72,13 @@ import {
   updateAdminNews,
   deleteAdminNews,
 } from "../controllers/newsController.js";
+import {
+  getAdminCombos,
+  getAdminComboById,
+  createAdminCombo,
+  updateAdminCombo,
+  deleteAdminCombo,
+} from "../controllers/comboController.js";
 import { uploadMovieFiles, uploadCinemaImage, uploadNewsImage } from "../../../config/upload.js";
 import { authMiddleware, adminOnly } from "../middleware/authMiddleware.js";
 
@@ -78,6 +86,9 @@ const router = express.Router();
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 router.get("/dashboard", getDashboardStats);
+
+// ─── Statistics ───────────────────────────────────────────────────────────────
+router.get("/statistics", getStatistics);
 
 // ─── User Management ─────────────────────────────────────────────────────────
 router.get("/users", getAdminUsers);
@@ -106,6 +117,13 @@ router.get("/news/:id", authMiddleware, adminOnly, getAdminNewsById);
 router.post("/news", authMiddleware, adminOnly, uploadNewsImage.single("thumbnailFile"), createAdminNews);
 router.put("/news/:id", authMiddleware, adminOnly, uploadNewsImage.single("thumbnailFile"), updateAdminNews);
 router.delete("/news/:id", authMiddleware, adminOnly, deleteAdminNews);
+
+// ─── Combo Management ─────────────────────────────────────────────────────────
+router.get("/combos", authMiddleware, adminOnly, getAdminCombos);
+router.get("/combos/:id", authMiddleware, adminOnly, getAdminComboById);
+router.post("/combos", authMiddleware, adminOnly, createAdminCombo);
+router.put("/combos/:id", authMiddleware, adminOnly, updateAdminCombo);
+router.delete("/combos/:id", authMiddleware, adminOnly, deleteAdminCombo);
 
 // ─── Booking Management ──────────────────────────────────────────────────────
 router.get("/bookings", getAdminBookings);

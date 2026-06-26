@@ -1,5 +1,25 @@
 import * as CinemaModel from "../models/cinemaModel.js";
 
+const DEBUG_SERVER_URL = "http://127.0.0.1:7778/event";
+const DEBUG_SESSION_ID = "admin-cinemas-500";
+const DEBUG_RUN_ID = "post-fix";
+
+const reportDebugEvent = (payload) => {
+  try {
+    if (typeof fetch !== "function") return;
+    fetch(DEBUG_SERVER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: DEBUG_SESSION_ID,
+        runId: DEBUG_RUN_ID,
+        ts: Date.now(),
+        ...payload,
+      }),
+    }).catch(() => {});
+  } catch {}
+};
+
 const normalizeCinemaImagePath = (cinema) => {
   if (!cinema) return cinema;
   const image = cinema.image;
@@ -29,10 +49,32 @@ const parseRoomsPayload = (rooms) => {
 // GET /admin/cinemas
 export const getAllCinemas = async (req, res) => {
   try {
+    // #region debug-point A:getAllCinemas-entry
+    reportDebugEvent({
+      hypothesisId: "A",
+      location: "cinemaController.js:getAllCinemas",
+      msg: "[DEBUG] getAllCinemas entry",
+    });
+    // #endregion
     const cinemas = await CinemaModel.findAll();
     res.json({ cinemas: cinemas.map(normalizeCinemaImagePath) });
   } catch (error) {
     console.error("Error getting all cinemas:", error);
+    // #region debug-point A:getAllCinemas-error
+    reportDebugEvent({
+      hypothesisId: "A",
+      location: "cinemaController.js:getAllCinemas",
+      msg: "[DEBUG] getAllCinemas error",
+      data: {
+        message: error?.message,
+        code: error?.code,
+        errno: error?.errno,
+        sqlState: error?.sqlState,
+        sqlMessage: error?.sqlMessage,
+        sql: error?.sql,
+      },
+    });
+    // #endregion
     res.status(500).json({ message: "Lỗi máy chủ khi lấy danh sách rạp phim" });
   }
 };

@@ -143,6 +143,25 @@ export const PromotionModel = {
     return rows.map(formatCouponRow);
   },
 
+  async findActiveCoupons(limit = 4) {
+    await ensurePromotionSchema();
+    const normalizedLimit = Math.max(1, Number(limit || 4) || 4);
+    const [rows] = await db.query(
+      `
+      SELECT *
+      FROM Promotions
+      WHERE promotion_type = 'coupon'
+        AND status = 'active'
+        AND (start_date IS NULL OR start_date <= CURDATE())
+        AND (end_date IS NULL OR end_date >= CURDATE())
+      ORDER BY created_at DESC, promotion_id DESC
+      LIMIT ?
+    `,
+      [normalizedLimit],
+    );
+    return rows.map(formatCouponRow);
+  },
+
   async findVouchers() {
     await ensurePromotionSchema();
     const [rows] = await db.query(

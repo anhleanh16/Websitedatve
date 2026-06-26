@@ -8,11 +8,12 @@ const NAV_ITEMS = [
   { to: "/admin/showtimes",     label: "Lịch chiếu",       icon: "🕐" },
   { to: "/admin/cinemas",       label: "Rạp chiếu",        icon: "🎭" },
   { to: "/admin/bookings",      label: "Đặt vé",           icon: "🎟" },
+  { to: "/admin/combos",        label: "Combo",            icon: "🍿" },
   { to: "/admin/promotions",    label: "Khuyến mãi",       icon: "🏷" },
   { to: "/admin/news",          label: "Tin tức",          icon: "📰" },
   { to: "/admin/notifications", label: "Thông báo",        icon: "🔔" },
   { to: "/admin/comments",      label: "Bình luận",        icon: "💬" },
-  { to: "/admin/reports",       label: "Báo cáo",          icon: "📊" },
+  { to: "/admin/statistics",       label: "Thống kê",          icon: "📊" },
   { to: "/admin/settings",      label: "Cài đặt",          icon: "⚙" },
 ];
 
