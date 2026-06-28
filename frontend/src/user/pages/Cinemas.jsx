@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./Cinemas.css";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { userCinemaService } from "../services/userApi";
 
 const banners = [
   "/uploads/banners/banner1.jpg",
@@ -64,12 +65,7 @@ export default function Cinemas() {
       setError("");
 
       try {
-        const res = await fetch("/api/user/cinemas");
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data?.message || "Không thể tải danh sách rạp.");
-        }
+        const data = await userCinemaService.getAll();
 
         if (ignore) return;
 
@@ -309,8 +305,8 @@ export default function Cinemas() {
 
                           {summary.facilities.length > 0 && (
                             <div className="cinema-facilities">
-                              {summary.facilities.map((facility) => (
-                                <span key={facility} className="facility-tag">
+                              {summary.facilities.map((facility, index) => (
+                                <span key={`${facility}-${index}`} className="facility-tag">
                                   {facility}
                                 </span>
                               ))}

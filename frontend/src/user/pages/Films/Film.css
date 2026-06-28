@@ -294,6 +294,9 @@
   overflow: hidden;
   cursor: pointer;
   box-shadow: inset 0 -26px 36px rgba(0, 0, 0, 0.36);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 .poster-age-badge {
@@ -761,7 +764,8 @@
 
 @media (max-width: 800px) {
   .film-main {
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    gap: 24px;
   }
   .film-right {
     width: 100%;
@@ -785,5 +789,28 @@
   .booking-intent-banner {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .film-page {
+    padding: 16px 0;
+  }
+  .film-container {
+    padding: 0 12px;
+  }
+  .movie-grid {
+    grid-template-columns: 1fr;
+  }
+  .tabs {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px 12px;
+  }
+  .tab {
+    white-space: nowrap;
+  }
+  .hero-carousel {
+    height: 200px;
   }
 }

@@ -8,7 +8,7 @@ import {
 import { markAsRead, markAllAsRead, deleteNotification, setNotifications } from '../../../redux/slices/notificationSlice'
 import { setSelectedCinema } from '../../../redux/slices/cinemaSlice'
 import { clearUser } from '../../../redux/slices/userSlice'
-import { userCinemaService, userNotificationService } from '../../services/userApi'
+import { userCinemaService, userNotificationService, userMovieService } from '../../services/userApi'
 import './nav.css'
 
 const NAV_ITEMS = [
@@ -78,8 +78,7 @@ export default function Navbar() {
       inputRef.current?.focus()
       // Load suggestions (tất cả phim, xáo trộn) khi mở search
       if (searchSuggestions.length === 0) {
-        fetch('/api/user/movies')
-          .then(r => r.json())
+        userMovieService.getAll()
           .then(d => {
             const all = Array.isArray(d?.movies) ? d.movies : []
             // Xáo trộn Fisher-Yates
@@ -108,8 +107,7 @@ export default function Navbar() {
     setSearchLoading(true)
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/user/movies`)
-        const data = await res.json()
+        const data = await userMovieService.getAll()
         const all = Array.isArray(data?.movies) ? data.movies : []
         const q = searchQuery.toLowerCase()
         const filtered = all.filter(m =>
