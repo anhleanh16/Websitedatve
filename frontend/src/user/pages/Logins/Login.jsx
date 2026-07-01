@@ -33,6 +33,12 @@ export default function Login() {
         return
       }
 
+      // Kiểm tra xem người dùng có phải admin không
+      if (data.user?.role === 'admin') {
+        setMessage('Tài khoản admin không thể đăng nhập tại đây. Vui lòng truy cập trang quản trị.')
+        return
+      }
+
       // Lưu token và user vào localStorage
       localStorage.setItem('token', data.token)
       localStorage.setItem('user',  JSON.stringify(data.user))
@@ -40,12 +46,8 @@ export default function Login() {
       // Dispatch vào Redux
       dispatch(setUser({ token: data.token, user: data.user }))
 
-      // Điều hướng dựa trên vai trò
-      if (data.user?.role === 'admin') {
-        navigate('/admin')
-      } else {
-        navigate('/')
-      }
+      // Điều hướng về trang chủ
+      navigate('/')
     } catch {
       setMessage('Không thể kết nối máy chủ, vui lòng thử lại.')
     } finally {
@@ -88,7 +90,7 @@ export default function Login() {
           <div className='auth-header'>
             <h1>Đăng nhập</h1>
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginTop: '8px' }}>
-              Đăng nhập để tiếp tục đặt vé và nhận ưu đãi từ Lunexa Movix.
+              Đăng nhập để tiếp tục đặt vé và nhận ưu đãi từ Sweetstar Movie.
             </p>
           </div>
 

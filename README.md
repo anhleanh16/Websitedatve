@@ -1,4 +1,4 @@
-﻿# Lunexa-Movix
+﻿# Sweetstar Movie
 
 Dự án monorepo gồm frontend (React + Vite) và backend (Node.js + Express). Tài nguyên chính:
 
@@ -29,7 +29,7 @@ Tạo file `.env` trong thư mục `backend/` với các biến tối thiểu:
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_password
-DB_NAME=lunexa
+DB_NAME=sweetstar
 PORT=4000
 ```
 

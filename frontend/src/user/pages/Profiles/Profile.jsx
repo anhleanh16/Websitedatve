@@ -11,15 +11,15 @@ import './profile.css'
 
 /* ── Mock data ── */
 const MOCK_TICKETS = [
-  { id: 1, movie: 'Doraemon: Vũ Trụ Tí Hon', cinema: 'Lunexa Đà Nẵng', date: '10/06/2026', time: '14:00', seats: 'C5, C6', format: '2D', status: 'upcoming' },
-  { id: 2, movie: 'Avengers: Secret Wars',   cinema: 'Lunexa Đà Nẵng', date: '08/06/2026', time: '20:00', seats: 'E3',     format: 'IMAX', status: 'upcoming' },
+  { id: 1, movie: 'Doraemon: Vũ Trụ Tí Hon', cinema: 'Sweetstar Movie Đà Nẵng', date: '10/06/2026', time: '14:00', seats: 'C5, C6', format: '2D', status: 'upcoming' },
+  { id: 2, movie: 'Avengers: Secret Wars',   cinema: 'Sweetstar Movie Đà Nẵng', date: '08/06/2026', time: '20:00', seats: 'E3',     format: 'IMAX', status: 'upcoming' },
 ]
 
 const MOCK_HISTORY = [
-  { id: 1, movie: 'Inside Out 3',   cinema: 'Lunexa Đà Nẵng', date: '01/06/2026', seats: 2, total: '180.000đ', status: 'done' },
-  { id: 2, movie: 'Spider-Man 4',   cinema: 'Lunexa Đà Nẵng', date: '25/05/2026', seats: 1, total: '110.000đ', status: 'done' },
-  { id: 3, movie: 'Dune: Part 3',   cinema: 'Lunexa Đà Nẵng', date: '15/05/2026', seats: 2, total: '220.000đ', status: 'done' },
-  { id: 4, movie: 'Moana 3',        cinema: 'Lunexa Đà Nẵng', date: '02/05/2026', seats: 3, total: '270.000đ', status: 'cancelled' },
+  { id: 1, movie: 'Inside Out 3',   cinema: 'Sweetstar Movie Đà Nẵng', date: '01/06/2026', seats: 2, total: '180.000đ', status: 'done' },
+  { id: 2, movie: 'Spider-Man 4',   cinema: 'Sweetstar Movie Đà Nẵng', date: '25/05/2026', seats: 1, total: '110.000đ', status: 'done' },
+  { id: 3, movie: 'Dune: Part 3',   cinema: 'Sweetstar Movie Đà Nẵng', date: '15/05/2026', seats: 2, total: '220.000đ', status: 'done' },
+  { id: 4, movie: 'Moana 3',        cinema: 'Sweetstar Movie Đà Nẵng', date: '02/05/2026', seats: 3, total: '270.000đ', status: 'cancelled' },
 ]
 
 const MOCK_NOTIFS = [
@@ -436,7 +436,7 @@ export default function Profile() {
             </div>
             <div className='support-grid'>
               {[
-                { icon: '📧', title: 'Email hỗ trợ',      desc: 'support@lunexa.vn', sub: 'Phản hồi trong 24 giờ' },
+                { icon: '📧', title: 'Email hỗ trợ',      desc: 'support@sweetstar.vn', sub: 'Phản hồi trong 24 giờ' },
                 { icon: '📞', title: 'Hotline',            desc: '1800 6868',          sub: 'Miễn phí 8:00–22:00 hàng ngày' },
                 { icon: '💬', title: 'Live Chat',          desc: 'Chat trực tiếp',     sub: 'Thường online 9:00–21:00' },
                 { icon: '📍', title: 'Văn phòng Đà Nẵng', desc: '123 Nguyễn Văn Linh', sub: 'Thứ 2–6: 8:00–17:00' },

@@ -14,20 +14,20 @@ const SOCIAL = [
 export default function Footer() {
   return (
     <footer className='footer'>
-      {/* ── Lunexa ── */}
+      {/* ── Sweetstar Movie ── */}
       <div className='footer-col col-brand'>
         <Link to='/' className='footer-logo'>
-          <img src='/logo.png' alt='Lunexa' />
+          <img src='/sweetstar.png' alt='Sweetstar Cinema' />
         </Link>
         <p className='footer-brand-desc'>
           Trải nghiệm điện ảnh đỉnh cao — đặt vé nhanh, chọn ghế dễ dàng, nhận ưu đãi hấp dẫn.
         </p>
         <div className='footer-links-list'>
-          <Link to='/'>Giới thiệu</Link>
-          <Link to='/'>Hướng dẫn sử dụng</Link>
-          <Link to='/'>Tiện ích online</Link>
-          <Link to='/'>Thẻ quà tặng</Link>
-          <Link to='/'>Tuyển dụng</Link>
+          <Link to='/blog?category=intro'>Giới thiệu</Link>
+          <Link to='/blog?category=guide'>Hướng dẫn sử dụng</Link>
+          <Link to='/blog?category=utility'>Tiện ích online</Link>
+          <Link to='/blog?category=gift'>Thẻ quà tặng</Link>
+          <Link to='/blog?category=recruitment'>Tuyển dụng</Link>
         </div>
       </div>
 
@@ -35,12 +35,12 @@ export default function Footer() {
       <div className='footer-col'>
         <h3>Chính sách</h3>
         <div className='footer-links-list'>
-          <Link to='/'>Điều khoản sử dụng</Link>
-          <Link to='/'>Điều khoản chung</Link>
-          <Link to='/'>Điều khoản giao dịch</Link>
-          <Link to='/'>Chính sách bảo mật</Link>
-          <Link to='/'>Chính sách thanh toán</Link>
-          <Link to='/'>Quy định tại rạp</Link>
+          <Link to='/blog?category=terms'>Điều khoản sử dụng</Link>
+          <Link to='/blog?category=general'>Điều khoản chung</Link>
+          <Link to='/blog?category=transaction'>Điều khoản giao dịch</Link>
+          <Link to='/blog?category=privacy'>Chính sách bảo mật</Link>
+          <Link to='/blog?category=payment'>Chính sách thanh toán</Link>
+          <Link to='/blog?category=cinema'>Quy định tại rạp</Link>
         </div>
       </div>
 
@@ -85,7 +85,7 @@ export default function Footer() {
             <FaEnvelope className='contact-icon' />
             <div>
               <span className='contact-label'>Email hỗ trợ</span>
-              <a href='mailto:lunexamovix@gmail.com' className='contact-value'>lunexamovix@gmail.com</a>
+              <a href='mailto:sweetstarmovie@gmail.com' className='contact-value'>sweetstarmovie@gmail.com</a>
             </div>
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function Footer() {
 
       {/* ── Bottom bar ── */}
       <div className='footer-bottom'>
-        <span>© 2026 Lunexa Movix. All Rights Reserved.</span>
+        <span>© 2026 Sweetstar Movie. All Rights Reserved.</span>
         <div className='footer-bottom-links'>
           <Link to='/'>Bảo mật</Link>
           <Link to='/'>Điều khoản</Link>

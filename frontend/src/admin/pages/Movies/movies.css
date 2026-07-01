@@ -339,3 +339,81 @@
 }
 .mv-tag-dropdown-item:hover { background: rgba(124,97,255,0.12); color: #fff; }
 .mv-tag-dropdown-item.active { color: #a78bfa; font-weight: 600; background: rgba(124,97,255,0.1); }
+
+/* ─── Trailer Type Selector ─────────────────────────────────────────────── */
+.trailer-type-selector {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.trailer-type-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 2px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #8fa6ff;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.trailer-type-btn:hover {
+  border-color: rgba(124,97,255,0.35);
+  background: rgba(124,97,255,0.1);
+  color: #c8d8ff;
+}
+
+.trailer-type-btn.active {
+  border-color: rgba(124,97,255,0.65);
+  background: rgba(124,97,255,0.2);
+  color: #fff;
+}
+
+/* ─── YouTube URL Input ─────────────────────────────────────────────────── */
+.trailer-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trailer-youtube-input {
+  flex: 1;
+  padding: 11px 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  border-radius: 12px;
+  color: #eef4ff;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.trailer-youtube-input:focus {
+  border-color: rgba(124,97,255,0.45);
+  background: rgba(255,255,255,0.06);
+  box-shadow: 0 0 12px rgba(124,97,255,0.15);
+}
+
+.trailer-youtube-input::placeholder {
+  color: #5a6e9e;
+}
+
+.trailer-clear-btn {
+  padding: 6px 10px;
+  border: none;
+  background: rgba(255,0,0,0.15);
+  color: #ff6b6b;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.trailer-clear-btn:hover {
+  background: rgba(255,0,0,0.25);
+  color: #fff;
+}

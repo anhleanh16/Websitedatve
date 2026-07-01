@@ -94,6 +94,7 @@
   position: relative;
   background: rgba(10, 14, 28, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  height: 452px;
   border-radius: 28px;
   padding: 22px;
   box-shadow: 0 26px 60px rgba(0, 0, 0, 0.24);
@@ -135,7 +136,7 @@
   background: linear-gradient(135deg, #31294a 0%, #121029 100%);
   background-size: cover;
   background-position: center;
-  height: 313px;
+  height: 403px;
   border-radius: 22px;
   display: flex;
   align-items: center;

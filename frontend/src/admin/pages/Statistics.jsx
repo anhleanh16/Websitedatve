@@ -31,12 +31,11 @@ export default function Statistics() {
       setLoading(true);
       setError(null);
       const data = await adminStatisticsService.getStatistics(filters);
-      console.log("Statistics data received:", data); // Log để debug
       setStats(data);
+      setLoading(false);
     } catch (err) {
       console.error("Failed to load statistics:", err);
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -124,7 +123,7 @@ export default function Statistics() {
       .join(" ");
   }
 
-  function generatePieSegments(data, radius, cx = 110, cy = 110) {
+  function generatePieSegments(data, radius = 80, cx = 110, cy = 110) {
     // Filter out any items with 0 tickets sold
     const validData = data.filter(item => (Number(item.tickets_sold) || 0) > 0);
     const total = validData.reduce(
@@ -256,6 +255,27 @@ export default function Statistics() {
           <div className="card-content">
             <p className="card-label">Người dùng</p>
             <h3 className="card-value">{formatNumber(stats?.overview?.total_users)}</h3>
+          </div>
+        </div>
+        <div className="overview-card">
+          <div className="card-icon expenses">💸</div>
+          <div className="card-content">
+            <p className="card-label">Chi phí</p>
+            <h3 className="card-value">{formatCurrency(stats?.overview?.total_expenses)}</h3>
+          </div>
+        </div>
+        <div className="overview-card">
+          <div className="card-icon profit">📈</div>
+          <div className="card-content">
+            <p className="card-label">Lợi nhuận</p>
+            <h3 className="card-value" style={{ color: stats?.overview?.total_profit >= 0 ? '#10b981' : '#ef4444' }}>
+              {formatCurrency(stats?.overview?.total_profit)}
+            </h3>
+            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              {stats?.overview?.total_revenue > 0 
+                ? `Tỷ suất: ${((stats.overview.total_profit / stats.overview.total_revenue) * 100).toFixed(1)}%`
+                : 'N/A'}
+            </p>
           </div>
         </div>
       </div>
@@ -515,6 +535,106 @@ export default function Statistics() {
                       <td className="revenue">{formatCurrency(combo.revenue)}</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="no-data">Không có dữ liệu</div>
+            )}
+          </div>
+        </section>
+
+        <section className="data-table-card">
+          <div className="chart-panel-header">
+            <div>
+              <h3>Thống kê theo Rạp chiếu</h3>
+              <p>Doanh thu, chi phí, lợi nhuận và người dùng theo từng rạp</p>
+            </div>
+          </div>
+          <div className="table-container">
+            {stats?.cinemaStats?.length > 0 ? (
+              <table className="cinema-stats-table">
+                <thead>
+                  <tr>
+                    <th>Rạp chiếu</th>
+                    <th>Khu vực</th>
+                    <th>Doanh thu</th>
+                    <th>Chi phí</th>
+                    <th>Lợi nhuận</th>
+                    <th>Tỷ suất (%)</th>
+                    <th>Vé bán</th>
+                    <th>Người dùng</th>
+                    <th>Đơn hàng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.cinemaStats.map((cinema) => {
+                    const profitMargin = cinema.revenue > 0 ? ((cinema.profit / cinema.revenue) * 100).toFixed(1) : 0;
+                    return (
+                      <tr key={cinema.cinema_id}>
+                        <td><strong>{cinema.cinema_name}</strong></td>
+                        <td>{cinema.city}</td>
+                        <td className="revenue">{formatCurrency(cinema.revenue)}</td>
+                        <td className="expenses">{formatCurrency(cinema.total_expenses)}</td>
+                        <td className="profit" style={{ color: cinema.profit >= 0 ? '#10b981' : '#ef4444' }}>
+                          {formatCurrency(cinema.profit)}
+                        </td>
+                        <td style={{ color: profitMargin >= 0 ? '#10b981' : '#ef4444' }}>
+                          {profitMargin}%
+                        </td>
+                        <td>{formatNumber(cinema.tickets_sold)}</td>
+                        <td>{formatNumber(cinema.total_users)}</td>
+                        <td>{formatNumber(cinema.bookings)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div className="no-data">Không có dữ liệu</div>
+            )}
+          </div>
+        </section>
+
+        <section className="data-table-card">
+          <div className="chart-panel-header">
+            <div>
+              <h3>Chi phí theo loại</h3>
+              <p>Phân bổ chi phí theo từng loại</p>
+            </div>
+          </div>
+          <div className="table-container">
+            {stats?.expensesByType?.length > 0 ? (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Loại chi phí</th>
+                    <th>Số lượng</th>
+                    <th>Tổng chi phí</th>
+                    <th>% Tổng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.expensesByType.map((expense) => {
+                    const totalExpenses = stats?.overview?.total_expenses || 1;
+                    const percentage = ((expense.total_amount / totalExpenses) * 100).toFixed(1);
+                    
+                    const expenseLabels = {
+                      'salary': '💼 Lương nhân viên',
+                      'utilities': '⚡ Điện nước',
+                      'maintenance': '🔧 Bảo trì',
+                      'marketing': '📢 Marketing',
+                      'other': '📋 Khác'
+                    };
+                    
+                    return (
+                      <tr key={expense.expense_type}>
+                        <td>{expenseLabels[expense.expense_type] || expense.expense_type}</td>
+                        <td>{formatNumber(expense.count)}</td>
+                        <td className="expenses">{formatCurrency(expense.total_amount)}</td>
+                        <td>{percentage}%</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (

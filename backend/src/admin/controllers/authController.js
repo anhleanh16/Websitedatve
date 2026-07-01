@@ -9,7 +9,7 @@ import {
   updateLastLogin,
 } from '../models/authModel.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'lunexa_secret_2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'sweetstar_secret_2026';
 const JWT_EXPIRES = '7d';
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */

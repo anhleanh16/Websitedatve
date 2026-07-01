@@ -1,0 +1,279 @@
+/* ── Combos Modal & Form Styles ── */
+.combo-modal {
+  min-width: 600px;
+}
+
+.combo-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.combo-form-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.combo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.combo-field label {
+  font-size: 13px;
+  color: #9db0ff;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.combo-field input,
+.combo-field select,
+.combo-field textarea {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #eef4ff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+  font-family: inherit;
+}
+
+.combo-field input:focus,
+.combo-field select:focus,
+.combo-field textarea:focus {
+  border-color: rgba(124, 97, 255, 0.45);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.combo-field input::placeholder,
+.combo-field textarea::placeholder {
+  color: #5a6e9e;
+}
+
+.combo-field select {
+  cursor: pointer;
+}
+
+.combo-field select option {
+  background: #0d1224;
+  color: #eef4ff;
+}
+
+.combo-field input.error,
+.combo-field select.error,
+.combo-field textarea.error {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.06);
+}
+
+.combo-field textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.combo-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.combo-error {
+  font-size: 12px;
+  color: #f87171;
+  margin-top: 4px;
+  display: block;
+}
+
+.combo-field small {
+  font-size: 11px;
+  color: #7a8fc0;
+  margin-top: 4px;
+  display: block;
+}
+
+/* ── Modal Footer Buttons ── */
+.bk-modal-footer button {
+  padding: 11px 24px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.bk-modal-footer button:hover {
+  transform: translateY(-1px);
+}
+
+button.bk-modal-footer-btn-primary,
+button:has-text("Tạo combo") {
+  background: linear-gradient(135deg, #7c61ff 0%, #5b3fd1 100%);
+  color: #fff;
+}
+
+button.bk-modal-footer-btn-primary:hover,
+button:has-text("Tạo combo"):hover {
+  background: linear-gradient(135deg, #8a72ff 0%, #6b4fe5 100%);
+}
+
+button.bk-modal-footer-btn-secondary,
+button:has-text("Hủy") {
+  background: rgba(255, 255, 255, 0.07);
+  color: #c8d8ff;
+}
+
+button.bk-modal-footer-btn-secondary:hover,
+button:has-text("Hủy"):hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ── Preview Section ── */
+.combo-preview-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.combo-preview-section h4 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #8fa6ff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.combo-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.combo-preview-item:last-child {
+  margin-bottom: 0;
+}
+
+.combo-preview-item strong {
+  color: #eef4ff;
+  min-width: 80px;
+}
+
+.combo-preview-item span {
+  color: #a8baff;
+  font-size: 13px;
+}
+
+/* ── Preview Card ── */
+.combo-preview-card {
+  background: linear-gradient(135deg, rgba(124, 97, 255, 0.08), rgba(84, 60, 218, 0.06));
+  border: 1px solid rgba(124, 97, 255, 0.2);
+  border-radius: 16px;
+  padding: 18px;
+  margin-top: 20px;
+}
+
+.combo-preview-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.combo-preview-badge {
+  display: inline-block;
+  background: rgba(124, 97, 255, 0.25);
+  color: #d4c8ff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.combo-preview-top strong {
+  color: #eef4ff;
+  font-size: 15px;
+  flex: 1;
+}
+
+.combo-preview-card > p {
+  margin: 0 0 12px;
+  color: #a8baff;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.combo-preview-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid rgba(124, 97, 255, 0.15);
+  gap: 12px;
+}
+
+.combo-preview-meta span {
+  color: #7a8fc0;
+  font-size: 12px;
+}
+
+.combo-preview-meta span:last-child {
+  color: #a78bfa;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* ── Responsive Design ── */
+@media (max-width: 900px) {
+  .combo-modal {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .combo-form-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .combo-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .combo-modal {
+    max-height: 100vh;
+    border-radius: 20px;
+  }
+
+  .combo-field,
+  .combo-field-row {
+    gap: 12px;
+  }
+
+  .combo-form-col {
+    gap: 14px;
+  }
+
+  .bk-modal-footer {
+    flex-direction: column;
+  }
+
+  .bk-modal-footer button {
+    width: 100%;
+  }
+}

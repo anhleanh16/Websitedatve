@@ -43,7 +43,7 @@ const TIERS = [
 const FAQ = [
   {
     q: 'Tích điểm như thế nào?',
-    a: 'Cứ mỗi 10.000đ chi tiêu tại Lunexa Movix, bạn nhận được 1 điểm. Điểm được tính cho vé phim, combo đồ ăn và dịch vụ tại rạp.'
+    a: 'Cứ mỗi 10.000đ chi tiêu tại Sweetstar Movie, bạn nhận được 1 điểm. Điểm được tính cho vé phim, combo đồ ăn và dịch vụ tại rạp.'
   },
   {
     q: 'Điểm có hết hạn không?',
@@ -371,7 +371,7 @@ export default function Membership() {
                   <div className='benefit-icon'>{b.type === 'fixed' ? '💸' : '🏷️'}</div>
                   <div className='benefit-title'>{b.title || b.code}</div>
                   <div className='benefit-desc'>
-                    {b.desc || 'Ưu đãi mới đang áp dụng tại Lunexa Movix.'}
+                    {b.desc || 'Ưu đãi mới đang áp dụng tại Sweetstar Movie.'}
                   </div>
                   <div className='benefit-desc'>
                     Mã: <strong>{b.code}</strong> · HSD: {b.endDate || 'Không giới hạn'}

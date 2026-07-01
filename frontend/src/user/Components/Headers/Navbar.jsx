@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { to: '/cinemas',    label: 'Rạp chiếu',  icon: <FaMapMarkerAlt /> },
   { to: '/Membership', label: 'Thành viên', icon: <FaCrown /> },
   { to: '/News',       label: 'Tin tức',    icon: <FaNewspaper /> },
+  { to: '/blog',       label: 'Blog',       icon: <FaNewspaper /> },
 ]
 
 const NOTIF_ICONS = { ticket: '🎟️', promo: '🎁', movie: '🎬', points: '⭐', system: '⚙️' }
@@ -146,7 +147,7 @@ export default function Navbar() {
   const userInitial = profile?.name?.[0]?.toUpperCase() || <FaUser />
   const userName    = profile?.name || 'Tài khoản'
   const userId = profile?.id
-  const displayCinema = selectedCinema?.name || 'Chọn rạp'
+  const displayCinema = selectedCinema?.city || 'Khu vực'
 
   const normalizeNotifications = (items = []) =>
     items.map((n) => ({
@@ -157,6 +158,19 @@ export default function Navbar() {
       time: new Date(n.created_at).toLocaleString('vi-VN'),
       read: Boolean(n.is_read),
     }))
+
+  // Group cinemas by city
+  const groupedCinemas = useMemo(() => {
+    const groups = {}
+    cinemas.forEach(c => {
+      const city = c.city || c.cinema_name
+      if (!groups[city]) {
+        groups[city] = []
+      }
+      groups[city].push(c)
+    })
+    return Object.entries(groups).map(([city, list]) => ({ city, cinemasList: list }))
+  }, [cinemas])
 
   useEffect(() => {
     const loadNotifications = async () => {
@@ -185,9 +199,10 @@ export default function Navbar() {
         if (ignore) return
         const list = Array.isArray(data?.cinemas) ? data.cinemas : []
         setCinemas(list)
-        // Auto-select rạp đầu tiên nếu chưa có lựa chọn
+        
+        // Auto-select first city if not selected
         if (!selectedCinema && list.length > 0) {
-          dispatch(setSelectedCinema({ id: list[0].cinemas_id, name: list[0].cinema_name }))
+          dispatch(setSelectedCinema({ id: list[0].cinemas_id, name: list[0].cinema_name, city: list[0].city }))
         }
       } catch (err) {
         if (ignore) return
@@ -201,7 +216,7 @@ export default function Navbar() {
   }, [])
 
   const handleSelectCinema = (cinema) => {
-    dispatch(setSelectedCinema({ id: cinema.cinemas_id, name: cinema.cinema_name }))
+    dispatch(setSelectedCinema({ id: cinema.cinemas_id, name: cinema.cinema_name, city: cinema.city }))
     setCinemaOpen(false)
   }
 
@@ -210,7 +225,7 @@ export default function Navbar() {
 
       {/* Logo */}
       <Link to='/' className='nav-logo'>
-        <img src='/logo.png' alt='Lunexa' />
+        <img src='/sweetstar.png' alt='Sweetstar Cinema' />
       </Link>
 
       {/* Desktop nav */}
@@ -247,20 +262,19 @@ export default function Navbar() {
             <FaChevronDown className={`region-caret${cinemaOpen ? ' up' : ''}`} />
           </button>
           <ul className='region-dropdown'>
-            <li className='region-dropdown-title'>Chọn rạp chiếu</li>
+            <li className='region-dropdown-title'>Chọn khu vực</li>
             {cinemaError && <li className='region-dropdown-title' style={{ color: '#f87171' }}>{cinemaError}</li>}
-            {cinemas.map(c => (
-              <li key={c.cinemas_id}>
+            {groupedCinemas.map(group => (
+              <li key={group.city}>
                 <button
-                  className={`region-option${selectedCinema?.id === c.cinemas_id ? ' active' : ''}`}
-                  onClick={() => handleSelectCinema(c)}
+                  className={`region-option${selectedCinema?.city === group.city ? ' active' : ''}`}
+                  onClick={() => handleSelectCinema(group.cinemasList[0])}
                 >
                   <FaMapMarkerAlt />
                   <span style={{ flex: 1, textAlign: 'left' }}>
-                    <span style={{ display: 'block', fontWeight: 600 }}>{c.cinema_name}</span>
-                    {c.city && <span style={{ fontSize: 11, opacity: 0.7 }}>{c.city}</span>}
+                    {group.city}
                   </span>
-                  {selectedCinema?.id === c.cinemas_id && <span className='region-check'>✓</span>}
+                  {selectedCinema?.city === group.city && <span className='region-check'>✓</span>}
                 </button>
               </li>
             ))}

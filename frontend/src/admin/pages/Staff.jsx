@@ -1,5 +1,17 @@
 import { useState } from "react";
 import './staff.css';
+
+const API_ORIGIN = (() => {
+  const base = import.meta.env.VITE_API_URL || "/api";
+  if (/^https?:\/\//i.test(base)) {
+    return new URL(base).origin;
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "";
+})();
+
 const DEPARTMENTS = [
   { id: 1, name: "Vé & Quầy thu ngân" },
   { id: 2, name: "Kỹ thuật chiếu phim" },
@@ -9,10 +21,10 @@ const DEPARTMENTS = [
 ];
 
 const CINEMAS = [
-  { id: 1, name: "Lunexa CGV Hà Nội" },
-  { id: 2, name: "Lunexa Lotte TP.HCM" },
-  { id: 3, name: "Lunexa CGV Đà Nẵng" },
-  { id: 4, name: "Lunexa BHD TP.HCM" },
+  { id: 1, name: "Sweetstar Movie CGV Hà Nội" },
+  { id: 2, name: "Sweetstar Movie Lotte TP.HCM" },
+  { id: 3, name: "Sweetstar Movie CGV Đà Nẵng" },
+  { id: 4, name: "Sweetstar Movie BHD TP.HCM" },
 ];
 
 const SHIFTS = [
@@ -24,7 +36,7 @@ const SHIFTS = [
 const SAMPLE_STAFF = [
   {
     id: 1, name: "Trần Văn Bình", code: "NV001",
-    email: "binh.tran@lunexa.vn", phone: "0901111001",
+    email: "binh.tran@sweetstar.vn", phone: "0901111001",
     dob: "1998-04-12", sex: "Nam", address: "Hà Nội",
     avatar: "",
     cinemaId: 1, departmentId: 1,
@@ -47,7 +59,7 @@ const SAMPLE_STAFF = [
   },
   {
     id: 2, name: "Lê Thị Hương", code: "NV002",
-    email: "huong.le@lunexa.vn", phone: "0901111002",
+    email: "huong.le@sweetstar.vn", phone: "0901111002",
     dob: "2000-09-22", sex: "Nữ", address: "TP.HCM",
     avatar: "",
     cinemaId: 2, departmentId: 3,
@@ -70,7 +82,7 @@ const SAMPLE_STAFF = [
   },
   {
     id: 3, name: "Nguyễn Quốc Dũng", code: "NV003",
-    email: "dung.nguyen@lunexa.vn", phone: "0901111003",
+    email: "dung.nguyen@sweetstar.vn", phone: "0901111003",
     dob: "1995-12-05", sex: "Nam", address: "Đà Nẵng",
     avatar: "",
     cinemaId: 3, departmentId: 2,
@@ -93,7 +105,7 @@ const SAMPLE_STAFF = [
   },
   {
     id: 4, name: "Phạm Thu Trang", code: "NV004",
-    email: "trang.pham@lunexa.vn", phone: "0901111004",
+    email: "trang.pham@sweetstar.vn", phone: "0901111004",
     dob: "1997-06-18", sex: "Nữ", address: "TP.HCM",
     avatar: "",
     cinemaId: 4, departmentId: 5,
@@ -117,7 +129,7 @@ const SAMPLE_STAFF = [
   },
   {
     id: 5, name: "Hoàng Minh Khoa", code: "NV005",
-    email: "khoa.hoang@lunexa.vn", phone: "0901111005",
+    email: "khoa.hoang@sweetstar.vn", phone: "0901111005",
     dob: "2002-03-30", sex: "Nam", address: "Hà Nội",
     avatar: "",
     cinemaId: 1, departmentId: 4,
@@ -171,6 +183,7 @@ const EMPTY_STAFF = {
   role: "staff", type: "full_time",
   salary: "", baseSalary: "",
   status: "active", hireDate: "",
+  avatar: "",
   shifts: [], tasks: [], attendance: [],
 };
 
@@ -206,10 +219,22 @@ function StaffForm({ staff, onClose, onSave }) {
   const isEdit = !!staff;
   const [form, setForm] = useState(staff ? { ...staff } : { ...EMPTY_STAFF });
   const [errors, setErrors] = useState({});
+  const [avatarFile, setAvatarFile] = useState(null);
 
   const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: undefined })); };
 
   const toggleShift = (id) => set("shifts", form.shifts.includes(id) ? form.shifts.filter(s => s !== id) : [...form.shifts, id]);
+
+  const handleAvatarFile = (file) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    setAvatarFile(file);
+    set("avatar", URL.createObjectURL(file));
+  };
+
+  const removeAvatar = () => {
+    setAvatarFile(null);
+    set("avatar", "");
+  };
 
   const validate = () => {
     const e = {};
@@ -228,7 +253,11 @@ function StaffForm({ staff, onClose, onSave }) {
   const handleSave = () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-    onSave({ ...form, id: staff?.id || Date.now(), baseSalary: Number(form.salary), salary: Number(form.salary) });
+    const data = { ...form, id: staff?.id || Date.now(), baseSalary: Number(form.salary), salary: Number(form.salary) };
+    if (avatarFile) {
+      data.avatarFile = avatarFile;
+    }
+    onSave(data);
   };
 
   return (
@@ -258,7 +287,7 @@ function StaffForm({ staff, onClose, onSave }) {
               <div className="sf-field-row">
                 <div className="sf-field">
                   <label>Email *</label>
-                  <input type="email" className={errors.email ? "error" : ""} value={form.email} onChange={e => set("email", e.target.value)} placeholder="nv@lunexa.vn" />
+                  <input type="email" className={errors.email ? "error" : ""} value={form.email} onChange={e => set("email", e.target.value)} placeholder="nv@sweetstar.vn" />
                   {errors.email && <span className="sf-error">{errors.email}</span>}
                 </div>
                 <div className="sf-field">
@@ -286,6 +315,37 @@ function StaffForm({ staff, onClose, onSave }) {
               <div className="sf-field">
                 <label>Địa chỉ</label>
                 <input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Số nhà, đường, quận, tỉnh…" />
+              </div>
+
+              <div className="sf-field">
+                <label>Ảnh đại diện</label>
+                <div
+                  className="sf-avatar-upload-zone"
+                  onClick={() => document.getElementById("avatar-file-input").click()}
+                >
+                  {form.avatar ? (
+                    <>
+                      <img src={form.avatar} alt="Avatar preview" className="sf-avatar-preview" />
+                      <button
+                        type="button"
+                        className="sf-avatar-remove"
+                        onClick={(e) => { e.stopPropagation(); removeAvatar(); }}
+                      >✕</button>
+                    </>
+                  ) : (
+                    <div className="sf-avatar-placeholder">
+                      <span className="sf-avatar-icon">📸</span>
+                      <span>Chọn ảnh đại diện</span>
+                    </div>
+                  )}
+                </div>
+                <input
+                  id="avatar-file-input"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => handleAvatarFile(e.target.files?.[0])}
+                />
               </div>
 
               <div className="sf-field">
@@ -368,7 +428,9 @@ function StaffForm({ staff, onClose, onSave }) {
               {/* Preview */}
               {form.name && (
                 <div className="sf-preview-card">
-                  <div className="sf-preview-avatar">{getInitials(form.name)}</div>
+                  <div className="sf-preview-avatar">
+                    {form.avatar ? <img src={form.avatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : getInitials(form.name)}
+                  </div>
                   <div className="sf-preview-info">
                     <strong>{form.name}</strong>
                     <span>{ROLE_MAP[form.role]?.icon} {ROLE_MAP[form.role]?.label} · {TYPE_MAP[form.type]?.label}</span>
@@ -588,7 +650,9 @@ function StaffDetail({ staff, onClose, onEdit, onTask, onAttend }) {
         <div className="sf-modal-body">
           {/* Profile row */}
           <div className="sf-profile-row">
-            <div className="sf-avatar-lg">{getInitials(staff.name)}</div>
+            <div className="sf-avatar-lg">
+              {staff.avatar ? <img src={staff.avatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : getInitials(staff.name)}
+            </div>
             <div className="sf-profile-info">
               <h3>{staff.name} <span className="sf-code">({staff.code})</span></h3>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
@@ -744,7 +808,9 @@ function StaffList({ staff, onView, onEdit, onTask, onAttend, onDelete }) {
                 <tr key={s.id}>
                   <td>
                     <div className="sf-user-cell">
-                      <div className="sf-avatar-sm">{getInitials(s.name)}</div>
+                      <div className="sf-avatar-sm">
+                        {s.avatar ? <img src={s.avatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : getInitials(s.name)}
+                      </div>
                       <div>
                         <strong>{s.name}</strong>
                         <span>{s.code} · {s.email}</span>
@@ -833,7 +899,9 @@ function AttendanceOverview({ staff }) {
                 <tr key={s.id}>
                   <td>
                     <div className="sf-user-cell">
-                      <div className="sf-avatar-sm">{getInitials(s.name)}</div>
+                      <div className="sf-avatar-sm">
+                        {s.avatar ? <img src={s.avatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : getInitials(s.name)}
+                      </div>
                       <div><strong>{s.name}</strong><span>{s.code}</span></div>
                     </div>
                   </td>
@@ -910,7 +978,10 @@ function TaskOverview({ staff }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminStaff() {
-  const [staffList, setStaffList] = useState(SAMPLE_STAFF);
+  const [staffList, setStaffList] = useState(() => {
+    const saved = localStorage.getItem('adminStaffList');
+    return saved ? JSON.parse(saved) : SAMPLE_STAFF;
+  });
   const [activeTab,  setActiveTab]  = useState("list");
 
   const [viewStaff,   setViewStaff]   = useState(null);
@@ -922,32 +993,61 @@ export default function AdminStaff() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3200); };
 
-  const handleSave = (data) => {
-    if (staffList.find(s => s.id === data.id)) {
-      setStaffList(p => p.map(s => s.id === data.id ? data : s));
-      showToast(`Đã cập nhật nhân viên "${data.name}".`);
-    } else {
-      setStaffList(p => [data, ...p]);
-      showToast(`Đã thêm nhân viên "${data.name}".`);
+  const handleSave = async (data) => {
+    try {
+      let finalData = { ...data };
+      
+      // If there's an avatar file, convert to base64
+      if (data.avatarFile) {
+        finalData.avatar = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(data.avatarFile);
+        });
+        delete finalData.avatarFile;
+      }
+      
+      // Update staff list
+      let updatedList;
+      if (staffList.find(s => s.id === finalData.id)) {
+        updatedList = staffList.map(s => s.id === finalData.id ? finalData : s);
+        showToast(`Đã cập nhật nhân viên "${finalData.name}".`);
+      } else {
+        updatedList = [finalData, ...staffList];
+        showToast(`Đã thêm nhân viên "${finalData.name}".`);
+      }
+      
+      // Save to localStorage
+      localStorage.setItem('adminStaffList', JSON.stringify(updatedList));
+      setStaffList(updatedList);
+      setEditStaff(undefined);
+      setViewStaff(null);
+    } catch (err) {
+      showToast(`Lỗi: ${err.message}`);
     }
-    setEditStaff(undefined);
-    setViewStaff(null);
   };
 
   const handleSaveTasks = (data) => {
-    setStaffList(p => p.map(s => s.id === data.id ? data : s));
+    const updatedList = staffList.map(s => s.id === data.id ? data : s);
+    localStorage.setItem('adminStaffList', JSON.stringify(updatedList));
+    setStaffList(updatedList);
     showToast(`Đã cập nhật phân công cho "${data.name}".`);
     setTaskStaff(null); setViewStaff(null);
   };
 
   const handleSaveAttend = (data) => {
-    setStaffList(p => p.map(s => s.id === data.id ? data : s));
+    const updatedList = staffList.map(s => s.id === data.id ? data : s);
+    localStorage.setItem('adminStaffList', JSON.stringify(updatedList));
+    setStaffList(updatedList);
     showToast(`Đã cập nhật chấm công cho "${data.name}".`);
     setAttendStaff(null); setViewStaff(null);
   };
 
   const handleConfirmDelete = () => {
-    setStaffList(p => p.filter(s => s.id !== deleteTarget.id));
+    const updatedList = staffList.filter(s => s.id !== deleteTarget.id);
+    localStorage.setItem('adminStaffList', JSON.stringify(updatedList));
+    setStaffList(updatedList);
     showToast(`Đã xóa nhân viên "${deleteTarget.name}".`);
     setDeleteTarget(null);
   };

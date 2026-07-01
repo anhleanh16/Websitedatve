@@ -125,7 +125,7 @@ export default function News() {
       <div className="news-page-header">
         <div className="news-page-title-group">
           <h1>Tin tức & Sự kiện</h1>
-          <p>Cập nhật thông tin điện ảnh, ưu đãi và sự kiện mới nhất từ Lunexa.</p>
+          <p>Cập nhật thông tin điện ảnh, ưu đãi và sự kiện mới nhất từ Sweetstar Movie.</p>
         </div>
         <div className="news-search-box">
           <FaSearch className="search-icon" />
@@ -153,9 +153,7 @@ export default function News() {
                 <span className="featured-cat">{getCategoryLabel(featured.category)}</span>
               </div>
               <h2 className="featured-title">{featured.title}</h2>
-              <p className="featured-excerpt">
-                {featured.short_description || "Khám phá bài viết nổi bật mới nhất tại Lunexa."}
-              </p>
+              <div className="featured-excerpt" dangerouslySetInnerHTML={{ __html: featured.short_description || "Khám phá bài viết nổi bật mới nhất tại Sweetstar Movie." }} />
               <div className="featured-meta">
                 <span>
                   <FaCalendarAlt /> {formatDate(featured.published_at || featured.created_at)}
@@ -254,9 +252,7 @@ export default function News() {
                       </span>
                     </div>
                     <h3 className="news-card-title">{item.title}</h3>
-                    <p className="news-card-excerpt">
-                      {item.short_description || "Bài viết đang được cập nhật mô tả ngắn."}
-                    </p>
+                    <div className="news-card-excerpt" dangerouslySetInnerHTML={{ __html: item.short_description || "Bài viết đang được cập nhật mô tả ngắn." }} />
                     <div className="news-card-footer">
                       <div className="news-card-stats">
                         <span>

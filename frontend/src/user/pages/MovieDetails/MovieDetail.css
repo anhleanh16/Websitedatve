@@ -1960,3 +1960,12 @@ h1.movie-detail-title,
     height: 150px;
   }
 }
+
+/* ─────────────────────────────────────────────
+   Review Section Wrapper
+───────────────────────────────────────────── */
+.movie-detail-reviews-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}

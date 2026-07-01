@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-const STORAGE_KEY = 'lunexa_selected_cinema';
+const STORAGE_KEY = 'sweetstar_selected_cinema';
 
 const getInitial = () => {
   try {
@@ -14,11 +14,11 @@ const getInitial = () => {
 const cinemaSlice = createSlice({
   name: 'cinema',
   initialState: {
-    selectedCinema: getInitial(), // { id, name } | null
+    selectedCinema: getInitial(), // { id, name, city } | null
   },
   reducers: {
     setSelectedCinema: (state, action) => {
-      state.selectedCinema = action.payload; // { id, name } | null
+      state.selectedCinema = action.payload; // { id, name, city } | null
       try {
         if (action.payload) {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(action.payload));

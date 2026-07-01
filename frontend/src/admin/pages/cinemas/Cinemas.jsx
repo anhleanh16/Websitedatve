@@ -1363,7 +1363,7 @@ function CinemaForm({ cinema, onClose, onSave, saving }) {
                     className={errors.name ? "error" : ""}
                     value={form.name}
                     onChange={(e) => set("name", e.target.value)}
-                    placeholder="Lunexa CGV…"
+                    placeholder="Sweetstar CGV…"
                   />
                   {errors.name && (
                     <span className="cn-error">{errors.name}</span>

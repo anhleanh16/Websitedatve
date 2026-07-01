@@ -15,35 +15,46 @@ import Notifications from "../pages/Notifications";
 import Comments from "../pages/Comments";
 import Staff from "../pages/Staff";
 import NewsManagement from "../pages/NewsManagement";
+import BlogManagement from "../pages/BlogManagement";
+import AdminLogin from "../pages/AdminLogin/AdminLogin";
 import { getValidStoredToken } from "../../utils/auth";
 
 export function AdminRoutes() {
   const profile = useSelector((state) => state.user.profile);
   const token = getValidStoredToken();
-
-  if (!token || profile?.role !== "admin") {
-    return <Navigate to="/login" replace />;
-  }
+  const isAdmin = token && profile?.role === "admin";
 
   return (
-    <AdminLayout>
-      <Routes>
-        <Route index element={<Dashboard />} />
-        <Route path="dashboard"     element={<Dashboard />}     />
-        <Route path="staff"         element={<Staff />}         />
-        <Route path="users"         element={<Users />}         />
-        <Route path="movies"        element={<Movies />}        />
-        <Route path="showtimes"     element={<Showtimes />}     />
-        <Route path="cinemas"       element={<Cinemas />}       />
-        <Route path="bookings"      element={<Bookings />}      />
-        <Route path="combos"        element={<Combos />}        />
-        <Route path="promotions"    element={<Promotions />}    />
-        <Route path="news"          element={<NewsManagement />} />
-        <Route path="notifications" element={<Notifications />} />
-        <Route path="comments"      element={<Comments />}      />
-        <Route path="statistics"       element={<Statistics />}       />
-        <Route path="settings"      element={<Settings />}      />
-      </Routes>
-    </AdminLayout>
+    <Routes>
+      {/* Route login không cần authentication */}
+      <Route path="login" element={<AdminLogin />} />
+
+      {/* Các route khác cần authentication */}
+      {isAdmin && (
+        <>
+          <Route path="dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />
+          <Route path="staff" element={<AdminLayout><Staff /></AdminLayout>} />
+          <Route path="users" element={<AdminLayout><Users /></AdminLayout>} />
+          <Route path="movies" element={<AdminLayout><Movies /></AdminLayout>} />
+          <Route path="showtimes" element={<AdminLayout><Showtimes /></AdminLayout>} />
+          <Route path="cinemas" element={<AdminLayout><Cinemas /></AdminLayout>} />
+          <Route path="bookings" element={<AdminLayout><Bookings /></AdminLayout>} />
+          <Route path="combos" element={<AdminLayout><Combos /></AdminLayout>} />
+          <Route path="promotions" element={<AdminLayout><Promotions /></AdminLayout>} />
+          <Route path="news" element={<AdminLayout><NewsManagement /></AdminLayout>} />
+          <Route path="blog" element={<AdminLayout><BlogManagement /></AdminLayout>} />
+          <Route path="notifications" element={<AdminLayout><Notifications /></AdminLayout>} />
+          <Route path="comments" element={<AdminLayout><Comments /></AdminLayout>} />
+          <Route path="statistics" element={<AdminLayout><Statistics /></AdminLayout>} />
+          <Route path="settings" element={<AdminLayout><Settings /></AdminLayout>} />
+          <Route index element={<AdminLayout><Dashboard /></AdminLayout>} />
+        </>
+      )}
+
+      {/* Redirect về login nếu không phải admin */}
+      {!isAdmin && (
+        <Route path="*" element={<Navigate to="/admin/login" replace />} />
+      )}
+    </Routes>
   );
 }

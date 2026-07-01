@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'lunexa_secret_2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'sweetstar_secret_2026';
 
 /* Xác thực JWT — gắn req.userId, req.userRole, req.userEmail */
 export const authMiddleware = (req, res, next) => {

@@ -113,6 +113,7 @@ CREATE TABLE Reviews (
     user_id INT,
     rating DECIMAL(2,1),
     comment TEXT,
+    status ENUM('pending','approved','rejected') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (movie_id) REFERENCES Movies(movie_id),
@@ -311,4 +312,59 @@ CREATE TABLE news (
     FOREIGN KEY (author_id)
         REFERENCES employees(employee_id)
         ON DELETE CASCADE
+);
+
+USE Lunexa;
+CREATE TABLE Blogs (
+    blog_id INT AUTO_INCREMENT PRIMARY KEY,
+    author_id INT,
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE,
+    thumbnail VARCHAR(255),
+    summary TEXT,
+    content LONGTEXT,
+    category VARCHAR(100),
+    tags VARCHAR(255),
+    views INT DEFAULT 0,
+    status ENUM('draft','published','hidden') DEFAULT 'draft',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (author_id) REFERENCES Employees(employee_id)
+);
+
+CREATE TABLE Blog_Categories(
+    category_id INT AUTO_INCREMENT PRIMARY KEY,
+    category_name VARCHAR(100),
+    description TEXT
+);
+
+CREATE TABLE Blog_Category_Detail(
+    blog_id INT,
+    category_id INT,
+    PRIMARY KEY(blog_id, category_id),
+
+    FOREIGN KEY(blog_id) REFERENCES Blogs(blog_id),
+    FOREIGN KEY(category_id) REFERENCES Blog_Categories(category_id)
+);
+
+CREATE TABLE Blog_Comments(
+    comment_id INT AUTO_INCREMENT PRIMARY KEY,
+    blog_id INT,
+    user_id INT,
+    content TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY(blog_id) REFERENCES Blogs(blog_id),
+    FOREIGN KEY(user_id) REFERENCES User(id)
+);
+
+CREATE TABLE Blog_Likes(
+    blog_id INT,
+    user_id INT,
+    PRIMARY KEY(blog_id,user_id),
+
+    FOREIGN KEY(blog_id) REFERENCES Blogs(blog_id),
+    FOREIGN KEY(user_id) REFERENCES User(id)
 );

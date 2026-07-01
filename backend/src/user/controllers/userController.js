@@ -1,5 +1,6 @@
 import * as CinemaModel from "../../admin/models/cinemaModel.js";
 import { MovieModel } from "../../admin/models/movieModel.js";
+import { BookingModel } from "../../admin/models/bookingModel.js";
 import { db } from "../../../config/db.js";
 import { NotificationModel } from "../../admin/models/notificationModel.js";
 import { PromotionModel } from "../../admin/models/promotionModel.js";
@@ -268,9 +269,9 @@ export const userGetMovieById = async (req, res) => {
         s.room_id,
         s.start_time,
         s.end_time,
-        COALESCE(s.price_standard, s.price) AS price_standard,
-        COALESCE(s.price_vip, s.price) AS price_vip,
-        COALESCE(s.price_couple, s.price) AS price_couple,
+        s.price AS price_standard,
+        s.price AS price_vip,
+        s.price AS price_couple,
         s.available_seats,
         r.room_name,
         r.room_type,
@@ -340,10 +341,33 @@ export const userGetBookings = async (req, res) => {
 export const userCreateBooking = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { movieId, showId, seats } = req.body;
-    res.status(201).json({ bookingId: 1, message: "Booking created" });
+    const { showtimeId, seatUnits, foodItems, paymentMethod } = req.body;
+
+    const normalizedUserId = Number(userId || 0);
+    if (!normalizedUserId) {
+      return res.status(400).json({ message: "Không xác định được người dùng." });
+    }
+
+    const booking = await BookingModel.createUserBooking({
+      userId: normalizedUserId,
+      showtimeId,
+      seatUnits,
+      foodItems,
+      paymentMethod,
+    });
+
+    res.status(201).json({
+      success: true,
+      booking,
+      message: "Đặt vé thành công",
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error in userCreateBooking:", error);
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      success: false,
+      message: error.message || "Lỗi khi đặt vé",
+    });
   }
 };
 
@@ -471,5 +495,61 @@ export const userGetNewsBySlug = async (req, res) => {
   } catch (error) {
     console.error("Error in userGetNewsBySlug:", error);
     res.status(500).json({ message: "Không thể tải chi tiết bài viết.", article: null, related: [] });
+  }
+};
+
+export const userGetCombos = async (req, res) => {
+  try {
+    const [combos] = await db.query(
+      `SELECT * FROM Combos WHERE is_active = 1 ORDER BY sort_order ASC, combo_id ASC`,
+    );
+
+    const formattedCombos = combos.map((combo) => ({
+      combo_id: combo.combo_id,
+      combo_name: combo.combo_name,
+      description: combo.description,
+      price: combo.price,
+      image: combo.image,
+      category: combo.category,
+      popcorn_quantity: combo.popcorn_quantity,
+      drink_quantity: combo.drink_quantity,
+      popcorn_options: combo.popcorn_options ? JSON.parse(combo.popcorn_options) : [],
+      drink_options: combo.drink_options ? JSON.parse(combo.drink_options) : [],
+    }));
+
+    res.json({ combos: formattedCombos });
+  } catch (error) {
+    console.error("Error in userGetCombos:", error);
+    res.status(500).json({ message: "Không thể tải danh sách combo", combos: [] });
+  }
+};
+
+export const userGetTodayPromotions = async (req, res) => {
+  try {
+    const [promotions] = await db.query(
+      `
+      SELECT 
+        promotion_id,
+        title,
+        description,
+        discount_amount,
+        discount_percent,
+        banner_image,
+        status,
+        start_date,
+        end_date,
+        created_at
+      FROM Promotions
+      WHERE status = 'active'
+        AND DATE(start_date) <= CURDATE()
+        AND DATE(end_date) >= CURDATE()
+      ORDER BY created_at DESC
+      `,
+    );
+
+    res.json({ promotions });
+  } catch (error) {
+    console.error("Error in userGetTodayPromotions:", error);
+    res.status(500).json({ message: "Không thể tải khuyến mãi hôm nay", promotions: [] });
   }
 };

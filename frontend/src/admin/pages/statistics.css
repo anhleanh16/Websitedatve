@@ -116,6 +116,14 @@
   background: linear-gradient(135deg, rgba(243, 199, 75, 0.2), rgba(243, 199, 75, 0.05));
 }
 
+.card-icon.expenses {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.05));
+}
+
+.card-icon.profit {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.05));
+}
+
 .card-content {
   flex: 1;
 }
@@ -424,4 +432,32 @@
   .pie-chart-container {
     flex-direction: column;
   }
+}
+
+/* Table Column Styles */
+.table-container td.revenue {
+  color: #7c61ff;
+  font-weight: 500;
+}
+
+.table-container td.expenses {
+  color: #f87171;
+  font-weight: 500;
+}
+
+.table-container td.profit {
+  font-weight: 600;
+}
+
+.cinema-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cinema-stats-table thead tr {
+  background: rgba(124, 97, 255, 0.05);
+}
+
+.cinema-stats-table tbody tr:hover {
+  background: rgba(124, 97, 255, 0.08);
 }

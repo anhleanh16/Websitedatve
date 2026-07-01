@@ -503,3 +503,65 @@
   font-size: 12px !important;
   border-radius: 8px !important;
 }
+
+/* ─── CKEditor5 ────────────────────────────────────────────────────────────── */
+.nm-field .ck-editor__main {
+  border-radius: 12px !important;
+  border: 1px solid rgba(124, 97, 255, 0.2) !important;
+}
+
+.nm-field .ck-editor__editable {
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: #eef4ff !important;
+  min-height: 250px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.nm-field .ck-editor__editable:focus {
+  outline: none;
+  border: 1px solid rgba(124, 97, 255, 0.4) !important;
+}
+
+.nm-field .ck-toolbar {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-bottom: 1px solid rgba(124, 97, 255, 0.15) !important;
+  border-radius: 12px 12px 0 0 !important;
+}
+
+.nm-field .ck-button {
+  color: #8fa6ff !important;
+}
+
+.nm-field .ck-button:hover {
+  color: #d9ccff !important;
+  background: rgba(124, 97, 255, 0.1) !important;
+}
+
+.nm-field .ck-button.ck-on {
+  color: #fff !important;
+  background: rgba(124, 97, 255, 0.2) !important;
+}
+
+.nm-field .ck-button__label {
+  color: inherit !important;
+}
+
+.nm-field .ck-dropdown__panel {
+  background: rgba(10, 15, 35, 0.95) !important;
+  border: 1px solid rgba(124, 97, 255, 0.2) !important;
+  border-radius: 12px !important;
+}
+
+.nm-field .ck-list__item {
+  color: #c8d8ff !important;
+}
+
+.nm-field .ck-list__item:hover {
+  background: rgba(124, 97, 255, 0.15) !important;
+}
+
+.nm-field .ck-list__item.ck-on {
+  background: rgba(124, 97, 255, 0.2) !important;
+  color: #fff !important;
+}

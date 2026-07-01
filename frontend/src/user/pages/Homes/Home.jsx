@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import QuickBookWidget from '../../Components/QuickBookWidget/QuickBookWidget'
 import {
   FaPlay, FaTicketAlt, FaStar, FaMapMarkerAlt, FaClock,
   FaFire, FaRobot, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt
@@ -176,7 +177,7 @@ const buildHeroSlides = (movies) => {
       {
         id: 'fallback',
         label: 'TRANG CHỦ',
-        title: 'Khám phá phim mới tại Lunexa',
+        title: 'Khám phá phim mới tại Sweetstar Movie',
         desc: 'Danh sách phim, suất chiếu và rạp sẽ được đồng bộ trực tiếp từ cơ sở dữ liệu.',
         genre: 'Đang cập nhật',
         duration: '--',
@@ -245,6 +246,12 @@ const groupShowtimesByMovie = (items) => {
 export default function Home() {
   const selectedCinema = useSelector((s) => s.cinema.selectedCinema)
   const navigate = useNavigate()
+
+  const handleBookingClick = (e, movieId) => {
+    e.preventDefault()
+    e.stopPropagation()
+    navigate(`/movie/${movieId}`, { state: { scrollToSchedule: true } })
+  }
 
   const [slide,       setSlide]       = useState(0)
   const [sliding,     setSliding]     = useState(false)
@@ -580,8 +587,8 @@ export default function Home() {
                         <span className='movie-rating-num'>{m.rating > 0 ? m.rating : '--'}</span>
                         <span className='movie-votes'>({formatReviewCount(m.reviewCount)})</span>
                       </div>
-                      <button className='movie-ticket-btn' onClick={e => e.preventDefault()}>
-                        <FaTicketAlt />
+                      <button className='movie-ticket-btn' onClick={(e) => handleBookingClick(e, m.id)}>
+                        <FaTicketAlt /> Đặt vé
                       </button>
                     </div>
                   </div>
@@ -779,33 +786,7 @@ export default function Home() {
         <aside className='col-right'>
 
           {/* Đặt vé nhanh */}
-          <div className='quick-book'>
-            <div className='quick-book-header'>
-              <h4>Đặt vé nhanh</h4>
-              <span>Dành cho người mới, làm lần lượt theo 4 bước này.</span>
-            </div>
-            <div className='quick-book-steps'>
-              {[
-                { step: 'Bước 1', title: 'Chọn phim',      description: 'Tìm bộ phim bạn muốn xem trong danh sách phim đang chiếu.' },
-                { step: 'Bước 2', title: 'Chọn rạp',       description: 'Chọn rạp gần bạn nhất hoặc phù hợp nhất.' },
-                { step: 'Bước 3', title: 'Chọn ngày',      description: 'Xem lịch chiếu và chọn ngày bạn muốn đến rạp.' },
-                { step: 'Bước 4', title: 'Chọn suất chiếu','description': 'Chọn giờ đẹp rồi vào thẳng phần đặt ghế.' },
-              ].map((item, index) => (
-                <div
-                  key={item.step}
-                  className='quick-book-step'
-                  style={{ animationDelay: `${index * 0.24}s` }}
-                >
-                  <div className='quick-book-step-index'>{index + 1}</div>
-                  <div className='quick-book-step-content'>
-                    <span className='quick-book-step-badge'>{item.step}</span>
-                    <strong>{item.title}</strong>
-                    <p>{item.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <QuickBookWidget />
 
           {/* Ưu đãi hôm nay */}
           <div className='deals-card'>

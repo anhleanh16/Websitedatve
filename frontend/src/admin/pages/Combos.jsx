@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { adminComboService } from "../services/adminApi";
+import "./combos.css";
 
 const CATEGORY_LABELS = {
   combo: "Combo",

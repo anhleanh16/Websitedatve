@@ -54,7 +54,7 @@ export default function Payment() {
     movieId = null,
     showtimeId = null,
     movieTitle = 'Doraemon: Nobita và Cuộc Chiến Vũ Trụ Tí Hon',
-    cinema = 'Lunexa Movix Đà Nẵng',
+    cinema = 'Sweetstar Movie Đà Nẵng',
     roomName = '',
     roomType = '',
     day = 'Hôm nay',
@@ -98,7 +98,7 @@ export default function Payment() {
   const finalTotal = baseTotal + serviceFee - discount
 
   const applyPromo = () => {
-    if (promoCode.trim().toUpperCase() === 'LUNEXA10') {
+    if (promoCode.trim().toUpperCase() === 'SWEETSTAR10') {
       setPromoApplied(true)
       setPromoError('')
     } else {
@@ -376,8 +376,8 @@ export default function Payment() {
                   <p>Chuyển khoản đến tài khoản:</p>
                   <div className="bank-detail-row"><span>Ngân hàng</span><strong>{selectedBank}</strong></div>
                   <div className="bank-detail-row"><span>Số tài khoản</span><strong>0123456789</strong></div>
-                  <div className="bank-detail-row"><span>Chủ tài khoản</span><strong>CÔNG TY LUNEXA</strong></div>
-                  <div className="bank-detail-row"><span>Nội dung CK</span><strong>LUNEXA {selectedSeats.join('')}</strong></div>
+                  <div className="bank-detail-row"><span>Chủ tài khoản</span><strong>CÔNG TY SWEETSTAR</strong></div>
+                  <div className="bank-detail-row"><span>Nội dung CK</span><strong>SWEETSTAR {selectedSeats.join('')}</strong></div>
                 </div>
               )}
             </section>
@@ -418,7 +418,7 @@ export default function Payment() {
             <div className="promo-row">
               <input
                 type="text"
-                placeholder="Nhập mã ưu đãi (thử: LUNEXA10)"
+                placeholder="Nhập mã ưu đãi (thử: SWEETSTAR10)"
                 value={promoCode}
                 onChange={(e) => { setPromoCode(e.target.value); setPromoError('') }}
                 className={promoApplied ? 'promo-success' : promoError ? 'promo-error' : ''}

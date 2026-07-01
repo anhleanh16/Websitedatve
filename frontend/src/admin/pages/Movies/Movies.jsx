@@ -316,6 +316,8 @@ function MovieForm({ movie, categories, onClose, onSave }) {
   const [errors, setErrors] = useState({});
   const [newPosterFiles, setNewPosterFiles] = useState([]);
   const [trailerFile, setTrailerFile] = useState(null);
+  const [trailerType, setTrailerType] = useState(movie?.trailer ? 'youtube' : 'upload');
+  const [youtubeUrl, setYoutubeUrl] = useState(movie?.trailer ? movie.trailer : '');
   const [allPosters, setAllPosters] = useState([]);
   const [posterDrag, setPosterDrag] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -393,6 +395,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
   // Xóa trailer
   const removeTrailer = () => {
     setTrailerFile(null);
+    setYoutubeUrl('');
   };
 
   const toggleCat = (id) => {
@@ -455,7 +458,9 @@ function MovieForm({ movie, categories, onClose, onSave }) {
       });
       
       // Thêm trailer mới nếu có
-      if (trailerFile) {
+      if (trailerType === 'youtube' && youtubeUrl.trim()) {
+        formData.append('trailer', youtubeUrl.trim());
+      } else if (trailerType === 'upload' && trailerFile) {
         formData.append('trailer', trailerFile);
       }
 
@@ -545,40 +550,82 @@ function MovieForm({ movie, categories, onClose, onSave }) {
 
               <div className="mv-field">
                 <label>Trailer phim</label>
-                <div
-                  className="img-upload-zone trailer-upload-zone"
-                  onClick={() => document.getElementById("trailer-file-input").click()}
-                >
-                  {trailerFile ? (
-                    <>
-                      <div className="img-upload-placeholder">
-                        <span className="img-upload-icon">🎬</span>
-                        <span>{trailerFile.name}</span>
-                      </div>
-                      <button
-                        className="img-upload-remove"
-                        onClick={(e) => { e.stopPropagation(); removeTrailer(); }}
-                      >✕</button>
-                    </>
-                  ) : movie?.trailer ? (
-                    <>
-                      <div className="img-upload-placeholder">
-                        <span className="img-upload-icon">🎬</span>
-                        <span>Trailer đã chọn</span>
-                      </div>
-                      <button
-                        className="img-upload-remove"
-                        onClick={(e) => { e.stopPropagation(); removeTrailer(); }}
-                      >✕</button>
-                    </>
-                  ) : (
-                    <div className="img-upload-placeholder">
-                      <span className="img-upload-icon">🎬</span>
-                      <span>Chọn trailer từ máy</span>
-                      <span className="img-upload-hint">MP4, WEBM, OGG – tối đa 100MB</span>
-                    </div>
-                  )}
+                
+                {/* Nút chọn loại trailer */}
+                <div className="trailer-type-selector">
+                  <button
+                    type="button"
+                    className={`trailer-type-btn ${trailerType === 'youtube' ? 'active' : ''}`}
+                    onClick={() => { setTrailerType('youtube'); setTrailerFile(null); }}
+                  >
+                    🔗 Link YouTube
+                  </button>
+                  <button
+                    type="button"
+                    className={`trailer-type-btn ${trailerType === 'upload' ? 'active' : ''}`}
+                    onClick={() => { setTrailerType('upload'); setYoutubeUrl(''); }}
+                  >
+                    📁 Tải từ máy
+                  </button>
                 </div>
+
+                {/* YouTube URL Input */}
+                {trailerType === 'youtube' && (
+                  <div className="trailer-input-wrapper">
+                    <input
+                      type="text"
+                      placeholder="Nhập link YouTube (vd: https://www.youtube.com/watch?v=...)"
+                      value={youtubeUrl}
+                      onChange={(e) => setYoutubeUrl(e.target.value)}
+                      className="trailer-youtube-input"
+                    />
+                    {youtubeUrl && (
+                      <button
+                        type="button"
+                        className="trailer-clear-btn"
+                        onClick={() => setYoutubeUrl('')}
+                      >✕</button>
+                    )}
+                  </div>
+                )}
+
+                {/* File Upload Zone */}
+                {trailerType === 'upload' && (
+                  <div
+                    className="img-upload-zone trailer-upload-zone"
+                    onClick={() => document.getElementById("trailer-file-input").click()}
+                  >
+                    {trailerFile ? (
+                      <>
+                        <div className="img-upload-placeholder">
+                          <span className="img-upload-icon">🎬</span>
+                          <span>{trailerFile.name}</span>
+                        </div>
+                        <button
+                          className="img-upload-remove"
+                          onClick={(e) => { e.stopPropagation(); removeTrailer(); }}
+                        >✕</button>
+                      </>
+                    ) : movie?.trailer && trailerType === 'upload' ? (
+                      <>
+                        <div className="img-upload-placeholder">
+                          <span className="img-upload-icon">🎬</span>
+                          <span>Trailer đã chọn</span>
+                        </div>
+                        <button
+                          className="img-upload-remove"
+                          onClick={(e) => { e.stopPropagation(); removeTrailer(); }}
+                        >✕</button>
+                      </>
+                    ) : (
+                      <div className="img-upload-placeholder">
+                        <span className="img-upload-icon">🎬</span>
+                        <span>Chọn trailer từ máy</span>
+                        <span className="img-upload-hint">MP4, WEBM, OGG – tối đa 100MB</span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <input
                   id="trailer-file-input"
                   type="file"

@@ -11,6 +11,7 @@ const moviesUploadDir = path.join(__dirname, "../uploads/movies");
 const trailersUploadDir = path.join(__dirname, "../uploads/trailers");
 const cinemasUploadDir = path.join(__dirname, "../uploads/cinemas");
 const newsUploadDir = path.join(__dirname, "../uploads/news");
+const staffUploadDir = path.join(__dirname, "../uploads/staff");
 
 if (!fs.existsSync(moviesUploadDir)) {
   fs.mkdirSync(moviesUploadDir, { recursive: true });
@@ -23,6 +24,9 @@ if (!fs.existsSync(cinemasUploadDir)) {
 }
 if (!fs.existsSync(newsUploadDir)) {
   fs.mkdirSync(newsUploadDir, { recursive: true });
+}
+if (!fs.existsSync(staffUploadDir)) {
+  fs.mkdirSync(staffUploadDir, { recursive: true });
 }
 
 // Cấu hình storage chung, phân biệt dựa trên fieldname
@@ -37,6 +41,9 @@ const storage = multer.diskStorage({
       cb(null, cinemasUploadDir);
     } else if (file.fieldname === "thumbnailFile") {
       cb(null, newsUploadDir);
+    } else if (file.fieldname === "avatar") {
+      // For staff avatars
+      cb(null, staffUploadDir);
     }
   },
   filename: (req, file, cb) => {
@@ -49,6 +56,8 @@ const storage = multer.diskStorage({
       cb(null, "cinema-" + uniqueSuffix + path.extname(file.originalname));
     } else if (file.fieldname === "thumbnailFile") {
       cb(null, "news-" + uniqueSuffix + path.extname(file.originalname));
+    } else if (file.fieldname === "avatar") {
+      cb(null, "avatar-" + uniqueSuffix + path.extname(file.originalname));
     }
   },
 });
@@ -58,7 +67,8 @@ const fileFilter = (req, file, cb) => {
   if (
     file.fieldname === "posters" ||
     file.fieldname === "image" ||
-    file.fieldname === "thumbnailFile"
+    file.fieldname === "thumbnailFile" ||
+    file.fieldname === "avatar"
   ) {
     // Gộp filter cho ảnh
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
@@ -107,4 +117,10 @@ export const uploadNewsImage = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+export const uploadStaffAvatar = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB for staff avatars
 });

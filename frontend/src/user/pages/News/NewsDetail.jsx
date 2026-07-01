@@ -94,7 +94,7 @@ export default function NewsDetail() {
             </span>
           </div>
           <h1>{article.title}</h1>
-          <p>{article.short_description || "Bài viết đang được cập nhật mô tả ngắn."}</p>
+          <div dangerouslySetInnerHTML={{ __html: article.short_description || "Bài viết đang được cập nhật mô tả ngắn." }} />
 
           <div className="news-detail-meta">
             <span>
@@ -106,7 +106,7 @@ export default function NewsDetail() {
             <span>
               <FaClock /> {readTime(article.content)}
             </span>
-            <span>Tác giả: {article.author_name || "Lunexa"}</span>
+            <span>Tác giả: {article.author_name || "Sweetstar Movie"}</span>
           </div>
         </header>
 
@@ -121,12 +121,7 @@ export default function NewsDetail() {
         )}
 
         <div className="news-detail-content">
-          {String(article.content || "")
-            .split(/\n{2,}/)
-            .filter(Boolean)
-            .map((paragraph, index) => (
-              <p key={index}>{paragraph}</p>
-            ))}
+          <div dangerouslySetInnerHTML={{ __html: article.content || "" }} />
         </div>
       </article>
 

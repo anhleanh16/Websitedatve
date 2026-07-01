@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import ReviewSection from '../../Components/ReviewSection';
 import './MovieDetail.css';
 
-const VISITED_TAG_STORAGE_KEY = 'lunexa_user_tag_preferences';
+const VISITED_TAG_STORAGE_KEY = 'sweetstar_user_tag_preferences';
 
 const formatDateKey = (input) => {
   const d = new Date(input);
@@ -460,7 +461,7 @@ export default function MovieDetail() {
         movieId: Number(movie?.movie_id || id || 0) || null,
         movieTitle,
         ageLimit: Number(movie?.age_limit || 0),
-        cinema: currentCinema?.name || selectedTime.cinemaName || 'Lunexa Movix',
+        cinema: currentCinema?.name || selectedTime.cinemaName || 'Sweetstar Movie',
         cinemaId: currentCinema?.id || selectedTime.cinemaId,
         roomId: selectedTime.roomId,
         roomName: selectedTime.roomName,
@@ -957,6 +958,11 @@ export default function MovieDetail() {
           )}
         </div>
       </div>{/* end movie-detail-content */}
+
+      {/* Review Section */}
+      <div className="movie-detail-reviews-wrapper">
+        <ReviewSection movieId={id} />
+      </div>
 
     </div>
   );

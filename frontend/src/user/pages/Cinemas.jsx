@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./Cinemas.css";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import QuickBookWidget from "../Components/QuickBookWidget/QuickBookWidget";
 
 const banners = [
   "/uploads/banners/banner1.jpg",
@@ -420,59 +421,11 @@ export default function Cinemas() {
           </section>
 
           <aside className="cinema-right">
-            <div className="quick-book">
-              <h4>Đặt vé nhanh</h4>
-              {featuredCinema ? (
-                <>
-                  <div className="quick-book-summary">
-                    <span className="quick-book-label">Rạp đang chọn</span>
-                    <strong>{featuredCinema.cinema_name}</strong>
-                    <p>{featuredCinema.address}</p>
-                  </div>
-
-                  <div className="quick-book-stats">
-                    <div>
-                      <strong>{featuredSummary?.roomCount || 0}</strong>
-                      <span>Phòng chiếu</span>
-                    </div>
-                    <div>
-                      <strong>{featuredSummary?.totalSeats || 0}</strong>
-                      <span>Tổng ghế</span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      handleToggleDetails(featuredCinema.cinemas_id)
-                    }
-                  >
-                    Xem phòng chiếu
-                  </button>
-                  <button onClick={() => handleBooking(featuredCinema)}>
-                    Chọn phim trước
-                  </button>
-                </>
-              ) : (
-                <p className="quick-book-empty">
-                  Chưa có dữ liệu rạp để hiển thị.
-                </p>
-              )}
-            </div>
-
+            <QuickBookWidget />
             <div className="suggest">
-              <div className="side-card-title">Tính năng hiện có</div>
-              <ul className="side-feature-list">
-                <li>Lọc theo tỉnh/thành</li>
-                <li>Tìm kiếm theo tên, địa chỉ, số điện thoại</li>
-                <li>Xem chi tiết rạp và danh sách phòng</li>
-                <li>Chuyển nhanh sang trang đặt vé</li>
-              </ul>
-            </div>
-            <div className="ad">
               <div className="side-card-title">Gợi ý sử dụng</div>
               <p className="side-card-text">
-                Chọn một rạp trong danh sách để xem ngay số phòng, số ghế và
-                loại phòng đang có.
+                Chọn phim, rạp, ngày và suất chiếu để đặt vé nhanh chóng.
               </p>
             </div>
           </aside>

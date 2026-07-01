@@ -387,7 +387,7 @@ export default function Booking() {
     movieId = null,
     movieTitle = "",
     ageLimit = 0,
-    cinema = "Lunexa Movix Đà Nẵng",
+    cinema = "Sweetstar Movie Đà Nẵng",
     cinemaId = null,
     showtimeId = null,
     roomId: initialRoomId = null,
@@ -1373,7 +1373,7 @@ export default function Booking() {
       <div className="booking-promo-banner">
         <div className="promo-content">
           <strong>Ưu đãi Member</strong>
-          <p>Giảm 5% cho thành viên Star Member khi đặt qua Lunexa App</p>
+          <p>Giảm 5% cho thành viên Star Member khi đặt qua Sweetstar App</p>
           <button type="button" className="promo-link">
             Khám phá ngay &rsaquo;
           </button>

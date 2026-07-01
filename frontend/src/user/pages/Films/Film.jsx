@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./Film.css";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import QuickBookWidget from "../../Components/QuickBookWidget/QuickBookWidget";
 
-const VISITED_TAG_STORAGE_KEY = "lunexa_user_tag_preferences";
+const VISITED_TAG_STORAGE_KEY = "sweetstar_user_tag_preferences";
 
 const banners = [
   "/uploads/banners/banner1.jpg",
@@ -412,28 +413,7 @@ export default function Film() {
           </section>
 
           <aside className="film-right">
-            <div className="quick-book">
-              <div className="quick-book-header">
-                <h4>Đặt vé nhanh</h4>
-                <span>Dành cho người mới, làm lần lượt theo 4 bước này.</span>
-              </div>
-              <div className="quick-book-steps">
-                {quickBookingSteps.map((item, index) => (
-                  <div
-                    key={item.id}
-                    className="quick-book-step"
-                    style={{ animationDelay: `${index * 0.24}s` }}
-                  >
-                    <div className="quick-book-step-index">{index + 1}</div>
-                    <div className="quick-book-step-content">
-                      <span className="quick-book-step-badge">{item.step}</span>
-                      <strong>{item.title}</strong>
-                      <p>{item.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <QuickBookWidget />
 
             <div className="suggest">
               <div className="suggest-header">
@@ -495,7 +475,7 @@ export default function Film() {
               <div className="ad-content">
                 <span className="ad-badge">Ưu đãi</span>
                 <strong>Đặt vé sớm</strong>
-                <p>Chọn suất đẹp và trải nghiệm phim hot tại Lunexa Movix.</p>
+                <p>Chọn suất đẹp và trải nghiệm phim hot tại Sweetstar Movie.</p>
                 <span className="ad-cta">Khám phá ngay</span>
               </div>
             </Link>

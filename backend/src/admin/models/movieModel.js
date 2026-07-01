@@ -204,12 +204,20 @@ export const MovieModel = {
       }
 
       let trailer = null;
-      if (files && files.trailer) {
-        const trailerFiles = Array.isArray(files.trailer)
-          ? files.trailer
-          : [files.trailer];
-        if (trailerFiles.length > 0) {
-          trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
+      // Kiểm tra xem trailer có phải URL (YouTube/link) hay file upload
+      if (movieData.trailer) {
+        // Nếu là URL (bắt đầu bằng http/https)
+        if (typeof movieData.trailer === 'string' && movieData.trailer.startsWith('http')) {
+          trailer = movieData.trailer;
+        }
+        // Nếu là file upload
+        else if (files && files.trailer) {
+          const trailerFiles = Array.isArray(files.trailer)
+            ? files.trailer
+            : [files.trailer];
+          if (trailerFiles.length > 0) {
+            trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
+          }
         }
       }
 
@@ -319,12 +327,20 @@ export const MovieModel = {
       }
 
       let trailer = movie.trailer;
-      if (files && files.trailer) {
-        const trailerFiles = Array.isArray(files.trailer)
-          ? files.trailer
-          : [files.trailer];
-        if (trailerFiles.length > 0) {
-          trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
+      // Kiểm tra xem trailer có phải URL (YouTube/link) hay file upload
+      if (movieData.trailer) {
+        // Nếu là URL (bắt đầu bằng http/https)
+        if (typeof movieData.trailer === 'string' && movieData.trailer.startsWith('http')) {
+          trailer = movieData.trailer;
+        }
+        // Nếu là file upload
+        else if (files && files.trailer) {
+          const trailerFiles = Array.isArray(files.trailer)
+            ? files.trailer
+            : [files.trailer];
+          if (trailerFiles.length > 0) {
+            trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
+          }
         }
       }
 

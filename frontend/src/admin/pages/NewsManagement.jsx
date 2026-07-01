@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { adminNewsService } from "../services/adminApi";
 import { toAbsoluteAssetUrl } from "../../utils/api";
+import { CKEditor } from "@ckeditor/ckeditor5-react";
+import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import "./news-management.css";
 
 const CATEGORY_OPTIONS = [
@@ -59,7 +61,7 @@ function CategoryManager({ newsList }) {
   const [editIcon, setEditIcon]         = useState("");
   const [labels, setLabels]             = useState(() => {
     try {
-      const raw = localStorage.getItem("lunexa_news_category_labels");
+      const raw = localStorage.getItem("sweetstar_news_category_labels");
       return raw ? JSON.parse(raw) : {};
     } catch { return {}; }
   });
@@ -70,7 +72,7 @@ function CategoryManager({ newsList }) {
       [value]: { label: editLabel.trim() || labels[value]?.label, icon: editIcon.trim() || labels[value]?.icon },
     };
     setLabels(next);
-    localStorage.setItem("lunexa_news_category_labels", JSON.stringify(next));
+    localStorage.setItem("sweetstar_news_category_labels", JSON.stringify(next));
     setEditingValue(null);
   };
 
@@ -139,7 +141,7 @@ function CategoryManager({ newsList }) {
                           const next = { ...labels };
                           delete next[cat.value];
                           setLabels(next);
-                          localStorage.setItem("lunexa_news_category_labels", JSON.stringify(next));
+                          localStorage.setItem("sweetstar_news_category_labels", JSON.stringify(next));
                           setEditingValue(null);
                         }}
                       >
@@ -223,22 +225,51 @@ function NewsModal({ open, form, setForm, onClose, onSubmit, saving, editingId }
 
               <div className="nm-field">
                 <label>Mô tả ngắn</label>
-                <textarea
-                  rows={4}
-                  value={form.short_description}
-                  onChange={(event) => setField("short_description", event.target.value)}
-                  placeholder="Tóm tắt ngắn nội dung bài viết"
+                <CKEditor
+                  editor={ClassicEditor}
+                  data={form.short_description}
+                  onChange={(event, editor) => {
+                    const data = editor.getData();
+                    setField("short_description", data);
+                  }}
+                  config={{
+                    toolbar: {
+                      items: ["heading", "|", "bold", "italic", "underline", "link", "|", "bulletedList", "numberedList", "|", "blockQuote", "code"],
+                      shouldNotGroupWhenFull: true,
+                    },
+                    heading: {
+                      options: [
+                        { model: "paragraph", title: "Paragraph", class: "ck-heading_paragraph" },
+                        { model: "heading1", view: "h1", title: "Heading 1", class: "ck-heading_heading1" },
+                        { model: "heading2", view: "h2", title: "Heading 2", class: "ck-heading_heading2" },
+                      ],
+                    },
+                  }}
                 />
               </div>
 
               <div className="nm-field">
                 <label>Nội dung *</label>
-                <textarea
-                  rows={12}
-                  value={form.content}
-                  onChange={(event) => setField("content", event.target.value)}
-                  placeholder="Nhập nội dung chi tiết bài viết"
-                  required
+                <CKEditor
+                  editor={ClassicEditor}
+                  data={form.content}
+                  onChange={(event, editor) => {
+                    const data = editor.getData();
+                    setField("content", data);
+                  }}
+                  config={{
+                    toolbar: {
+                      items: ["heading", "|", "bold", "italic", "underline", "link", "|", "bulletedList", "numberedList", "|", "blockQuote", "code"],
+                      shouldNotGroupWhenFull: true,
+                    },
+                    heading: {
+                      options: [
+                        { model: "paragraph", title: "Paragraph", class: "ck-heading_paragraph" },
+                        { model: "heading1", view: "h1", title: "Heading 1", class: "ck-heading_heading1" },
+                        { model: "heading2", view: "h2", title: "Heading 2", class: "ck-heading_heading2" },
+                      ],
+                    },
+                  }}
                 />
               </div>
             </div>
@@ -495,7 +526,7 @@ export default function NewsManagement() {
       <div className="nm-page-header">
         <div>
           <h2>Quản lý tin tức</h2>
-          <p>Tạo, chỉnh sửa và xuất bản tin tức cho hệ thống Lunexa từ dữ liệu database.</p>
+          <p>Tạo, chỉnh sửa và xuất bản tin tức cho hệ thống Sweetstar Movie từ dữ liệu database.</p>
         </div>
         <button className="nm-btn nm-btn-primary nm-btn-lg" onClick={openCreate}>
           + Thêm bài viết

@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: "/admin/combos",        label: "Combo",            icon: "🍿" },
   { to: "/admin/promotions",    label: "Khuyến mãi",       icon: "🏷" },
   { to: "/admin/news",          label: "Tin tức",          icon: "📰" },
+  { to: "/admin/blog",          label: "Blog",             icon: "📑" },
   { to: "/admin/notifications", label: "Thông báo",        icon: "🔔" },
   { to: "/admin/comments",      label: "Bình luận",        icon: "💬" },
   { to: "/admin/statistics",       label: "Thống kê",          icon: "📊" },
@@ -22,7 +23,7 @@ export default function AdminSidebar({ collapsed, onToggle, mobileOpen, onMobile
     <aside className={`admin-sidebar${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`}>
       {/* Header */}
       <div className="sidebar-header">
-        {!collapsed && <h2 className="sidebar-logo">Lunexa</h2>}
+        {!collapsed && <h2 className="sidebar-logo">Sweetstar</h2>}
         <button
           className="sidebar-toggle"
           onClick={onToggle}
