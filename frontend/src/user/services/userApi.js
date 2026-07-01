@@ -75,6 +75,29 @@ export const userBookingService = {
     }),
 };
 
+export const userMovieService = {
+  getAll: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+      ),
+    ).toString();
+    return apiFetch(`/user/movies${q ? `?${q}` : ""}`);
+  },
+  getById: (id) => apiFetch(`/user/movies/${encodeURIComponent(id)}`),
+};
+
+export const userShowtimeService = {
+  getAll: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+      ),
+    ).toString();
+    return apiFetch(`/user/showtimes${q ? `?${q}` : ""}`);
+  },
+};
+
 export const userNewsService = {
   getAll: (params = {}) => {
     const q = new URLSearchParams(

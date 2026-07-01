@@ -7,7 +7,7 @@ import {
 } from 'react-icons/fa'
 import { MdLocalOffer } from 'react-icons/md'
 import { useSelector } from 'react-redux'
-import { userNewsService } from '../../services/userApi'
+import { userNewsService, userMovieService, userCinemaService, userPromotionService, userComboService, userShowtimeService } from '../../services/userApi'
 import { toAbsoluteAssetUrl } from '../../../utils/api'
 import './home.css'
 
@@ -275,27 +275,15 @@ export default function Home() {
   const adTimer   = useRef(null)
 
   useEffect(() => {
-    const controller = new AbortController()
-
     const loadHomeData = async () => {
       setLoadingMovies(true)
       setMoviesError('')
 
       try {
-        const [nowRes, soonRes, cinemaRes] = await Promise.all([
-          fetch('/api/user/movies?status=now_showing', { signal: controller.signal }),
-          fetch('/api/user/movies?status=coming_soon', { signal: controller.signal }),
-          fetch('/api/user/cinemas', { signal: controller.signal }),
-        ])
-
-        if (!nowRes.ok || !soonRes.ok || !cinemaRes.ok) {
-          throw new Error('Không thể tải dữ liệu trang chủ.')
-        }
-
         const [nowData, soonData, cinemaData] = await Promise.all([
-          nowRes.json(),
-          soonRes.json(),
-          cinemaRes.json(),
+          userMovieService.getAll({ status: 'now_showing' }),
+          userMovieService.getAll({ status: 'coming_soon' }),
+          userCinemaService.getAll(),
         ])
 
         const nextNowShowing = Array.isArray(nowData?.movies)
@@ -317,7 +305,6 @@ export default function Home() {
           return prev || String(nextCinemas[0]?.cinemas_id || '')
         })
       } catch (err) {
-        if (err?.name === 'AbortError') return
         console.error(err)
         setNowShowing([])
         setComingSoon([])
@@ -329,7 +316,6 @@ export default function Home() {
     }
 
     loadHomeData()
-    return () => controller.abort()
   }, [])
 
   useEffect(() => {
@@ -362,26 +348,17 @@ export default function Home() {
       return
     }
 
-    const controller = new AbortController()
-
     const loadShowtimes = async () => {
       setLoadingShowtimes(true)
       setShowtimesError('')
 
       try {
-        const params = new URLSearchParams({ cinemaId: selectedCinemaId })
-        if (showtimeTab !== 'all') params.set('format', showtimeTab)
+        const params = { cinemaId: selectedCinemaId }
+        if (showtimeTab !== 'all') params.format = showtimeTab
 
-        const res = await fetch(`/api/user/showtimes?${params.toString()}`, {
-          signal: controller.signal,
-        })
-
-        if (!res.ok) throw new Error('Không thể tải lịch chiếu.')
-
-        const data = await res.json()
+        const data = await userShowtimeService.getAll(params)
         setShowtimes(Array.isArray(data?.showtimes) ? data.showtimes : [])
       } catch (err) {
-        if (err?.name === 'AbortError') return
         console.error(err)
         setShowtimes([])
         setShowtimesError('Không thể tải lịch chiếu từ database.')
@@ -391,7 +368,6 @@ export default function Home() {
     }
 
     loadShowtimes()
-    return () => controller.abort()
   }, [selectedCinemaId, showtimeTab])
 
   const featuredMovies = movieTab === 'soon' ? comingSoon : nowShowing

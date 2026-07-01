@@ -5,6 +5,7 @@ import { db } from "../../../config/db.js";
 import { NotificationModel } from "../../admin/models/notificationModel.js";
 import { PromotionModel } from "../../admin/models/promotionModel.js";
 import { NewsModel } from "../../admin/models/newsModel.js";
+import { ComboModel } from "../../admin/models/comboModel.js";
 
 const normalizeCinemaImagePath = (cinema) => {
   if (!cinema) return cinema;
@@ -319,6 +320,16 @@ export const userGetMovieById = async (req, res) => {
   }
 };
 
+export const userGetCombos = async (req, res) => {
+  try {
+    const combos = await ComboModel.findActive();
+    res.json({ combos });
+  } catch (error) {
+    console.error("Error in userGetCombos:", error);
+    res.status(500).json({ message: "Error getting combos", combos: [] });
+  }
+};
+
 export const userUpdateProfile = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -446,6 +457,16 @@ export const userGetPromotions = async (req, res) => {
       coupons: [],
       vouchers: [],
     });
+  }
+};
+
+export const userGetTodayPromotions = async (req, res) => {
+  try {
+    const coupons = await PromotionModel.findActiveCoupons();
+    res.json({ coupons });
+  } catch (error) {
+    console.error("Error in userGetTodayPromotions:", error);
+    res.status(500).json({ message: "Không thể tải khuyến mãi hôm nay", coupons: [] });
   }
 };
 

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./Booking.css";
-import { userComboService } from "../../services/userApi";
+import { userComboService, userCinemaService } from "../../services/userApi";
 
 const parseSeatCode = (seatCode) => {
   const match = String(seatCode || "")
@@ -445,12 +445,7 @@ export default function Booking() {
       setSeatError("");
 
       try {
-        const res = await fetch(`/api/user/cinemas/${cinemaId}`);
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data?.message || "Không thể tải dữ liệu ghế.");
-        }
+        const data = await userCinemaService.getById(cinemaId);
 
         if (ignore) return;
 

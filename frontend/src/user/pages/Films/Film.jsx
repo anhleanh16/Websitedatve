@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import "./Film.css";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import QuickBookWidget from "../../Components/QuickBookWidget/QuickBookWidget";
+import { userMovieService } from "../../services/userApi";
 
 const VISITED_TAG_STORAGE_KEY = "sweetstar_user_tag_preferences";
 
@@ -104,21 +105,14 @@ export default function Film() {
   }, [currentBannerIndex]);
 
   useEffect(() => {
-    const controller = new AbortController();
-
     const loadMovies = async () => {
       setLoadingMovies(true);
       setMoviesError(null);
       try {
-        const res = await fetch(`/api/user/movies?status=${encodeURIComponent(activeTab)}`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error("API error");
-        const data = await res.json();
+        const data = await userMovieService.getAll({ status: activeTab });
         const list = Array.isArray(data?.movies) ? data.movies : [];
         setMovies(list.map(normalizeMovieItem));
       } catch (err) {
-        if (err?.name === "AbortError") return;
         console.error(err);
         setMovies([]);
         setMoviesError("Không thể tải danh sách phim.");
@@ -128,28 +122,21 @@ export default function Film() {
     };
 
     loadMovies();
-    return () => controller.abort();
   }, [activeTab]);
 
   useEffect(() => {
-    const controller = new AbortController();
-
     const loadMovieCatalog = async () => {
       try {
-        const res = await fetch("/api/user/movies", { signal: controller.signal });
-        if (!res.ok) throw new Error("API error");
-        const data = await res.json();
+        const data = await userMovieService.getAll();
         const list = Array.isArray(data?.movies) ? data.movies : [];
         setMovieCatalog(list.map(normalizeMovieItem));
       } catch (err) {
-        if (err?.name === "AbortError") return;
         console.error(err);
         setMovieCatalog([]);
       }
     };
 
     loadMovieCatalog();
-    return () => controller.abort();
   }, []);
 
   const suggestedMovies = useMemo(() => {

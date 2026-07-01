@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import ReviewSection from '../../Components/ReviewSection';
+import { userMovieService } from '../../services/userApi';
 import './MovieDetail.css';
 
 const VISITED_TAG_STORAGE_KEY = 'sweetstar_user_tag_preferences';
@@ -112,20 +113,14 @@ export default function MovieDetail() {
 
   useEffect(() => {
     if (!id) return;
-    const controller = new AbortController();
 
     const loadMovie = async () => {
       setLoadingMovie(true);
       setMovieError(null);
       try {
-        const res = await fetch(`/api/user/movies/${encodeURIComponent(id)}`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error("API error");
-        const data = await res.json();
+        const data = await userMovieService.getById(id);
         setMovie(data?.movie || null);
       } catch (err) {
-        if (err?.name === "AbortError") return;
         console.error(err);
         setMovie(null);
         setMovieError("Không thể tải chi tiết phim.");
@@ -135,7 +130,6 @@ export default function MovieDetail() {
     };
 
     loadMovie();
-    return () => controller.abort();
   }, [id]);
 
   // Scroll xuống phần lịch chiếu nếu được navigate từ nút "Mua vé"
