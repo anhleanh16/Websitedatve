@@ -87,7 +87,31 @@
 .mv-form-col  { display: flex; flex-direction: column; gap: 0; }
 .mv-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .mv-field label { font-size: 13px; color: #9db0ff; }
-.mv-field input, .mv-field select, .mv-field textarea { padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; transition: border-color 0.2s; font-family: inherit; }
+.mv-field input, .mv-field select {
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #eef4ff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+
+.mv-field textarea {
+  min-height: 100px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #eef4ff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
 .mv-field input:focus, .mv-field select:focus, .mv-field textarea:focus { border-color: rgba(124,97,255,0.45); }
 .mv-field input.error, .mv-field select.error { border-color: rgba(248,113,113,0.5); }
 .mv-field textarea { resize: vertical; }

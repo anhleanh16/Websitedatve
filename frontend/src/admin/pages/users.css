@@ -104,7 +104,16 @@
 .us-adjust-info { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: 14px; margin-bottom: 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); font-size: 15px; color: #eef4ff; }
 .us-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .us-field label { font-size: 13px; color: #9db0ff; }
-.us-field input { padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; }
+.us-field input {
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #eef4ff;
+  font-size: 14px;
+  outline: none;
+}
 .us-field input:focus { border-color: rgba(124,97,255,0.45); }
 .us-error { color: #f87171; font-size: 12px; }
 .us-toast { position: fixed; bottom: 32px; right: 32px; z-index: 99999; padding: 14px 20px; border-radius: 16px; font-size: 14px; display: flex; align-items: center; gap: 14px; background: rgba(16,185,129,0.18); border: 1px solid rgba(16,185,129,0.3); color: #a7f3d0; box-shadow: 0 20px 50px rgba(0,0,0,0.35); animation: us-toast-in 0.3s ease; }

@@ -318,6 +318,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
   const [trailerFile, setTrailerFile] = useState(null);
   const [trailerType, setTrailerType] = useState(movie?.trailer ? 'youtube' : 'upload');
   const [youtubeUrl, setYoutubeUrl] = useState(movie?.trailer ? movie.trailer : '');
+  const [deleteTrailer, setDeleteTrailer] = useState(false);
   const [allPosters, setAllPosters] = useState([]);
   const [posterDrag, setPosterDrag] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -457,8 +458,10 @@ function MovieForm({ movie, categories, onClose, onSave }) {
         formData.append('posters', file);
       });
       
-      // Thêm trailer mới nếu có
-      if (trailerType === 'youtube' && youtubeUrl.trim()) {
+      // Xử lý trailer
+      if (deleteTrailer) {
+        formData.append('delete_trailer', 'true');
+      } else if (trailerType === 'youtube' && youtubeUrl.trim()) {
         formData.append('trailer', youtubeUrl.trim());
       } else if (trailerType === 'upload' && trailerFile) {
         formData.append('trailer', trailerFile);
@@ -551,26 +554,59 @@ function MovieForm({ movie, categories, onClose, onSave }) {
               <div className="mv-field">
                 <label>Trailer phim</label>
                 
+                {movie?.trailer && !deleteTrailer && (
+                  <button
+                    type="button"
+                    className="mv-btn mv-btn-delete"
+                    style={{ marginBottom: '10px' }}
+                    onClick={() => {
+                      setDeleteTrailer(true);
+                      setYoutubeUrl('');
+                      setTrailerFile(null);
+                    }}
+                  >
+                    🗑️ Xóa trailer
+                  </button>
+                )}
+
+                {deleteTrailer && (
+                  <button
+                    type="button"
+                    className="mv-btn mv-btn-secondary"
+                    style={{ marginBottom: '10px' }}
+                    onClick={() => {
+                      setDeleteTrailer(false);
+                      if (movie?.trailer) {
+                        setYoutubeUrl(movie.trailer);
+                      }
+                    }}
+                  >
+                    🔄 Hoàn tác
+                  </button>
+                )}
+
                 {/* Nút chọn loại trailer */}
-                <div className="trailer-type-selector">
-                  <button
-                    type="button"
-                    className={`trailer-type-btn ${trailerType === 'youtube' ? 'active' : ''}`}
-                    onClick={() => { setTrailerType('youtube'); setTrailerFile(null); }}
-                  >
-                    🔗 Link YouTube
-                  </button>
-                  <button
-                    type="button"
-                    className={`trailer-type-btn ${trailerType === 'upload' ? 'active' : ''}`}
-                    onClick={() => { setTrailerType('upload'); setYoutubeUrl(''); }}
-                  >
-                    📁 Tải từ máy
-                  </button>
-                </div>
+                {!deleteTrailer && (
+                  <div className="trailer-type-selector">
+                    <button
+                      type="button"
+                      className={`trailer-type-btn ${trailerType === 'youtube' ? 'active' : ''}`}
+                      onClick={() => { setTrailerType('youtube'); setTrailerFile(null); }}
+                    >
+                      🔗 Link YouTube
+                    </button>
+                    <button
+                      type="button"
+                      className={`trailer-type-btn ${trailerType === 'upload' ? 'active' : ''}`}
+                      onClick={() => { setTrailerType('upload'); setYoutubeUrl(''); }}
+                    >
+                      📁 Tải từ máy
+                    </button>
+                  </div>
+                )}
 
                 {/* YouTube URL Input */}
-                {trailerType === 'youtube' && (
+                {!deleteTrailer && trailerType === 'youtube' && (
                   <div className="trailer-input-wrapper">
                     <input
                       type="text"
@@ -590,7 +626,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
                 )}
 
                 {/* File Upload Zone */}
-                {trailerType === 'upload' && (
+                {!deleteTrailer && trailerType === 'upload' && (
                   <div
                     className="img-upload-zone trailer-upload-zone"
                     onClick={() => document.getElementById("trailer-file-input").click()}

@@ -70,7 +70,18 @@
 .pr-form-col  { display: flex; flex-direction: column; }
 .pr-field     { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .pr-field label { font-size: 13px; color: #9db0ff; }
-.pr-field input, .pr-field select { padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; font-family: inherit; transition: border-color 0.2s; }
+.pr-field input, .pr-field select {
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #eef4ff;
+  font-size: 14px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
 .pr-field input:focus, .pr-field select:focus { border-color: rgba(124,97,255,0.45); }
 .pr-field input.error { border-color: rgba(248,113,113,0.5); }
 .pr-field select option { background: #0d1224; }

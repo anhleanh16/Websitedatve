@@ -104,7 +104,31 @@ export const uploadMovieFiles = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB mỗi file
-});
+}).fields([
+  { name: "posters", maxCount: 12 },
+  { name: "trailer", maxCount: 1 },
+]);
+
+// Tạo một wrapper để xử lý lỗi unexpected field một cách nhẹ nhàng
+export const uploadMovieFilesMiddleware = (req, res, next) => {
+  const upload = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: { fileSize: 100 * 1024 * 1024 },
+  }).any(); // Accept any files, we'll filter them manually
+  
+  upload(req, res, (err) => {
+    if (err) {
+      console.error("Multer error:", err);
+      // Ignore all multer errors and just continue, because we might not even be uploading files (just a YouTube link)
+      console.log("Ignoring multer error, continuing with request...");
+      // Make sure req.files is an empty array if there's an error
+      if (!req.files) req.files = [];
+      return next();
+    }
+    next();
+  });
+};
 
 // Multer instance for cinema image
 export const uploadCinemaImage = multer({

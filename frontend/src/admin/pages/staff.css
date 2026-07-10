@@ -70,7 +70,32 @@
 .sf-field { display: flex; flex-direction: column; gap: 5px; }
 .sf-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sf-field label { font-size: 13px; color: #8fa6ff; font-weight: 500; }
-.sf-field input, .sf-field select, .sf-field textarea { padding: 10px 13px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; transition: border-color 0.2s; font-family: inherit; box-sizing: border-box; }
+.sf-field input, .sf-field select {
+  height: 46px;
+  padding: 0 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #eef4ff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.sf-field textarea {
+  padding: 10px 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #eef4ff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+  box-sizing: border-box;
+}
 .sf-field input:focus, .sf-field select:focus { border-color: rgba(124,97,255,0.45); }
 .sf-field input.error { border-color: rgba(248,113,113,0.5); }
 .sf-field select option { background: #0d1224; }

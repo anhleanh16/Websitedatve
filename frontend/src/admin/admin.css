@@ -4080,3 +4080,14 @@
   .seat-overview-header { flex-direction: column; align-items: flex-start; }
   .room-detail-right { display: none; }
 }
+
+/* Global fix for admin form inputs/selects to prevent enlargement */
+.admin-layout input:not([type="checkbox"]):not([type="radio"]),
+.admin-layout select {
+  height: 46px !important;
+  min-height: 46px !important;
+  max-height: 46px !important;
+  box-sizing: border-box !important;
+  line-height: 1.5 !important;
+  resize: none !important;
+}

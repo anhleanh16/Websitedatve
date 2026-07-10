@@ -368,3 +368,8 @@ CREATE TABLE Blog_Likes(
     FOREIGN KEY(blog_id) REFERENCES Blogs(blog_id),
     FOREIGN KEY(user_id) REFERENCES User(id)
 );
+
+ALTER TABLE User
+ADD level_id INT,
+ADD FOREIGN KEY(level_id)
+REFERENCES Membership_Levels(level_id);

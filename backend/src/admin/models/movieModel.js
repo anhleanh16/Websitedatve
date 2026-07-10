@@ -170,6 +170,9 @@ export const MovieModel = {
    */
   async create(movieData, files) {
     const conn = await db.getConnection();
+    console.log("=== MOVIE MODEL CREATE ===");
+    console.log("movieData:", JSON.stringify(movieData, null, 2));
+    console.log("files:", JSON.stringify(files, null, 2));
     const uploadedPaths = getUploadedPaths(files);
     try {
       await conn.beginTransaction();
@@ -204,22 +207,30 @@ export const MovieModel = {
       }
 
       let trailer = null;
-      // Kiểm tra xem trailer có phải URL (YouTube/link) hay file upload
-      if (movieData.trailer) {
-        // Nếu là URL (bắt đầu bằng http/https)
+      console.log("Processing trailer:");
+      console.log("  files.trailer exists:", !!files?.trailer);
+      console.log("  files.trailer length:", files?.trailer?.length || 0);
+      console.log("  movieData.trailer:", movieData.trailer);
+      console.log("  movieData.delete_trailer:", movieData.delete_trailer);
+      
+      if (movieData.delete_trailer === 'true') {
+        // Xóa trailer (nếu có)
+        trailer = null;
+      } else if (files && files.trailer && files.trailer.length > 0) {
+        // Ưu tiên file upload trước
+        const trailerFiles = Array.isArray(files.trailer)
+          ? files.trailer
+          : [files.trailer];
+        if (trailerFiles.length > 0) {
+          trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
+        }
+      } else if (movieData.trailer) {
+        // Nếu không có file upload, kiểm tra xem có URL không
         if (typeof movieData.trailer === 'string' && movieData.trailer.startsWith('http')) {
           trailer = movieData.trailer;
         }
-        // Nếu là file upload
-        else if (files && files.trailer) {
-          const trailerFiles = Array.isArray(files.trailer)
-            ? files.trailer
-            : [files.trailer];
-          if (trailerFiles.length > 0) {
-            trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
-          }
-        }
       }
+      console.log("  Final trailer:", trailer);
 
       const [result] = await conn.query(
         "INSERT INTO Movies (title,description,duration,age_limit,director,actors,trailer,poster,posters,release_date,status,language,country) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -327,22 +338,34 @@ export const MovieModel = {
       }
 
       let trailer = movie.trailer;
-      // Kiểm tra xem trailer có phải URL (YouTube/link) hay file upload
-      if (movieData.trailer) {
-        // Nếu là URL (bắt đầu bằng http/https)
+      console.log("=== MOVIE MODEL UPDATE ===");
+      console.log("movieData:", JSON.stringify(movieData, null, 2));
+      console.log("files:", JSON.stringify(files, null, 2));
+      console.log("Processing trailer:");
+      console.log("  Current trailer:", movie.trailer);
+      console.log("  files.trailer exists:", !!files?.trailer);
+      console.log("  files.trailer length:", files?.trailer?.length || 0);
+      console.log("  movieData.trailer:", movieData.trailer);
+      console.log("  movieData.delete_trailer:", movieData.delete_trailer);
+      
+      if (movieData.delete_trailer === 'true') {
+        // Xóa trailer
+        trailer = null;
+      } else if (files && files.trailer && files.trailer.length > 0) {
+        // Ưu tiên file upload trước
+        const trailerFiles = Array.isArray(files.trailer)
+          ? files.trailer
+          : [files.trailer];
+        if (trailerFiles.length > 0) {
+          trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
+        }
+      } else if (movieData.trailer) {
+        // Nếu không có file upload, kiểm tra xem có URL không
         if (typeof movieData.trailer === 'string' && movieData.trailer.startsWith('http')) {
           trailer = movieData.trailer;
         }
-        // Nếu là file upload
-        else if (files && files.trailer) {
-          const trailerFiles = Array.isArray(files.trailer)
-            ? files.trailer
-            : [files.trailer];
-          if (trailerFiles.length > 0) {
-            trailer = `/uploads/trailers/${trailerFiles[0].filename}`;
-          }
-        }
       }
+      console.log("  Final trailer:", trailer);
 
       const finalPosterSet = new Set([poster, ...posters].filter(Boolean));
       const filesToDeleteAfterCommit = [

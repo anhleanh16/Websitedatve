@@ -294,6 +294,20 @@
   box-shadow: 0 12px 36px rgba(79,70,229,0.35);
 }
 
+.card-preview-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-preview-type {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
 .card-preview-chip {
   font-size: 24px;
 }
@@ -313,6 +327,47 @@
   font-weight: 600;
   color: rgba(255,255,255,0.85);
   letter-spacing: 0.5px;
+}
+
+.cvv-input-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.cvv-input {
+  flex: 1;
+  padding: 11px 45px 11px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: #dbe6ff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.cvv-input:focus {
+  border-color: rgba(129,140,248,0.55);
+  background: rgba(255,255,255,0.07);
+}
+
+.cvv-toggle {
+  position: absolute;
+  right: 14px;
+  background: transparent;
+  border: none;
+  color: #7a8fc4;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.cvv-toggle:hover {
+  color: #dbe6ff;
 }
 
 .form-grid {
@@ -357,6 +412,30 @@
 .form-group input:focus {
   border-color: rgba(129,140,248,0.55);
   background: rgba(255,255,255,0.07);
+}
+
+.expiry-input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: #dbe6ff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  cursor: pointer;
+}
+
+.expiry-input:focus {
+  border-color: rgba(129,140,248,0.55);
+  background: rgba(255,255,255,0.07);
+}
+
+/* Style the calendar picker icon */
+.expiry-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
 }
 
 /* ── Bank grid ── */

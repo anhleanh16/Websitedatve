@@ -3,10 +3,38 @@ import { useSelector } from 'react-redux'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import {
   FaCreditCard, FaUniversity, FaMobileAlt,
-  FaLock, FaCheckCircle, FaTicketAlt, FaTag, FaChevronDown, FaChevronUp
+  FaLock, FaCheckCircle, FaTicketAlt, FaTag, FaChevronDown, FaChevronUp, FaEye, FaEyeSlash
 } from 'react-icons/fa'
 import './Payment.css'
 import { userBookingService } from '../../services/userApi'
+
+// Card type detection patterns
+const CARD_TYPES = [
+  {
+    name: 'Visa',
+    pattern: /^4/,
+    color: 'linear-gradient(135deg, #1a1f71, #f7931e)',
+    icon: 'VISA'
+  },
+  {
+    name: 'Mastercard',
+    pattern: /^5[1-5]/,
+    color: 'linear-gradient(135deg, #1e3a8a, #7c3aed)',
+    icon: 'MC'
+  },
+  {
+    name: 'JCB',
+    pattern: /^35/,
+    color: 'linear-gradient(135deg, #006400, #32cd32)',
+    icon: 'JCB'
+  },
+  {
+    name: 'Amex',
+    pattern: /^3[47]/,
+    color: 'linear-gradient(135deg, #0077c5, #179cde)',
+    icon: 'AMEX'
+  }
+]
 
 const PAYMENT_METHODS = [
   {
@@ -78,11 +106,54 @@ export default function Payment() {
   const [bookingError, setBookingError] = useState('')
   const [showOrderDetail, setShowOrderDetail] = useState(true)
   const [cardInfo, setCardInfo] = useState({ number: '', name: '', expiry: '', cvv: '' })
+  const [showCVV, setShowCVV] = useState(false)
   const [selectedBank, setSelectedBank] = useState('')
   const [agreed, setAgreed] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [paid, setPaid] = useState(false)
   const [createdBooking, setCreatedBooking] = useState(null)
+
+  // Detect card type
+  const detectedCardType = useMemo(() => {
+    if (!cardInfo.number) return null
+    return CARD_TYPES.find(type => type.pattern.test(cardInfo.number))
+  }, [cardInfo.number])
+
+  // Generate month/year options for expiry
+  const expiryMonths = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
+  }, [])
+
+  const expiryYears = useMemo(() => {
+    const currentYear = new Date().getFullYear()
+    return Array.from({ length: 15 }, (_, i) => String(currentYear + i))
+  }, [])
+
+  const formatCardNumber = (value) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 16)
+    return numbers.replace(/(.{4})/g, '$1 ').trim()
+  }
+
+  const formatExpiry = (value) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 4)
+    if (numbers.length >= 2) {
+      return `${numbers.slice(0, 2)}/${numbers.slice(2)}`
+    }
+    return numbers
+  }
+
+  const handleCardNumberChange = (e) => {
+    const rawValue = e.target.value.replace(/\D/g, '').slice(0, 16)
+    setCardInfo({ ...cardInfo, number: rawValue })
+  }
+
+  const handleExpiryChange = (e) => {
+    setCardInfo({ ...cardInfo, expiry: formatExpiry(e.target.value) })
+  }
+
+  const handleCVVChange = (e) => {
+    setCardInfo({ ...cardInfo, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) })
+  }
 
   const displaySeats = selectedSeatLabels.length > 0 ? selectedSeatLabels : selectedSeats
   const effectiveSeatTotal = Number(seatTotal || 0)
@@ -109,6 +180,34 @@ export default function Payment() {
 
   const handlePay = async () => {
     if (!agreed || processing) return
+
+    // Validate card info if payment method is card
+    if (method === 'card') {
+      if (!cardInfo.number || cardInfo.number.length < 13) {
+        setBookingError('Vui lòng nhập số thẻ hợp lệ')
+        return
+      }
+      if (!cardInfo.name || cardInfo.name.trim().length < 2) {
+        setBookingError('Vui lòng nhập tên chủ thẻ')
+        return
+      }
+      if (!cardInfo.expiry) {
+        setBookingError('Vui lòng chọn ngày hết hạn')
+        return
+      }
+      const [year, month] = cardInfo.expiry.split('-')
+      const currentDate = new Date()
+      const currentYear = currentDate.getFullYear()
+      const currentMonth = currentDate.getMonth() + 1
+      if (parseInt(year) < currentYear || (parseInt(year) === currentYear && parseInt(month) < currentMonth)) {
+        setBookingError('Thẻ đã hết hạn')
+        return
+      }
+      if (!cardInfo.cvv || cardInfo.cvv.length < 3) {
+        setBookingError('Vui lòng nhập CVV hợp lệ')
+        return
+      }
+    }
 
     if (!currentUser?.id) {
       setBookingError('Vui lòng đăng nhập trước khi thanh toán.')
@@ -295,16 +394,24 @@ export default function Payment() {
                 <FaLock /> Thông tin thẻ
               </h2>
               <div className="card-form">
-                <div className="card-preview">
-                  <div className="card-preview-chip">💳</div>
+                <div 
+                  className="card-preview"
+                  style={{ background: detectedCardType?.color || 'linear-gradient(135deg, #4f46e5, #7c3aed, #2563eb)' }}
+                >
+                  <div className="card-preview-top">
+                    <div className="card-preview-chip">💳</div>
+                    {detectedCardType && (
+                      <div className="card-preview-type">{detectedCardType.icon}</div>
+                    )}
+                  </div>
                   <div className="card-preview-number">
                     {cardInfo.number
                       ? cardInfo.number.replace(/(.{4})/g, '$1 ').trim()
                       : '**** **** **** ****'}
                   </div>
                   <div className="card-preview-bottom">
-                    <span>{cardInfo.name || 'Tên chủ thẻ'}</span>
-                    <span>{cardInfo.expiry || 'MM/YY'}</span>
+                    <span>{cardInfo.name || 'TÊN CHỦ THẺ'}</span>
+                    <span>{cardInfo.expiry ? `${cardInfo.expiry.split('-')[1]}/${cardInfo.expiry.split('-')[0].slice(-2)}` : 'MM/YY'}</span>
                   </div>
                 </div>
                 <div className="form-grid">
@@ -313,12 +420,8 @@ export default function Payment() {
                     <input
                       type="text"
                       placeholder="1234 5678 9012 3456"
-                      maxLength={19}
-                      value={cardInfo.number}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '').slice(0, 16)
-                        setCardInfo({ ...cardInfo, number: val })
-                      }}
+                      value={formatCardNumber(cardInfo.number)}
+                      onChange={handleCardNumberChange}
                     />
                   </div>
                   <div className="form-group full">
@@ -333,22 +436,31 @@ export default function Payment() {
                   <div className="form-group">
                     <label>Ngày hết hạn</label>
                     <input
-                      type="text"
-                      placeholder="MM/YY"
-                      maxLength={5}
+                      type="month"
                       value={cardInfo.expiry}
                       onChange={(e) => setCardInfo({ ...cardInfo, expiry: e.target.value })}
+                      className="expiry-input"
                     />
                   </div>
                   <div className="form-group">
                     <label>CVV</label>
-                    <input
-                      type="password"
-                      placeholder="•••"
-                      maxLength={3}
-                      value={cardInfo.cvv}
-                      onChange={(e) => setCardInfo({ ...cardInfo, cvv: e.target.value.replace(/\D/g, '') })}
-                    />
+                    <div className="cvv-input-wrapper">
+                      <input
+                        type={showCVV ? 'text' : 'password'}
+                        placeholder="•••"
+                        maxLength={4}
+                        value={cardInfo.cvv}
+                        onChange={handleCVVChange}
+                        className="cvv-input"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCVV(!showCVV)}
+                        className="cvv-toggle"
+                      >
+                        {showCVV ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

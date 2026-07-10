@@ -86,7 +86,24 @@
 .sh-form-col  { display: flex; flex-direction: column; min-width: 0; }
 .sh-field     { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .sh-field label { font-size: 13px; color: #9db0ff; }
-.sh-field input, .sh-field select { width: 100%; min-width: 0; max-width: 100%; padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; transition: border-color 0.2s; font-family: inherit; box-sizing: border-box; }
+.sh-field input, .sh-field select { 
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  max-height: 46px !important;
+  padding: 0 14px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  background: rgba(255,255,255,0.04) !important;
+  color: #eef4ff !important;
+  font-size: 14px !important;
+  outline: none !important;
+  transition: border-color 0.2s !important;
+  font-family: inherit !important;
+  box-sizing: border-box !important;
+}
 .sh-field input:focus, .sh-field select:focus { border-color: rgba(124,97,255,0.45); }
 .sh-field input.error, .sh-field select.error { border-color: rgba(248,113,113,0.5); }
 .sh-field select option { background: #0d1224; }

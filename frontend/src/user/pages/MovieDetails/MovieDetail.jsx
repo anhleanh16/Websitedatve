@@ -33,6 +33,24 @@ const formatTimeLabel = (input, roomType) => {
   return `${hours}:${minutes}${roomType ? ` - ${roomType}` : ''}`;
 };
 
+// Check if trailer is a URL or local file
+const isTrailerUrl = (trailer) => {
+  if (!trailer) return false;
+  return typeof trailer === 'string' && (trailer.startsWith('http://') || trailer.startsWith('https://'));
+};
+
+// Convert YouTube URL to embed URL
+const getYouTubeEmbedUrl = (url) => {
+  if (!url) return null;
+  let videoId = null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  if (match && match[2].length === 11) {
+    videoId = match[2];
+  }
+  return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+};
+
 export default function MovieDetail() {
   const location = useLocation();
   const { id } = useParams();
@@ -476,28 +494,43 @@ export default function MovieDetail() {
         style={{ opacity: bannerOpacity }}
       >
         {hasTrailer ? (
-          <video
-            ref={videoRef}
-            className="trailer-hero-video"
-            autoPlay
-            muted
-            loop
-            playsInline
-            poster={posterSrc || undefined}
-            src={trailerSrc || undefined}
-          >
-            Trình duyệt của bạn không hỗ trợ video.
-          </video>
+          isTrailerUrl(trailerSrc) ? (
+            // YouTube trailer (hero banner doesn't auto-play external videos)
+            <div className="trailer-hero-video">
+              {posterSrc ? <img src={posterSrc} alt={movie?.title || 'Poster'} /> : null}
+              <div className="trailer-hero-overlay">
+                <div className="trailer-hero-badge"><span>▶</span> Trailer</div>
+                <div className="trailer-hero-scroll-hint">Cuộn xuống để xem chi tiết ↓</div>
+              </div>
+            </div>
+          ) : (
+            // Local video file
+            <video
+              ref={videoRef}
+              className="trailer-hero-video"
+              autoPlay
+              muted
+              loop
+              playsInline
+              poster={posterSrc || undefined}
+              src={trailerSrc || undefined}
+            >
+              Trình duyệt của bạn không hỗ trợ video.
+            </video>
+          )
         ) : (
           <div className="trailer-waiting-poster">
             {posterSrc ? <img src={posterSrc} alt={movie?.title || 'Poster'} /> : null}
             <div className="trailer-waiting-hint">CHƯA CÓ TRAILER</div>
           </div>
         )}
-        <div className="trailer-hero-overlay">
-          <div className="trailer-hero-badge"><span>▶</span> Trailer</div>
-          <div className="trailer-hero-scroll-hint">Cuộn xuống để xem chi tiết ↓</div>
-        </div>
+        {/* Only show overlay if not already showing for YouTube case */}
+        {!isTrailerUrl(trailerSrc) && hasTrailer && (
+          <div className="trailer-hero-overlay">
+            <div className="trailer-hero-badge"><span>▶</span> Trailer</div>
+            <div className="trailer-hero-scroll-hint">Cuộn xuống để xem chi tiết ↓</div>
+          </div>
+        )}
       </div>
 
       {/* Nội dung trang, có padding-top = chiều cao banner để scroll overlap ── */}
@@ -609,43 +642,66 @@ export default function MovieDetail() {
               <div
                 ref={trailerContainerRef}
                 className="trailer-video-container"
-                onClick={hasTrailer ? handleSmallTrailerClick : undefined}
+                onClick={hasTrailer && !isTrailerUrl(trailerSrc) ? handleSmallTrailerClick : undefined}
               >
                 {hasTrailer ? (
-                  <>
-                    <video
-                      ref={pageSmallTrailerRef}
-                      className="trailer-video"
-                      muted={smallTrailerMuted}
-                      loop
-                      playsInline
-                      poster={posterSrc || undefined}
-                      src={trailerSrc || undefined}
-                    >
-                      Trình duyệt của bạn không hỗ trợ video.
-                    </video>
-                    {!smallTrailerPlaying && (
-                      <div className="trailer-play-button">
-                        ▶
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      className="trailer-mute-btn small-trailer-mute-btn"
-                      onClick={handleSmallTrailerToggleMute}
-                      aria-label={smallTrailerMuted ? 'Bật tiếng' : 'Tắt tiếng'}
-                    >
-                      {smallTrailerMuted ? '🔇' : '🔊'}
-                    </button>
-                    <button
-                      type="button"
-                      className="trailer-fullscreen-btn"
-                      onClick={handleSmallTrailerToggleFullscreen}
-                      aria-label={isSmallTrailerFullscreen ? 'Thoát toàn màn hình' : 'Phóng to toàn màn hình'}
-                    >
-                      {isSmallTrailerFullscreen ? '↩️' : '⛶'}
-                    </button>
-                  </>
+                  isTrailerUrl(trailerSrc) ? (
+                    // YouTube/link trailer
+                    <>
+                      <iframe
+                        className="trailer-video"
+                        src={getYouTubeEmbedUrl(trailerSrc) || trailerSrc}
+                        title="Trailer"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                      <button
+                        type="button"
+                        className="trailer-fullscreen-btn"
+                        onClick={handleSmallTrailerToggleFullscreen}
+                        aria-label={isSmallTrailerFullscreen ? 'Thoát toàn màn hình' : 'Phóng to toàn màn hình'}
+                      >
+                        {isSmallTrailerFullscreen ? '↩️' : '⛶'}
+                      </button>
+                    </>
+                  ) : (
+                    // Local video file
+                    <>
+                      <video
+                        ref={pageSmallTrailerRef}
+                        className="trailer-video"
+                        muted={smallTrailerMuted}
+                        loop
+                        playsInline
+                        poster={posterSrc || undefined}
+                        src={trailerSrc || undefined}
+                      >
+                        Trình duyệt của bạn không hỗ trợ video.
+                      </video>
+                      {!smallTrailerPlaying && (
+                        <div className="trailer-play-button">
+                          ▶
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        className="trailer-mute-btn small-trailer-mute-btn"
+                        onClick={handleSmallTrailerToggleMute}
+                        aria-label={smallTrailerMuted ? 'Bật tiếng' : 'Tắt tiếng'}
+                      >
+                        {smallTrailerMuted ? '🔇' : '🔊'}
+                      </button>
+                      <button
+                        type="button"
+                        className="trailer-fullscreen-btn"
+                        onClick={handleSmallTrailerToggleFullscreen}
+                        aria-label={isSmallTrailerFullscreen ? 'Thoát toàn màn hình' : 'Phóng to toàn màn hình'}
+                      >
+                        {isSmallTrailerFullscreen ? '↩️' : '⛶'}
+                      </button>
+                    </>
+                  )
                 ) : (
                   <div className="trailer-waiting-poster">
                     {posterSrc ? <img src={posterSrc} alt={movie?.title || 'Poster'} /> : null}
@@ -811,41 +867,56 @@ export default function MovieDetail() {
                   ×
                 </button>
                 <div className="trailer-modal-video-container">
-                  <video
-                    ref={modalSmallTrailerRef}
-                    className="trailer-modal-video"
-                    muted={smallTrailerMuted}
-                    loop
-                    playsInline
-                    autoPlay={smallTrailerPlaying}
-                    poster={posterSrc || undefined}
-                    src={trailerSrc || undefined}
-                    onLoadedMetadata={() => {
-                      // Sync when modal video is ready
-                      const pageVideo = pageSmallTrailerRef.current;
-                      const modalVideo = modalSmallTrailerRef.current;
-                      if (pageVideo && modalVideo) {
-                        modalVideo.currentTime = pageVideo.currentTime;
-                      }
-                    }}
-                  >
-                    Trình duyệt của bạn không hỗ trợ video.
-                  </video>
-                  {/* Play/Pause overlay button */}
-                  {!smallTrailerPlaying && (
-                    <div className="trailer-modal-play-button" onClick={handleSmallTrailerClick}>
-                      ▶
-                    </div>
+                  {isTrailerUrl(trailerSrc) ? (
+                    // YouTube/link trailer in modal
+                    <iframe
+                      className="trailer-modal-video"
+                      src={getYouTubeEmbedUrl(trailerSrc) || trailerSrc}
+                      title="Trailer"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    // Local video file in modal
+                    <>
+                      <video
+                        ref={modalSmallTrailerRef}
+                        className="trailer-modal-video"
+                        muted={smallTrailerMuted}
+                        loop
+                        playsInline
+                        autoPlay={smallTrailerPlaying}
+                        poster={posterSrc || undefined}
+                        src={trailerSrc || undefined}
+                        onLoadedMetadata={() => {
+                          // Sync when modal video is ready
+                          const pageVideo = pageSmallTrailerRef.current;
+                          const modalVideo = modalSmallTrailerRef.current;
+                          if (pageVideo && modalVideo) {
+                            modalVideo.currentTime = pageVideo.currentTime;
+                          }
+                        }}
+                      >
+                        Trình duyệt của bạn không hỗ trợ video.
+                      </video>
+                      {/* Play/Pause overlay button */}
+                      {!smallTrailerPlaying && (
+                        <div className="trailer-modal-play-button" onClick={handleSmallTrailerClick}>
+                          ▶
+                        </div>
+                      )}
+                      {/* Mute/Unmute button */}
+                      <button
+                        type="button"
+                        className="trailer-modal-mute-btn"
+                        onClick={handleSmallTrailerToggleMute}
+                        aria-label={smallTrailerMuted ? 'Bật tiếng' : 'Tắt tiếng'}
+                      >
+                        {smallTrailerMuted ? '🔇' : '🔊'}
+                      </button>
+                    </>
                   )}
-                  {/* Mute/Unmute button */}
-                  <button
-                    type="button"
-                    className="trailer-modal-mute-btn"
-                    onClick={handleSmallTrailerToggleMute}
-                    aria-label={smallTrailerMuted ? 'Bật tiếng' : 'Tắt tiếng'}
-                  >
-                    {smallTrailerMuted ? '🔇' : '🔊'}
-                  </button>
                 </div>
               </div>
             </div>

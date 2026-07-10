@@ -30,7 +30,19 @@
 }
 
 .combo-field input,
-.combo-field select,
+.combo-field select {
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #eef4ff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+  font-family: inherit;
+}
+
 .combo-field textarea {
   padding: 12px 14px;
   border-radius: 12px;

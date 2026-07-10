@@ -79,7 +79,7 @@ import {
   updateAdminCombo,
   deleteAdminCombo,
 } from "../controllers/comboController.js";
-import { uploadMovieFiles, uploadCinemaImage, uploadNewsImage } from "../../../config/upload.js";
+import { uploadMovieFilesMiddleware, uploadCinemaImage, uploadNewsImage } from "../../../config/upload.js";
 import { authMiddleware, adminOnly } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -134,20 +134,49 @@ router.put("/bookings/:orderId/check-in", checkInBooking);
 
 // ─── Movie Management ─────────────────────────────────────────────────────────
 router.get("/movies", getAdminMovies);
+
+// Middleware to log form data before processing
+const logFormData = (req, res, next) => {
+  console.log("=== Incoming request to movie route ===");
+  console.log("Method:", req.method);
+  console.log("Headers:", Object.keys(req.headers));
+  
+  // Since it's multipart, we can't easily log body here, but multer will handle it
+  next();
+};
+
 router.post(
   "/movies",
-  uploadMovieFiles.fields([
-    { name: "posters", maxCount: 12 },
-    { name: "trailer", maxCount: 1 },
-  ]),
+  logFormData,
+  uploadMovieFilesMiddleware,
+  // Middleware để tổ chức lại files cho đúng định dạng cũ
+  (req, res, next) => {
+    // Tổ chức lại files theo đúng field
+    if (req.files && Array.isArray(req.files)) {
+      req.files = {
+        posters: req.files.filter(f => f.fieldname === 'posters'),
+        trailer: req.files.filter(f => f.fieldname === 'trailer'),
+      };
+    }
+    next();
+  },
   createMovie,
 );
 router.put(
   "/movies/:id",
-  uploadMovieFiles.fields([
-    { name: "posters", maxCount: 12 },
-    { name: "trailer", maxCount: 1 },
-  ]),
+  logFormData,
+  uploadMovieFilesMiddleware,
+  // Middleware để tổ chức lại files cho đúng định dạng cũ
+  (req, res, next) => {
+    // Tổ chức lại files theo đúng field
+    if (req.files && Array.isArray(req.files)) {
+      req.files = {
+        posters: req.files.filter(f => f.fieldname === 'posters'),
+        trailer: req.files.filter(f => f.fieldname === 'trailer'),
+      };
+    }
+    next();
+  },
   updateMovie,
 );
 router.delete("/movies/:id", deleteMovie);

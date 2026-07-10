@@ -17,16 +17,22 @@ export const getAdminMovies = async (req, res) => {
 
 export const createMovie = async (req, res) => {
   try {
+    console.log("=== CREATE MOVIE ===");
+    console.log("req.body:", JSON.stringify(req.body, null, 2));
+    console.log("req.files:", JSON.stringify(req.files, null, 2));
     const movieId = await MovieModel.create(req.body, req.files);
     res.status(201).json({ message: "Movie created successfully", movieId });
   } catch (err) {
     console.error("Error creating movie:", err);
-    res.status(500).json({ message: "Failed to create movie" });
+    res.status(500).json({ message: "Failed to create movie", error: err.message });
   }
 };
 
 export const updateMovie = async (req, res) => {
   try {
+    console.log("=== UPDATE MOVIE ===");
+    console.log("req.body:", JSON.stringify(req.body, null, 2));
+    console.log("req.files:", JSON.stringify(req.files, null, 2));
     const { id } = req.params;
     const success = await MovieModel.update(id, req.body, req.files);
 
@@ -40,7 +46,7 @@ export const updateMovie = async (req, res) => {
     if (err.message === "Movie not found") {
       return res.status(404).json({ message: "Movie not found" });
     }
-    res.status(500).json({ message: "Failed to update movie" });
+    res.status(500).json({ message: "Failed to update movie", error: err.message });
   }
 };
 

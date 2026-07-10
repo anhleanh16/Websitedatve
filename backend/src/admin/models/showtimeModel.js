@@ -277,6 +277,7 @@ export const ShowtimeModel = {
     const cur = new Date(startD);
     while (cur <= endD) {
       const dateKey = toDateKey(cur);
+      const todayCreatedSlots = []; // Lưu các slot vừa tạo trong hôm nay để kiểm tra xung đột lẫn nhau
 
       for (const slot of time_slots) {
         const hour   = Number(slot.hour   ?? 0);
@@ -285,6 +286,7 @@ export const ShowtimeModel = {
         const startTime = new Date(cur);
         startTime.setHours(hour, minute, 0, 0);
         const endTime = addMinutes(startTime, movie.duration);
+        const endTimeWithCleanup = addMinutes(endTime, CLEANUP_BUFFER_MINUTES);
 
         // bỏ qua nếu trước ngày phát hành
         try {
@@ -294,7 +296,26 @@ export const ShowtimeModel = {
           continue;
         }
 
-        // bỏ qua nếu xung đột lịch phòng
+        // Kiểm tra xung đột với các slot vừa tạo trong cùng hôm nay
+        let conflictWithTodaySlot = null;
+        for (const existingSlot of todayCreatedSlots) {
+          const existingEndWithCleanup = addMinutes(existingSlot.endTime, CLEANUP_BUFFER_MINUTES);
+          if (startTime < existingEndWithCleanup && endTimeWithCleanup > existingSlot.startTime) {
+            conflictWithTodaySlot = existingSlot;
+            break;
+          }
+        }
+        if (conflictWithTodaySlot) {
+          skipped.push({ 
+            date: dateKey, 
+            hour, 
+            minute, 
+            reason: `Trùng khung giờ với suất vừa tạo (${String(conflictWithTodaySlot.hour).padStart(2, '0')}:${String(conflictWithTodaySlot.minute).padStart(2, '0')})` 
+          });
+          continue;
+        }
+
+        // bỏ qua nếu xung đột lịch phòng trong DB
         try {
           await this.ensureRoomScheduleGap({ roomId: room_id, startTime, endTime });
         } catch (err) {
@@ -307,6 +328,7 @@ export const ShowtimeModel = {
           [movie_id, room_id, startTime, endTime, standardPrice, standardPrice, vipPrice, couplePrice, seats, ACTIVE_SHOWTIME_STATUS],
         );
         created.push(result.insertId);
+        todayCreatedSlots.push({ startTime, endTime, hour, minute });
       }
 
       cur.setDate(cur.getDate() + 1);
@@ -553,7 +575,7 @@ export const ShowtimeModel = {
       .join(", ");
 
     throw buildAppError(
-      `Phòng này đã có suất chiếu quá gần nhau. Mỗi suất trong cùng phòng phải cách nhau ít nhất ${CLEANUP_BUFFER_MINUTES} phút sau khi phim trước kết thúc. Xung đột với: ${conflictText}.`,
+      `Không thể tạo suất chiếu này! Phòng đã có lịch trùng khung giờ hoặc chưa đủ thời gian dọn dẹp (${CLEANUP_BUFFER_MINUTES} phút). Xung đột với: ${conflictText}.`,
     );
   },
 };

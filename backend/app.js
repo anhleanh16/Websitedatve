@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import adminRoutes from './src/admin/routes/adminRoutes.js';
 import userRoutes from './src/user/routes/userRoutes.js';
-import authRoutes from './src/auth/authRoutes.js';
+import authRoutes from './src/admin/routes/authRoutes.js';
 import blogRoutes from './src/admin/routes/blogRoutes.js';
 import reviewRoutes from './src/admin/routes/reviewRoutes.js';
 

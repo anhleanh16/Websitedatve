@@ -12,10 +12,10 @@
 .bk-tab.active { color: #fff; border-bottom-color: #7c61ff; }
 .bk-tab.disabled { opacity: 0.35; cursor: not-allowed; }
 .bk-toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
-.bk-search { flex: 1; min-width: 220px; padding: 11px 16px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; transition: border-color 0.2s; }
+.bk-search { flex: 1; min-width: 220px; padding: 0 16px; height: 46px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; transition: border-color 0.2s; }
 .bk-search:focus { border-color: rgba(124,97,255,0.45); }
 .bk-search::placeholder { color: #5a6e9e; }
-.bk-filter-select { padding: 11px 16px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; cursor: pointer; }
+.bk-filter-select { padding: 0 16px; height: 46px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; cursor: pointer; }
 .bk-filter-select option { background: #0d1224; }
 .bk-code { font-family: monospace; font-size: 13px; color: #a8baff; background: rgba(124,97,255,0.12); padding: 3px 8px; border-radius: 6px; }
 .bk-user-cell { display: flex; flex-direction: column; gap: 2px; }

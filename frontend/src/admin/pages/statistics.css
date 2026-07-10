@@ -37,7 +37,8 @@
 }
 
 .statistics-filters input {
-  padding: 0.625rem 1rem;
+  padding: 0 1rem;
+  height: 46px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.5rem;
   background: rgba(15, 18, 32, 0.8);
