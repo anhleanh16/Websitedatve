@@ -372,4 +372,4 @@ CREATE TABLE Blog_Likes(
 ALTER TABLE User
 ADD level_id INT,
 ADD FOREIGN KEY(level_id)
-REFERENCES Membership_Levels(level_id);
+REFERENCES Membership_Levels(level_id);wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
