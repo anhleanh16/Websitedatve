@@ -54,6 +54,26 @@ const getStatusMeta = (value) => {
   }
 };
 
+const sanitizeShortDescription = (value) => {
+  if (!value) return "";
+
+  return String(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(nbsp|#160);/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const shortDescriptionText = (value, fallback) => {
+  const cleaned = sanitizeShortDescription(value);
+  return cleaned || fallback;
+};
+
 // ─── Category Manager ─────────────────────────────────────────────────────────
 function CategoryManager({ newsList }) {
   const [editingValue, setEditingValue] = useState(null);
@@ -338,7 +358,7 @@ function NewsModal({ open, form, setForm, onClose, onSubmit, saving, editingId }
                 <div className="nm-preview-body">
                   <span className="nm-preview-category">{getCategoryLabel(form.category)}</span>
                   <strong>{form.title || "Tiêu đề bài viết"}</strong>
-                  <p>{form.short_description || "Mô tả ngắn sẽ hiển thị ở đây."}</p>
+                  <p>{shortDescriptionText(form.short_description, "Mô tả ngắn sẽ hiển thị ở đây.")}</p>
                 </div>
               </div>
             </div>
@@ -374,10 +394,12 @@ export default function NewsManagement() {
 
   const buildNewsFormData = () => {
     const formData = new FormData();
+    const cleanShortDescription = sanitizeShortDescription(form.short_description || "");
+
     formData.append("title", form.title || "");
     formData.append("slug", form.slug || "");
     formData.append("thumbnail", form.thumbnail || "");
-    formData.append("short_description", form.short_description || "");
+    formData.append("short_description", cleanShortDescription);
     formData.append("content", form.content || "");
     formData.append("category", form.category || "movie_news");
     formData.append("status", form.status || "draft");
@@ -646,7 +668,7 @@ export default function NewsManagement() {
                         <div className="nm-news-meta">
                           <strong>{item.title}</strong>
                           <span>{item.slug}</span>
-                          <p>{item.short_description || "Chưa có mô tả ngắn."}</p>
+                          <p>{shortDescriptionText(item.short_description, "Chưa có mô tả ngắn.")}</p>
                         </div>
                       </div>
                     </td>

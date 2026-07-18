@@ -16,6 +16,7 @@ import Comments from "../pages/Comments";
 import Staff from "../pages/Staff";
 import NewsManagement from "../pages/NewsManagement";
 import BlogManagement from "../pages/BlogManagement";
+import PointsManagement from "../pages/PointsManagement";
 import AdminLogin from "../pages/AdminLogin/AdminLogin";
 import { getValidStoredToken } from "../../utils/auth";
 
@@ -41,6 +42,7 @@ export function AdminRoutes() {
           <Route path="bookings" element={<AdminLayout><Bookings /></AdminLayout>} />
           <Route path="combos" element={<AdminLayout><Combos /></AdminLayout>} />
           <Route path="promotions" element={<AdminLayout><Promotions /></AdminLayout>} />
+          <Route path="points" element={<AdminLayout><PointsManagement /></AdminLayout>} />
           <Route path="news" element={<AdminLayout><NewsManagement /></AdminLayout>} />
           <Route path="blog" element={<AdminLayout><BlogManagement /></AdminLayout>} />
           <Route path="notifications" element={<AdminLayout><Notifications /></AdminLayout>} />

@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import {
   FaCreditCard, FaUniversity, FaMobileAlt,
-  FaLock, FaCheckCircle, FaTicketAlt, FaTag, FaChevronDown, FaChevronUp
+  FaLock, FaCheckCircle, FaTicketAlt, FaTag, FaChevronDown, FaChevronUp, FaStar
 } from 'react-icons/fa'
 import './Payment.css'
 import { userBookingService } from '../../services/userApi'
@@ -210,6 +210,17 @@ export default function Payment() {
               <strong className="final-price">{finalTotal.toLocaleString('vi-VN')}đ</strong>
             </div>
           </div>
+
+          {Number(createdBooking?.pointsAwarded || 0) > 0 && (
+            <div className="success-points-banner">
+              <FaStar className="success-points-icon" />
+              <div>
+                <div className="success-points-title">Điểm vừa cộng</div>
+                <div className="success-points-value">+{Number(createdBooking.pointsAwarded).toLocaleString('vi-VN')} điểm</div>
+                <div className="success-points-sub">Tổng điểm hiện tại: {Number(createdBooking.pointsBalance || 0).toLocaleString('vi-VN')} điểm</div>
+              </div>
+            </div>
+          )}
 
           <div className="success-qr">
             <div className="qr-placeholder">

@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: "/admin/bookings",      label: "Đặt vé",           icon: "🎟" },
   { to: "/admin/combos",        label: "Combo",            icon: "🍿" },
   { to: "/admin/promotions",    label: "Khuyến mãi",       icon: "🏷" },
+  { to: "/admin/points",        label: "Điểm thưởng",       icon: "⭐" },
   { to: "/admin/news",          label: "Tin tức",          icon: "📰" },
   { to: "/admin/blog",          label: "Blog",             icon: "📑" },
   { to: "/admin/notifications", label: "Thông báo",        icon: "🔔" },

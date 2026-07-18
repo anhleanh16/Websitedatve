@@ -5,7 +5,6 @@ import { db } from "../../../config/db.js";
 import { NotificationModel } from "../../admin/models/notificationModel.js";
 import { PromotionModel } from "../../admin/models/promotionModel.js";
 import { NewsModel } from "../../admin/models/newsModel.js";
-import { ComboModel } from "../../admin/models/comboModel.js";
 
 const normalizeCinemaImagePath = (cinema) => {
   if (!cinema) return cinema;
@@ -320,16 +319,6 @@ export const userGetMovieById = async (req, res) => {
   }
 };
 
-export const userGetCombos = async (req, res) => {
-  try {
-    const combos = await ComboModel.findActive();
-    res.json({ combos });
-  } catch (error) {
-    console.error("Error in userGetCombos:", error);
-    res.status(500).json({ message: "Error getting combos", combos: [] });
-  }
-};
-
 export const userUpdateProfile = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -542,35 +531,5 @@ export const userGetCombos = async (req, res) => {
   } catch (error) {
     console.error("Error in userGetCombos:", error);
     res.status(500).json({ message: "Không thể tải danh sách combo", combos: [] });
-  }
-};
-
-export const userGetTodayPromotions = async (req, res) => {
-  try {
-    const [promotions] = await db.query(
-      `
-      SELECT 
-        promotion_id,
-        title,
-        description,
-        discount_amount,
-        discount_percent,
-        banner_image,
-        status,
-        start_date,
-        end_date,
-        created_at
-      FROM Promotions
-      WHERE status = 'active'
-        AND DATE(start_date) <= CURDATE()
-        AND DATE(end_date) >= CURDATE()
-      ORDER BY created_at DESC
-      `,
-    );
-
-    res.json({ promotions });
-  } catch (error) {
-    console.error("Error in userGetTodayPromotions:", error);
-    res.status(500).json({ message: "Không thể tải khuyến mãi hôm nay", promotions: [] });
   }
 };
