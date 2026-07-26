@@ -11,6 +11,7 @@ const moviesUploadDir = path.join(__dirname, "../uploads/movies");
 const trailersUploadDir = path.join(__dirname, "../uploads/trailers");
 const cinemasUploadDir = path.join(__dirname, "../uploads/cinemas");
 const newsUploadDir = path.join(__dirname, "../uploads/news");
+const newsInlineUploadDir = path.join(__dirname, "../uploads/news/inline");
 const staffUploadDir = path.join(__dirname, "../uploads/staff");
 
 if (!fs.existsSync(moviesUploadDir)) {
@@ -24,6 +25,9 @@ if (!fs.existsSync(cinemasUploadDir)) {
 }
 if (!fs.existsSync(newsUploadDir)) {
   fs.mkdirSync(newsUploadDir, { recursive: true });
+}
+if (!fs.existsSync(newsInlineUploadDir)) {
+  fs.mkdirSync(newsInlineUploadDir, { recursive: true });
 }
 if (!fs.existsSync(staffUploadDir)) {
   fs.mkdirSync(staffUploadDir, { recursive: true });
@@ -41,6 +45,9 @@ const storage = multer.diskStorage({
       cb(null, cinemasUploadDir);
     } else if (file.fieldname === "thumbnailFile") {
       cb(null, newsUploadDir);
+    } else if (file.fieldname === "upload") {
+      // CKEditor inline images (inserted inside news body)
+      cb(null, newsInlineUploadDir);
     } else if (file.fieldname === "avatar") {
       // For staff avatars
       cb(null, staffUploadDir);
@@ -56,6 +63,8 @@ const storage = multer.diskStorage({
       cb(null, "cinema-" + uniqueSuffix + path.extname(file.originalname));
     } else if (file.fieldname === "thumbnailFile") {
       cb(null, "news-" + uniqueSuffix + path.extname(file.originalname));
+    } else if (file.fieldname === "upload") {
+      cb(null, "news-inline-" + uniqueSuffix + path.extname(file.originalname));
     } else if (file.fieldname === "avatar") {
       cb(null, "avatar-" + uniqueSuffix + path.extname(file.originalname));
     }
@@ -68,6 +77,7 @@ const fileFilter = (req, file, cb) => {
     file.fieldname === "posters" ||
     file.fieldname === "image" ||
     file.fieldname === "thumbnailFile" ||
+    file.fieldname === "upload" ||
     file.fieldname === "avatar"
   ) {
     // Gộp filter cho ảnh
@@ -147,4 +157,11 @@ export const uploadStaffAvatar = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB for staff avatars
+});
+
+// Multer instance for CKEditor inline news-body images (field name = "upload", standard CKEditor format)
+export const uploadCkeditorNewsImage = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per inline image
 });

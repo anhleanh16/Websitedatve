@@ -135,6 +135,43 @@ const normalizeDate = (v) => {
   return d.toISOString().slice(0, 10);
 };
 
+export const searchAdminUsers = async (req, res) => {
+  try {
+    const { query = "" } = req.query;
+    const q = `%${String(query || "").trim()}%`;
+
+    const [users] = await db.query(
+      `SELECT
+        u.id as user_id,
+        u.full_name,
+        u.email,
+        u.phone as phone_number,
+        COALESCE(r.role_name, 'user') as role,
+        u.status,
+        u.birthday,
+        u.sex,
+        u.point as points,
+        u.created_at
+      FROM User u
+      LEFT JOIN Roles r ON u.role_id = r.role_id
+      WHERE u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
+      ORDER BY u.created_at DESC
+      LIMIT 15`,
+      [q, q, q],
+    );
+
+    const usersWithFlags = users.map((user) => ({
+      ...user,
+      can_be_locked: user.user_id !== 1,
+    }));
+
+    res.json({ users: usersWithFlags });
+  } catch (err) {
+    console.error("Error in searchAdminUsers:", err);
+    res.status(500).json({ message: "Error searching users", users: [] });
+  }
+};
+
 export const resetAdminUserPassword = async (req, res) => {
   try {
     const userId = Number(req.params.userId || 0);

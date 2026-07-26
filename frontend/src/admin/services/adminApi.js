@@ -92,6 +92,10 @@ export const adminCategoryService = {
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const adminUserService = {
   getAllUsers: () => apiFetch("/admin/users"),
+  searchUsers: (query) =>
+    apiFetch(
+      `/admin/users/search?query=${encodeURIComponent(query || "")}`,
+    ),
   createUser: (data) =>
     apiFetch("/admin/users", {
       method: "POST",
@@ -215,6 +219,13 @@ export const adminBookingService = {
     ).toString();
     return apiFetch(`/admin/bookings${q ? `?${q}` : ""}`);
   },
+
+  /** Nhân viên đặt vé (hỗ trợ khách đã có TK hoặc tạo TK mới) */
+  staffCreateBooking: (payload) =>
+    apiFetch("/admin/bookings/staff-create", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   /** Chi tiết vé */
   getBookingDetail: (orderId) => apiFetch(`/admin/bookings/${orderId}`),

@@ -1,5 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import './staff.css';
+import BookingWizard from "./Bookings/BookingWizard.jsx";
+import {
+  adminBookingService,
+  adminUserService,
+  adminShowtimeService,
+  adminCinemaService,
+  adminRoomService,
+  adminSeatService,
+  adminComboService,
+} from "../services/adminApi.js";
 
 const API_ORIGIN = (() => {
   const base = import.meta.env.VITE_API_URL || "/api";
@@ -738,6 +748,7 @@ function StaffDetail({ staff, onClose, onEdit, onTask, onAttend }) {
   );
 }
 
+
 // ─── Staff List Tab ───────────────────────────────────────────────────────────
 function StaffList({ staff, onView, onEdit, onTask, onAttend, onDelete }) {
   const [search, setSearch]   = useState("");
@@ -1065,6 +1076,7 @@ export default function AdminStaff() {
 
   const TABS = [
     { key: "list",       label: "Danh sách nhân viên"  },
+    { key: "booking",    label: "Đặt vé nhanh"        },
     { key: "attendance", label: "Theo dõi chấm công"   },
     { key: "tasks",      label: "Tổng quan công việc"  },
   ];
@@ -1097,6 +1109,7 @@ export default function AdminStaff() {
       </div>
 
       {activeTab === "list"       && <StaffList staffList={staffList} staff={staffList} onView={setViewStaff} onEdit={openEdit} onTask={openTask} onAttend={openAtt} onDelete={setDeleteTarget} />}
+      {activeTab === "booking"    && <BookingWizard onToast={showToast} />}
       {activeTab === "attendance" && <AttendanceOverview staff={staffList} />}
       {activeTab === "tasks"      && <TaskOverview staff={staffList} />}
 

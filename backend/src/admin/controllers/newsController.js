@@ -59,6 +59,20 @@ export const updateAdminNews = async (req, res) => {
   }
 };
 
+export const uploadNewsInlineImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: { message: "Không có file được upload." } });
+    }
+    const url = `/uploads/news/inline/${req.file.filename}`;
+    // CKEditor 5 expects: { url: "..." }
+    res.json({ url });
+  } catch (error) {
+    console.error("Error in uploadNewsInlineImage:", error);
+    res.status(500).json({ error: { message: "Không thể upload ảnh." } });
+  }
+};
+
 export const deleteAdminNews = async (req, res) => {
   try {
     const success = await NewsModel.delete(Number(req.params.id));

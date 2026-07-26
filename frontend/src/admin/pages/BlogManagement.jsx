@@ -24,6 +24,57 @@ const createInitialBlogForm = (defaultCategory = '') => ({
   status: 'draft'
 })
 
+const uploadPastedImage = async (file, editor) => {
+  if (!file || !file.type?.startsWith('image/')) return
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : ''
+  const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
+  const formData = new FormData()
+  formData.append('upload', file)
+
+  try {
+    const response = await fetch(`${apiBase}/admin/upload/ckeditor-image`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    })
+
+    const data = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new Error(data?.error?.message || data?.message || 'Không thể upload ảnh.')
+    }
+
+    const uploadedUrl = data?.url || data?.default || ''
+    if (!uploadedUrl) {
+      throw new Error('Không nhận được đường dẫn ảnh từ máy chủ.')
+    }
+
+    try {
+      editor.execute('insertImage', { src: uploadedUrl, alt: 'Pasted image' })
+    } catch (insertError) {
+      console.warn('Insert image failed, fallback to HTML insertion', insertError)
+      editor.setData(`${editor.getData()}<img src="${uploadedUrl}" alt="Pasted image" />`)
+    }
+  } catch (error) {
+    console.error('Upload pasted image failed', error)
+  }
+}
+
+const attachImagePasteHandler = (editor) => {
+  if (!editor?.editing?.view?.document) return
+
+  const viewDocument = editor.editing.view.document
+  const onPaste = (event, data) => {
+    const files = Array.from(data?.dataTransfer?.files || []).filter((file) => file?.type?.startsWith('image/'))
+    if (!files.length) return
+
+    event.preventDefault()
+    files.forEach((file) => uploadPastedImage(file, editor))
+  }
+
+  viewDocument.on('paste', onPaste)
+}
+
 export default function BlogManagement() {
   const [blogs, setBlogs] = useState([])
   const [categories, setCategories] = useState([])
@@ -397,6 +448,7 @@ export default function BlogManagement() {
               editor={ClassicEditor}
               data={form.content}
               onReady={(editor) => {
+                attachImagePasteHandler(editor)
                 editor.ui.getEditableElement().parentElement.insertBefore(
                   document.createElement('div'),
                   editor.ui.getEditableElement()
@@ -407,8 +459,17 @@ export default function BlogManagement() {
               }}
               config={{
                 toolbar: [
-                  'paragraph', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'heading'
-                ]
+                  'heading', '|', 'bold', 'italic', 'underline', 'strikethrough', 'fontSize', 'fontColor', 'highlight', '|', 'alignment', '|', 'link', '|', 'bulletedList', 'numberedList', '|', 'blockQuote', 'code', '|', 'insertTable', '|', 'imageUpload'
+                ],
+                fontSize: {
+                  options: [9, 11, 13, 16, 18, 24, 32]
+                },
+                alignment: {
+                  options: ['left', 'center', 'right', 'justify']
+                },
+                table: {
+                  contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+                }
               }}
             />
           </div>

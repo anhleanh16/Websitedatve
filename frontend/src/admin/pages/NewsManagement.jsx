@@ -33,6 +33,136 @@ const EMPTY_FORM = {
   published_at: "",
 };
 
+const getEditorConfig = () => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+  const apiBase = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+
+  return {
+    toolbar: {
+      items: [
+        "heading",
+        "|",
+        "bold",
+        "italic",
+        "underline",
+        "strikethrough",
+        "fontSize",
+        "fontColor",
+        "highlight",
+        "|",
+        "alignment",
+        "|",
+        "link",
+        "|",
+        "bulletedList",
+        "numberedList",
+        "|",
+        "blockQuote",
+        "code",
+        "|",
+        "insertTable",
+        "|",
+        "imageUpload",
+      ],
+      shouldNotGroupWhenFull: true,
+    },
+    heading: {
+      options: [
+        { model: "paragraph", title: "Paragraph", class: "ck-heading_paragraph" },
+        { model: "heading1", view: "h1", title: "Heading 1", class: "ck-heading_heading1" },
+        { model: "heading2", view: "h2", title: "Heading 2", class: "ck-heading_heading2" },
+      ],
+    },
+    image: {
+      toolbar: [
+        "imageStyle:full",
+        "imageStyle:alignLeft",
+        "imageStyle:alignCenter",
+        "imageStyle:alignRight",
+        "|",
+        "imageTextAlternative",
+        "imageResize",
+      ],
+      styles: ["full", "alignLeft", "alignCenter", "alignRight"],
+    },
+    table: {
+      contentToolbar: ["tableColumn", "tableRow", "mergeTableCells"],
+    },
+    fontSize: {
+      options: [9, 11, 13, 16, 18, 24, 32],
+    },
+    alignment: {
+      options: ["left", "center", "right", "justify"],
+    },
+    simpleUpload: {
+      uploadUrl: `${apiBase}/admin/upload/ckeditor-image`,
+      withCredentials: false,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  };
+};
+
+const uploadPastedImage = async (file, editor) => {
+  if (!file || !file.type?.startsWith("image/")) return;
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+  const apiBase = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+  const formData = new FormData();
+  formData.append("upload", file);
+
+  try {
+    const response = await fetch(`${apiBase}/admin/upload/ckeditor-image`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(data?.error?.message || data?.message || "Không thể upload ảnh.");
+    }
+
+    const uploadedUrl = data?.url || data?.default || "";
+    if (!uploadedUrl) {
+      throw new Error("Không nhận được đường dẫn ảnh từ máy chủ.");
+    }
+
+    try {
+      editor.execute("insertImage", { src: uploadedUrl, alt: "Pasted image" });
+    } catch (insertError) {
+      console.warn("Insert image failed, fallback to HTML insertion", insertError);
+      editor.setData(`${editor.getData()}<img src="${uploadedUrl}" alt="Pasted image" />`);
+    }
+  } catch (error) {
+    console.error("Upload pasted image failed", error);
+  }
+};
+
+const attachImagePasteHandler = (editor) => {
+  if (!editor?.editing?.view?.document) return;
+
+  const viewDocument = editor.editing.view.document;
+  const onPaste = (event, data) => {
+    const files = Array.from(data?.dataTransfer?.files || []).filter((file) => file?.type?.startsWith("image/"));
+    if (!files.length) return;
+
+    event.preventDefault();
+    files.forEach((file) => uploadPastedImage(file, editor));
+  };
+
+  viewDocument.on("paste", onPaste);
+
+  const onDrop = (event, data) => {
+    const files = Array.from(data?.dataTransfer?.files || []).filter((file) => file?.type?.startsWith("image/"));
+    if (!files.length) return;
+
+    event.preventDefault();
+    files.forEach((file) => uploadPastedImage(file, editor));
+  };
+
+  viewDocument.on("drop", onDrop);
+};
+
 const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -197,6 +327,7 @@ function NewsModal({ open, form, setForm, onClose, onSubmit, saving, editingId }
   const setField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
+  const editorConfig = getEditorConfig();
 
   return (
     <div className="nm-overlay" onClick={onClose}>
@@ -248,23 +379,12 @@ function NewsModal({ open, form, setForm, onClose, onSubmit, saving, editingId }
                 <CKEditor
                   editor={ClassicEditor}
                   data={form.short_description}
+                  onReady={(editor) => attachImagePasteHandler(editor)}
                   onChange={(event, editor) => {
                     const data = editor.getData();
                     setField("short_description", data);
                   }}
-                  config={{
-                    toolbar: {
-                      items: ["heading", "|", "bold", "italic", "underline", "link", "|", "bulletedList", "numberedList", "|", "blockQuote", "code"],
-                      shouldNotGroupWhenFull: true,
-                    },
-                    heading: {
-                      options: [
-                        { model: "paragraph", title: "Paragraph", class: "ck-heading_paragraph" },
-                        { model: "heading1", view: "h1", title: "Heading 1", class: "ck-heading_heading1" },
-                        { model: "heading2", view: "h2", title: "Heading 2", class: "ck-heading_heading2" },
-                      ],
-                    },
-                  }}
+                  config={editorConfig}
                 />
               </div>
 
@@ -273,23 +393,12 @@ function NewsModal({ open, form, setForm, onClose, onSubmit, saving, editingId }
                 <CKEditor
                   editor={ClassicEditor}
                   data={form.content}
+                  onReady={(editor) => attachImagePasteHandler(editor)}
                   onChange={(event, editor) => {
                     const data = editor.getData();
                     setField("content", data);
                   }}
-                  config={{
-                    toolbar: {
-                      items: ["heading", "|", "bold", "italic", "underline", "link", "|", "bulletedList", "numberedList", "|", "blockQuote", "code"],
-                      shouldNotGroupWhenFull: true,
-                    },
-                    heading: {
-                      options: [
-                        { model: "paragraph", title: "Paragraph", class: "ck-heading_paragraph" },
-                        { model: "heading1", view: "h1", title: "Heading 1", class: "ck-heading_heading1" },
-                        { model: "heading2", view: "h2", title: "Heading 2", class: "ck-heading_heading2" },
-                      ],
-                    },
-                  }}
+                  config={editorConfig}
                 />
               </div>
             </div>

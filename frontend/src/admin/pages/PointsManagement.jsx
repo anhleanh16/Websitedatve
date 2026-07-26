@@ -13,10 +13,6 @@ export default function PointsManagement() {
   const [rewards, setRewards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedUserId, setSelectedUserId] = useState('');
-  const [adjustDelta, setAdjustDelta] = useState('');
-  const [adjustReason, setAdjustReason] = useState('');
-  const [adjustMessage, setAdjustMessage] = useState('');
   const [levelForm, setLevelForm] = useState(defaultLevelForm);
   const [ruleForm, setRuleForm] = useState(defaultRuleForm);
   const [rewardForm, setRewardForm] = useState(defaultRewardForm);
@@ -48,8 +44,6 @@ export default function PointsManagement() {
 
   useEffect(() => { loadData(); }, []);
 
-  const selectedUser = useMemo(() => users.find((u) => String(u.id) === String(selectedUserId)) || null, [selectedUserId, users]);
-
   const activeRules = useMemo(() => {
     return (Array.isArray(rules) ? rules : []).filter((rule) => rule.status !== false);
   }, [rules]);
@@ -68,45 +62,6 @@ export default function PointsManagement() {
     const threshold = Number(primaryRule.spendingAmount || primaryRule.spending_amount || 0);
     const earned = Number(primaryRule.earnedPoints || primaryRule.earned_points || 0);
     return threshold > 0 ? Math.floor(Number(amount || 0) / threshold) * earned : 0;
-  };
-
-  // Tạo ví dụ động từ các seat rules
-  const seatExamples = useMemo(() => {
-    const seatRules = activeRules.filter(r => r.ruleScope === 'seat' && r.status !== false);
-    return seatRules.slice(0, 3).map(rule => ({
-      label: `Ghế ${rule.ruleKey || 'chưa xác định'}`,
-      points: Number(rule.pointsValue || 0)
-    }));
-  }, [activeRules]);
-
-  // Tạo ví dụ động từ các combo rules
-  const comboExamples = useMemo(() => {
-    const comboRules = activeRules.filter(r => r.ruleScope === 'combo' && r.status !== false);
-    return comboRules.slice(0, 2).map(rule => ({
-      label: `Combo ${rule.ruleKey || 'chưa xác định'}`,
-      points: Number(rule.pointsValue || 0)
-    }));
-  }, [activeRules]);
-
-  const handleAdjust = async (e) => {
-    e.preventDefault();
-    if (!selectedUserId) {
-      setAdjustMessage('Vui lòng chọn người dùng.');
-      return;
-    }
-    try {
-      setSaving(true);
-      const payload = { delta: Number(adjustDelta || 0), description: adjustReason || 'Điều chỉnh điểm' };
-      await pointsService.adjustUserPoints(selectedUserId, payload);
-      setAdjustMessage('Cập nhật điểm thành công.');
-      setAdjustDelta('');
-      setAdjustReason('');
-      await loadData();
-    } catch (err) {
-      setAdjustMessage(err.message || 'Không thể cập nhật điểm.');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const handleLevelSubmit = async (e) => {
@@ -206,74 +161,109 @@ export default function PointsManagement() {
       {error && <div className="points-alert points-alert-error">{error}</div>}
       {loading ? <div className="points-loading">Đang tải...</div> : (
         <div className="points-grid">
-          <section className="points-card points-policy-card">
+          {/* =======================================================================
+              CARD 1 — GỘP TOÀN BỘ QUY TẮC TÍCH ĐIỂM VÀO MỘT KHỐI DUY NHẤT
+              (gộp policy summary + ví dụ + form tạo/sửa + list quy tắc)
+              ======================================================================= */}
+          <section className="points-card points-policy-card" style={{ gridColumn: "1 / -1" }}>
             <h2>Quy tắc tích điểm</h2>
-            {primaryRule ? (
+
+            {activeRules.length > 0 ? (
               <>
-                <p className="points-policy-summary">
-                  Mỗi <strong>{formatCurrency(primaryRule.spendingAmount || primaryRule.spending_amount || 0)}</strong> chi tiêu sẽ tích được <strong>{Number(primaryRule.earnedPoints || primaryRule.earned_points || 0)} điểm</strong>.
-                </p>
-                <div className="points-policy-list">
-                  <div className="points-policy-item">
-                    <span>1 điểm tương đương</span>
-                    <strong>{formatCurrency(primaryRule.spendingAmount || primaryRule.spending_amount || 0)}</strong>
-                  </div>
-                  <div className="points-policy-item">
-                    <span>Điểm được tính trên</span>
-                    <strong>tổng giá trị đơn hàng</strong>
-                  </div>
-                  <div className="points-policy-item">
-                    <span>Vé + combo đều được tính</span>
-                    <strong>có thể tích điểm</strong>
-                  </div>
-                </div>
+                {/* Thông báo chính (lấy quy tắc tổng đơn hàng đầu tiên làm tiêu điểm) */}
+                {primaryRule && (
+                  <>
+                    <p className="points-policy-summary">
+                      Mỗi <strong>{formatCurrency(primaryRule.spendingAmount || primaryRule.spending_amount || 0)}</strong> chi tiêu sẽ tích được <strong>{Number(primaryRule.earnedPoints || primaryRule.earned_points || 0)} điểm</strong>.
+                    </p>
+                    <div className="points-policy-list">
+                      <div className="points-policy-item">
+                        <span>1 điểm tương đương</span>
+                        <strong>{formatCurrency(primaryRule.spendingAmount || primaryRule.spending_amount || 0)}</strong>
+                      </div>
+                      <div className="points-policy-item">
+                        <span>Điểm được tính trên</span>
+                        <strong>tổng giá trị đơn hàng</strong>
+                      </div>
+                      <div className="points-policy-item">
+                        <span>Vé + combo đều được tính</span>
+                        <strong>có thể tích điểm</strong>
+                      </div>
+                      <div className="points-policy-item">
+                        <span>Hết hạn sau</span>
+                        <strong>{primaryRule.expiresInMonths || primaryRule.expires_in_months || 12} tháng</strong>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ========= VÍ DỤ NHANH — GỘP TẤT CẢ RULES VÀO MỘT LIST (KHÔNG CHIA RA) ========= */}
                 <div className="points-example-box">
-                  <h3>Ví dụ nhanh</h3>
-                  {seatExamples.map((item) => (
-                    <div key={item.label} className="points-example-row">
-                      <span>{item.label}</span>
-                      <strong>{item.points} điểm</strong>
-                    </div>
-                  ))}
-                  {comboExamples.map((item) => (
-                    <div key={item.label} className="points-example-row">
-                      <span>{item.label}</span>
-                      <strong>{item.points} điểm</strong>
-                    </div>
-                  ))}
-                  {seatExamples.length === 0 && comboExamples.length === 0 && (
-                    <p style={{ color: '#999' }}>Chưa có quy tắc ghế hoặc combo nào được kích hoạt.</p>
-                  )}
+                  <h3>Toàn bộ quy tắc đang áp dụng</h3>
+                  {activeRules.map((rule) => {
+                    const scope = rule.ruleScope || rule.rule_scope || "order";
+                    const key = rule.ruleKey || rule.rule_key || "";
+                    const desc =
+                      scope === "seat"
+                        ? `Ghế ${key || "đặc biệt"}: +${Number(rule.pointsValue || rule.points_value || 0)} điểm / vé`
+                        : scope === "combo"
+                          ? `Combo ${key || "đặc biệt"}: +${Number(rule.pointsValue || rule.points_value || 0)} điểm / combo`
+                          : `Mỗi ${formatCurrency(rule.spendingAmount || rule.spending_amount || 0)} chi tiêu → +${Number(rule.earnedPoints || rule.earned_points || 0)} điểm`;
+                    return (
+                      <div key={rule.id} className="points-example-row">
+                        <span>
+                          {rule.ruleName}
+                          <span style={{ fontSize: 12, color: "#999", marginLeft: 8 }}>
+                            ({scope === "order" ? "Đơn hàng" : scope === "seat" ? "Loại ghế" : "Combo"})
+                          </span>
+                        </span>
+                        <strong>{desc.split(": ")[1] || desc}</strong>
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             ) : (
               <p className="points-policy-summary">Chưa có quy tắc tích điểm nào được kích hoạt.</p>
             )}
-          </section>
-          <section className="points-card">
-            <h2>Điều chỉnh điểm người dùng</h2>
-            <form onSubmit={handleAdjust} className="points-form">
-              <label>
-                Người dùng
-                <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)}>
-                  <option value="">-- Chọn người dùng --</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>{user.fullName} ({user.email})</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Số điểm
-                <input type="number" value={adjustDelta} onChange={(e) => setAdjustDelta(e.target.value)} />
-              </label>
-              <label>
-                Lý do
-                <input type="text" value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} />
-              </label>
-              {selectedUser && <p className="points-help">Điểm hiện tại: {selectedUser.points}</p>}
-              {adjustMessage && <p className="points-help">{adjustMessage}</p>}
-              <button type="submit" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
+
+            {/* FORM tạo/sửa quy tắc — nằm GỘP trong cùng card */}
+            <hr style={{ margin: "24px 0", borderColor: "#1e2a55" }} />
+            <h3 style={{ marginTop: 0 }}>{editingRuleId ? "Cập nhật quy tắc" : "Thêm quy tắc tích điểm"}</h3>
+            <form onSubmit={handleRuleSubmit} className="points-form">
+              <label>Tên quy tắc<input value={ruleForm.ruleName} onChange={(e) => setRuleForm({ ...ruleForm, ruleName: e.target.value })} /></label>
+              <label>Loại quy tắc<select value={ruleForm.ruleScope} onChange={(e) => setRuleForm({ ...ruleForm, ruleScope: e.target.value })}><option value="order">Tổng đơn hàng</option><option value="seat">Ghế</option><option value="combo">Combo</option></select></label>
+              <label>Mã quy tắc (ví dụ: regular, vip, couple, combo1)<input value={ruleForm.ruleKey} onChange={(e) => setRuleForm({ ...ruleForm, ruleKey: e.target.value })} /></label>
+              <label>Chi tiêu tối thiểu<input type="number" value={ruleForm.spendingAmount} onChange={(e) => setRuleForm({ ...ruleForm, spendingAmount: Number(e.target.value) })} /></label>
+              <label>Điểm nhận được<input type="number" value={ruleForm.earnedPoints} onChange={(e) => setRuleForm({ ...ruleForm, earnedPoints: Number(e.target.value) })} /></label>
+              <label>Điểm cố định cho loại này<input type="number" value={ruleForm.pointsValue} onChange={(e) => setRuleForm({ ...ruleForm, pointsValue: Number(e.target.value) })} /></label>
+              <label>Hết hạn sau (tháng)<input type="number" value={ruleForm.expiresInMonths} onChange={(e) => setRuleForm({ ...ruleForm, expiresInMonths: Number(e.target.value) })} /></label>
+              <label className="checkbox-row"><input type="checkbox" checked={ruleForm.status} onChange={(e) => setRuleForm({ ...ruleForm, status: e.target.checked })} /> Kích hoạt</label>
+              <button type="submit" disabled={saving}>{saving ? 'Đang lưu...' : editingRuleId ? 'Cập nhật quy tắc' : 'Thêm quy tắc'}</button>
             </form>
+
+            {/* Danh sách tất cả quy tắc — cùng card, không chia tách */}
+            <h3 style={{ marginTop: 28 }}>Danh sách quy tắc ({rules.length})</h3>
+            <div className="points-list">
+              {rules.map((rule) => (
+                <div key={rule.id} className="points-item">
+                  <div>
+                    <strong>{rule.ruleName}</strong>
+                    <div>
+                      {rule.ruleScope === 'seat' ? `Ghế ${rule.ruleKey || 'đặc biệt'}: ${rule.pointsValue} điểm` : rule.ruleScope === 'combo' ? `Combo ${rule.ruleKey || 'đặc biệt'}: ${rule.pointsValue} điểm` : `Cho mỗi ${Number(rule.spendingAmount || 0).toLocaleString()}₫ nhận ${rule.earnedPoints} điểm`}
+                      <span style={{ marginLeft: 10, color: rule.status ? "#4ade80" : "#f87171", fontSize: 12 }}>
+                        ● {rule.status ? "Đang kích hoạt" : "Tạm tắt"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="points-actions">
+                    <button onClick={() => { setEditingRuleId(rule.id); setRuleForm(rule); }}>Sửa</button>
+                    <button onClick={() => deleteRule(rule.id)}>Xóa</button>
+                  </div>
+                </div>
+              ))}
+              {rules.length === 0 && <p style={{ color: "#999", fontSize: 13 }}>Chưa có quy tắc nào. Thêm quy tắc đầu tiên bên trên.</p>}
+            </div>
           </section>
 
           <section className="points-card">
@@ -296,37 +286,6 @@ export default function PointsManagement() {
                   <div className="points-actions">
                     <button onClick={() => { setEditingLevelId(level.id); setLevelForm(level); }}>Sửa</button>
                     <button onClick={() => deleteLevel(level.id)}>Xóa</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="points-card">
-            <h2>Quy tắc tích điểm</h2>
-            <form onSubmit={handleRuleSubmit} className="points-form">
-              <label>Tên quy tắc<input value={ruleForm.ruleName} onChange={(e) => setRuleForm({ ...ruleForm, ruleName: e.target.value })} /></label>
-              <label>Loại quy tắc<select value={ruleForm.ruleScope} onChange={(e) => setRuleForm({ ...ruleForm, ruleScope: e.target.value })}><option value="order">Tổng đơn hàng</option><option value="seat">Ghế</option><option value="combo">Combo</option></select></label>
-              <label>Mã quy tắc (ví dụ: regular, vip, couple, combo1)<input value={ruleForm.ruleKey} onChange={(e) => setRuleForm({ ...ruleForm, ruleKey: e.target.value })} /></label>
-              <label>Chi tiêu tối thiểu<input type="number" value={ruleForm.spendingAmount} onChange={(e) => setRuleForm({ ...ruleForm, spendingAmount: Number(e.target.value) })} /></label>
-              <label>Điểm nhận được<input type="number" value={ruleForm.earnedPoints} onChange={(e) => setRuleForm({ ...ruleForm, earnedPoints: Number(e.target.value) })} /></label>
-              <label>Điểm cố định cho loại này<input type="number" value={ruleForm.pointsValue} onChange={(e) => setRuleForm({ ...ruleForm, pointsValue: Number(e.target.value) })} /></label>
-              <label>Hết hạn sau (tháng)<input type="number" value={ruleForm.expiresInMonths} onChange={(e) => setRuleForm({ ...ruleForm, expiresInMonths: Number(e.target.value) })} /></label>
-              <label className="checkbox-row"><input type="checkbox" checked={ruleForm.status} onChange={(e) => setRuleForm({ ...ruleForm, status: e.target.checked })} /> Kích hoạt</label>
-              <button type="submit" disabled={saving}>{saving ? 'Đang lưu...' : editingRuleId ? 'Cập nhật quy tắc' : 'Thêm quy tắc'}</button>
-            </form>
-            <div className="points-list">
-              {rules.map((rule) => (
-                <div key={rule.id} className="points-item">
-                  <div>
-                    <strong>{rule.ruleName}</strong>
-                    <div>
-                      {rule.ruleScope === 'seat' ? `Ghế ${rule.ruleKey || 'đặc biệt'}: ${rule.pointsValue} điểm` : rule.ruleScope === 'combo' ? `Combo ${rule.ruleKey || 'đặc biệt'}: ${rule.pointsValue} điểm` : `Cho mỗi ${rule.spendingAmount.toLocaleString()}₫ nhận ${rule.earnedPoints} điểm`}
-                    </div>
-                  </div>
-                  <div className="points-actions">
-                    <button onClick={() => { setEditingRuleId(rule.id); setRuleForm(rule); }}>Sửa</button>
-                    <button onClick={() => deleteRule(rule.id)}>Xóa</button>
                   </div>
                 </div>
               ))}

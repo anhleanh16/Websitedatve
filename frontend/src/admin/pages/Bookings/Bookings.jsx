@@ -1,5 +1,6 @@
 import { useState } from "react";
 import './bookings.css';
+import BookingWizard from "./BookingWizard.jsx";
 
 // ─── Sample Data ──────────────────────────────────────────────────────────────
 const sampleBookings = [
@@ -510,30 +511,44 @@ export default function AdminBookings() {
 
   const tabs = [
     { key: "list",  label: "Danh sách vé" },
+    { key: "create", label: "➕ Đặt vé nhanh" },
     { key: "check", label: "Kiểm tra vé", disabled: activeTab !== "check" && activeTab !== "detail" },
   ];
 
   return (
     <div className="admin-bookings">
-      <div className="bk-page-header">
-        <h2>Quản lý đặt vé</h2>
-        <p>Quản lý toàn bộ vé đặt, chi tiết và kiểm tra vé</p>
+      <div className="bk-page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h2>Quản lý đặt vé</h2>
+          <p>Quản lý toàn bộ vé đặt, chi tiết và kiểm tra vé</p>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            className="bk-modal-footer-btn-primary"
+            onClick={() => setActiveTab("create")}
+            style={{ padding: "10px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}
+          >
+            🎟️ Đặt vé nhanh (cho khách hàng)
+          </button>
+        </div>
       </div>
 
       {/* Summary stats */}
-      <div className="bk-stats-row">
-        {[
-          { label: "Tổng vé",     value: bookings.length,                                                      color: "#7c61ff" },
-          { label: "Đã xác nhận", value: bookings.filter(b => b.status === "confirmed").length,               color: "#4ade80" },
-          { label: "Đang chờ",    value: bookings.filter(b => b.status === "pending").length,                 color: "#fbbf24" },
-          { label: "Đã hủy",      value: bookings.filter(b => b.status === "cancelled").length,               color: "#f87171" },
-        ].map(s => (
-          <div className="bk-stat-pill" key={s.label}>
-            <span>{s.label}</span>
-            <strong style={{ color: s.color }}>{s.value}</strong>
-          </div>
-        ))}
-      </div>
+      {activeTab !== "create" && (
+        <div className="bk-stats-row">
+          {[
+            { label: "Tổng vé",     value: bookings.length,                                                      color: "#7c61ff" },
+            { label: "Đã xác nhận", value: bookings.filter(b => b.status === "confirmed").length,               color: "#4ade80" },
+            { label: "Đang chờ",    value: bookings.filter(b => b.status === "pending").length,                 color: "#fbbf24" },
+            { label: "Đã hủy",      value: bookings.filter(b => b.status === "cancelled").length,               color: "#f87171" },
+          ].map(s => (
+            <div className="bk-stat-pill" key={s.label}>
+              <span>{s.label}</span>
+              <strong style={{ color: s.color }}>{s.value}</strong>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Tab navigation */}
       <div className="bk-tabs">
@@ -554,6 +569,38 @@ export default function AdminBookings() {
           bookings={bookings}
           onView={handleView}
           onCheck={handleCheck}
+        />
+      )}
+
+      {activeTab === "create" && (
+        <BookingWizard
+          onToast={showToast}
+          onBookingSuccess={(r) => {
+            const b = r?.booking || {};
+            const seatCodes = Array.isArray(b.seats) ? b.seats.join(", ") : (b.seat_codes || "");
+            const newItem = {
+              id: `B${Date.now()}`,
+              orderId: `ORD_${Date.now()}`,
+              user: b.full_name || (r?.new_user?.full_name) || "Khách hàng",
+              email: b.email || r?.new_user?.email || "",
+              phone: b.phone || r?.new_user?.phone || "",
+              movie: b.movie_title || "",
+              cinema: b.cinema_name || "",
+              room: b.room_name || "",
+              showtime: b.start_time ? new Date(b.start_time).toLocaleString("vi-VN") : "",
+              seats: Array.isArray(b.seats) ? b.seats : (seatCodes ? seatCodes.split(",").map(s => s.trim()) : []),
+              combo: null,
+              totalAmount: Number(b.total_price || 0),
+              paymentMethod: b.payment_method || b.paymentMethod || "",
+              paymentStatus: b.status === "cancelled" ? "failed" : "paid",
+              status: b.status || "confirmed",
+              bookingCode: b.booking_code || "",
+              qrCode: b.booking_code ? `QR_${b.booking_code}` : "",
+              checkInTime: null,
+              createdAt: new Date().toLocaleString("vi-VN"),
+            };
+            setBookings(prev => [newItem, ...prev]);
+          }}
         />
       )}
 

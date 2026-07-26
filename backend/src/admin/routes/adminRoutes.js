@@ -15,6 +15,7 @@ import {
   refundBooking,
   checkInBooking,
   verifyBookingCode,
+  staffCreateBooking,
 } from "../controllers/bookingController.js";
 import {
   getAllCategories,
@@ -46,6 +47,7 @@ import {
 } from "../controllers/showtimeController.js";
 import {
   getAdminUsers,
+  searchAdminUsers,
   createAdminUser,
   deactivateAdminUser,
   resetAdminUserPassword,
@@ -73,6 +75,7 @@ import {
   createAdminNews,
   updateAdminNews,
   deleteAdminNews,
+  uploadNewsInlineImage,
 } from "../controllers/newsController.js";
 import {
   getAdminCombos,
@@ -81,7 +84,7 @@ import {
   updateAdminCombo,
   deleteAdminCombo,
 } from "../controllers/comboController.js";
-import { uploadMovieFilesMiddleware, uploadCinemaImage, uploadNewsImage } from "../../../config/upload.js";
+import { uploadMovieFilesMiddleware, uploadCinemaImage, uploadNewsImage, uploadCkeditorNewsImage } from "../../../config/upload.js";
 import { authMiddleware, adminOnly } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -94,6 +97,7 @@ router.get("/statistics", getStatistics);
 
 // ─── User Management ─────────────────────────────────────────────────────────
 router.get("/users", getAdminUsers);
+router.get("/users/search", searchAdminUsers);
 router.post("/users", authMiddleware, adminOnly, createAdminUser);
 router.put("/users/:userId/deactivate", deactivateAdminUser);
 router.put("/users/:userId/reset-password", authMiddleware, adminOnly, resetAdminUserPassword);
@@ -116,11 +120,37 @@ router.put("/promotions/vouchers/:id", authMiddleware, adminOnly, updateVoucher)
 router.delete("/promotions/:id", authMiddleware, adminOnly, deletePromotion);
 
 // ─── News Management ──────────────────────────────────────────────────────────
+router.post("/news/upload-image", authMiddleware, adminOnly, uploadCkeditorNewsImage.single("upload"), uploadNewsInlineImage);
 router.get("/news", authMiddleware, adminOnly, getAdminNews);
 router.get("/news/:id", authMiddleware, adminOnly, getAdminNewsById);
 router.post("/news", authMiddleware, adminOnly, uploadNewsImage.single("thumbnailFile"), createAdminNews);
 router.put("/news/:id", authMiddleware, adminOnly, uploadNewsImage.single("thumbnailFile"), updateAdminNews);
 router.delete("/news/:id", authMiddleware, adminOnly, deleteAdminNews);
+
+// Upload inline image for CKEditor news body (Word-style inline images)
+// CKEditor expects response JSON: { url: "/uploads/..." }  (or { default: "..." })
+router.post(
+  "/upload/ckeditor-image",
+  authMiddleware,
+  adminOnly,
+  uploadCkeditorNewsImage.single("upload"),
+  (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: { message: "Không nhận được file ảnh." } });
+      }
+      const url = `/uploads/news/inline/${req.file.filename}`;
+      res.json({
+        url,
+        // Also return "default" for SimpleUploadAdapter compatibility
+        default: url,
+      });
+    } catch (e) {
+      console.error("CKEditor upload error:", e);
+      res.status(500).json({ error: { message: e.message || "Không thể upload ảnh." } });
+    }
+  }
+);
 
 // ─── Combo Management ─────────────────────────────────────────────────────────
 router.get("/combos", authMiddleware, adminOnly, getAdminCombos);
@@ -132,6 +162,7 @@ router.delete("/combos/:id", authMiddleware, adminOnly, deleteAdminCombo);
 // ─── Booking Management ──────────────────────────────────────────────────────
 router.get("/bookings", getAdminBookings);
 router.get("/bookings/verify/:code", verifyBookingCode);
+router.post("/bookings/staff-create", authMiddleware, adminOnly, staffCreateBooking);
 router.get("/bookings/:orderId", getAdminBookingDetail);
 router.put("/bookings/:orderId/refund", refundBooking);
 router.put("/bookings/:orderId/check-in", checkInBooking);
