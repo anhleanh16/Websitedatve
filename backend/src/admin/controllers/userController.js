@@ -138,7 +138,14 @@ const normalizeDate = (v) => {
 export const searchAdminUsers = async (req, res) => {
   try {
     const { query = "" } = req.query;
-    const q = `%${String(query || "").trim()}%`;
+    const trimmed = String(query || "").trim();
+
+    // Không cho phép search khi query rỗng
+    if (!trimmed) {
+      return res.json({ users: [] });
+    }
+
+    const q = `%${trimmed}%`;
 
     const [users] = await db.query(
       `SELECT
@@ -156,7 +163,7 @@ export const searchAdminUsers = async (req, res) => {
       LEFT JOIN Roles r ON u.role_id = r.role_id
       WHERE u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
       ORDER BY u.created_at DESC
-      LIMIT 15`,
+      LIMIT 20`,
       [q, q, q],
     );
 

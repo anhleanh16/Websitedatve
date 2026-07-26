@@ -17,6 +17,7 @@ import {
   userClearNotifications,
   userGetPromotions,
   userGetTodayPromotions,
+  validatePromoCode,
   userGetNews,
   userGetNewsBySlug,
 } from '../controllers/userController.js';
@@ -32,6 +33,7 @@ router.get('/showtimes', userGetShowtimes);
 router.get('/combos', userGetCombos);
 router.get('/movies/:id', userGetMovieById);
 router.get('/promotions/today', userGetTodayPromotions);
+router.post('/promotions/validate', validatePromoCode);
 router.get('/news', userGetNews);
 router.get('/news/:slug', userGetNewsBySlug);
 

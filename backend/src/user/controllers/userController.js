@@ -55,6 +55,37 @@ export const getPublicCinemaById = async (req, res) => {
     if (!cinema) {
       return res.status(404).json({ message: "Không tìm thấy rạp phim" });
     }
+
+    // Nếu có showtimeId, overlay trạng thái ghế đã bán theo suất chiếu cụ thể
+    const showtimeId = Number(req.query.showtimeId || 0);
+    if (showtimeId > 0 && Array.isArray(cinema.rooms)) {
+      // Lấy tất cả seat_code đã có ticket active trong suất chiếu này
+      const [soldRows] = await db.query(
+        `SELECT UPPER(s.seat_code) AS seat_code
+         FROM Tickets t
+         JOIN Seats s ON s.seat_id = t.seat_id
+         JOIN Orders o ON o.order_id = t.order_id
+         WHERE t.showtime_id = ?
+           AND t.ticket_status <> 'cancelled'
+           AND o.status <> 'cancelled'`,
+        [showtimeId],
+      );
+      const soldSet = new Set(soldRows.map((r) => r.seat_code));
+
+      // Overlay: đánh dấu ghế đã bán theo suất
+      cinema.rooms = cinema.rooms.map((room) => ({
+        ...room,
+        seats: Array.isArray(room.seats)
+          ? room.seats.map((seat) => ({
+              ...seat,
+              status: soldSet.has(String(seat.seat_code || "").toUpperCase())
+                ? "sold"
+                : seat.status,
+            }))
+          : [],
+      }));
+    }
+
     res.json({ cinema: normalizeCinemaImagePath(cinema) });
   } catch (error) {
     console.error(`Error getting public cinema ${req.params.id}:`, error);
@@ -157,7 +188,7 @@ export const userGetShowtimes = async (req, res) => {
       WHERE s.status = 'active'
         AND m.is_deleted = 0
         AND m.is_hidden = 0
-        AND DATE(s.start_time) = COALESCE(?, CURDATE())
+        AND DATE(CONVERT_TZ(s.start_time, '+00:00', '+07:00')) = COALESCE(?, DATE(CONVERT_TZ(NOW(), '+00:00', '+07:00')))
     `;
     params.push(date || null);
 
@@ -282,7 +313,7 @@ export const userGetMovieById = async (req, res) => {
       JOIN Cinemas c ON r.cinema_id = c.cinemas_id
       WHERE s.movie_id = ?
         AND s.status = 'active'
-        AND DATE(s.start_time) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 6 DAY)
+        AND DATE(CONVERT_TZ(s.start_time, '+00:00', '+07:00')) BETWEEN DATE(CONVERT_TZ(NOW(), '+00:00', '+07:00')) AND DATE_ADD(DATE(CONVERT_TZ(NOW(), '+00:00', '+07:00')), INTERVAL 6 DAY)
       ORDER BY c.cinema_name ASC, s.start_time ASC
     `,
       [movieId],
@@ -331,10 +362,15 @@ export const userUpdateProfile = async (req, res) => {
 
 export const userGetBookings = async (req, res) => {
   try {
-    const { userId } = req.params;
-    res.json({ bookings: [] });
+    const userId = Number(req.params.userId);
+    if (!userId || userId <= 0) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ." });
+    }
+    const bookings = await BookingModel.findByUserId(userId);
+    res.json({ bookings });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error in userGetBookings:", error);
+    res.status(500).json({ message: "Không thể tải danh sách vé.", bookings: [] });
   }
 };
 
@@ -456,6 +492,95 @@ export const userGetTodayPromotions = async (req, res) => {
   } catch (error) {
     console.error("Error in userGetTodayPromotions:", error);
     res.status(500).json({ message: "Không thể tải khuyến mãi hôm nay", coupons: [] });
+  }
+};
+
+export const validatePromoCode = async (req, res) => {
+  try {
+    const { code, orderAmount = 0, userId } = req.body || {};
+    const trimmedCode = String(code || "").trim().toUpperCase();
+
+    if (!trimmedCode) {
+      return res.status(400).json({ valid: false, message: "Vui lòng nhập mã ưu đãi." });
+    }
+
+    const [rows] = await db.query(
+      `SELECT * FROM Promotions
+       WHERE UPPER(code) = ?
+         AND status = 'active'
+         AND (start_date IS NULL OR start_date <= CURDATE())
+         AND (end_date IS NULL OR end_date >= CURDATE())
+       LIMIT 1`,
+      [trimmedCode],
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ valid: false, message: "Mã không hợp lệ hoặc đã hết hạn." });
+    }
+
+    const promo = rows[0];
+
+    // Kiểm tra số lần sử dụng
+    if (Number(promo.usage_limit) > 0 && Number(promo.used_count) >= Number(promo.usage_limit)) {
+      return res.status(400).json({ valid: false, message: "Mã đã hết lượt sử dụng." });
+    }
+
+    // Kiểm tra đơn tối thiểu
+    const minOrder = Number(promo.min_order || 0);
+    if (minOrder > 0 && Number(orderAmount) < minOrder) {
+      return res.status(400).json({
+        valid: false,
+        message: `Đơn hàng tối thiểu ${minOrder.toLocaleString("vi-VN")}đ để dùng mã này.`,
+      });
+    }
+
+    // Kiểm tra voucher riêng tư (promotion_type = 'voucher') phải đúng user
+    if (promo.promotion_type === "voucher" && userId) {
+      const [assignment] = await db.query(
+        `SELECT * FROM User_Promotions
+         WHERE promotion_id = ? AND user_id = ? AND status = 'active'
+         LIMIT 1`,
+        [promo.promotion_id, Number(userId)],
+      );
+      if (!assignment.length) {
+        return res.status(403).json({ valid: false, message: "Voucher này không dành cho tài khoản của bạn." });
+      }
+    }
+
+    // Tính discount
+    const discountType = promo.discount_type || "percent";
+    const discountValue = Number(promo.discount_value || 0);
+    const amount = Number(orderAmount || 0);
+    let discountAmount = 0;
+
+    if (discountType === "percent") {
+      discountAmount = Math.round(amount * discountValue / 100);
+    } else {
+      discountAmount = discountValue;
+    }
+
+    // Giới hạn max discount
+    const maxDiscount = Number(promo.max_discount || 0);
+    if (maxDiscount > 0 && discountAmount > maxDiscount) {
+      discountAmount = maxDiscount;
+    }
+
+    return res.json({
+      valid: true,
+      message: `Áp dụng thành công! Giảm ${discountType === "percent" ? `${discountValue}%` : `${discountValue.toLocaleString("vi-VN")}đ`}.`,
+      promo: {
+        id: promo.promotion_id,
+        code: promo.code,
+        discountType,
+        discountValue,
+        discountAmount,
+        maxDiscount,
+        description: promo.description || "",
+      },
+    });
+  } catch (error) {
+    console.error("Error in validatePromoCode:", error);
+    res.status(500).json({ valid: false, message: "Không thể kiểm tra mã ưu đãi." });
   }
 };
 

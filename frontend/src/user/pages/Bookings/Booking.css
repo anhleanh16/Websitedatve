@@ -772,9 +772,13 @@
   pointer-events: none;
 }
 
-.booking-seat.booking-seat-sold:hover {
+.booking-seat.booking-seat-sold:hover,
+.booking-seat.booking-seat-sold:focus,
+.booking-seat.booking-seat-sold:active {
   transform: none;
   background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
 }
 
 .booking-seat.booking-seat-sold:disabled {

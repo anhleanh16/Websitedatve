@@ -55,11 +55,19 @@ export const userPromotionService = {
     ).toString();
     return apiFetch(`/user/promotions/today${q ? `?${q}` : ""}`);
   },
+  validateCode: (code, payload = {}) =>
+    apiFetch("/user/promotions/validate", {
+      method: "POST",
+      body: JSON.stringify({ code, ...payload }),
+    }),
 };
 
 export const userCinemaService = {
   getAll: () => apiFetch('/user/cinemas'),
-  getById: (id) => apiFetch(`/user/cinemas/${encodeURIComponent(id)}`),
+  getById: (id, showtimeId) => {
+    const url = `/user/cinemas/${encodeURIComponent(id)}${showtimeId ? `?showtimeId=${encodeURIComponent(showtimeId)}` : ''}`;
+    return apiFetch(url);
+  },
 };
 
 export const userComboService = {
@@ -70,6 +78,19 @@ export const userBookingService = {
   getAll: (userId) => apiFetch(`/user/${encodeURIComponent(userId)}/bookings`),
   create: (userId, data) =>
     apiFetch(`/user/${encodeURIComponent(userId)}/bookings`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  createZaloPayOrder: (userId, data) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/payments/zalopay`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  queryZaloPayOrder: (appTransId) =>
+    apiFetch(`/user/payments/zalopay/query?app_trans_id=${encodeURIComponent(appTransId)}`),
+  // legacy alias
+  createZaloPayPayment: (userId, data) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/payments/zalopay`, {
       method: "POST",
       body: JSON.stringify(data),
     }),

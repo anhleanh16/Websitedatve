@@ -33,10 +33,36 @@ const EMPTY_VOUCHER = {
   status: "active", desc: "",
 };
 
+// ─── Helpers normalize date ───────────────────────────────────────────────────
+const toDateInput = (val) => {
+  if (!val) return "";
+  // Nếu đã là YYYY-MM-DD (10 ký tự đúng format)
+  if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+  // Thử parse và lấy theo giờ VN
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return String(val).slice(0, 10);
+  return d.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+};
+
 // ─── Coupon Form Modal ────────────────────────────────────────────────────────
 function CouponForm({ coupon, onClose, onSave }) {
   const isEdit = !!coupon;
-  const [form, setForm] = useState(coupon ? { ...coupon } : { ...EMPTY_COUPON, code: genCode("KM") });
+  const [form, setForm] = useState(() => {
+    if (!coupon) return { ...EMPTY_COUPON, code: genCode("KM") };
+    return {
+      ...coupon,
+      startDate:   toDateInput(coupon.startDate),
+      endDate:     toDateInput(coupon.endDate),
+      value:       coupon.value ?? "",
+      minOrder:    coupon.minOrder ?? 0,
+      maxDiscount: coupon.maxDiscount ?? "",
+      usageLimit:  coupon.usageLimit ?? 100,
+      type:        coupon.type || "percent",
+      applicableTo: coupon.applicableTo || "all",
+      status:      coupon.status || "active",
+      desc:        coupon.desc || "",
+    };
+  });
   const [errors, setErrors] = useState({});
 
   const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: undefined })); };
@@ -56,7 +82,13 @@ function CouponForm({ coupon, onClose, onSave }) {
   const handleSave = () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-    onSave({ ...form, id: coupon?.id || Date.now(), value: Number(form.value), minOrder: Number(form.minOrder), maxDiscount: Number(form.maxDiscount), usageLimit: Number(form.usageLimit) });
+    onSave({
+      ...form,
+      value:      Number(form.value),
+      minOrder:   Number(form.minOrder || 0),
+      maxDiscount: Number(form.maxDiscount || 0),
+      usageLimit: Number(form.usageLimit),
+    });
   };
 
   return (
@@ -182,7 +214,28 @@ function CouponForm({ coupon, onClose, onSave }) {
 // ─── Voucher Form Modal ───────────────────────────────────────────────────────
 function VoucherForm({ voucher, users, onClose, onSave }) {
   const isEdit = !!voucher;
-  const [form, setForm] = useState(voucher ? { ...voucher } : { ...EMPTY_VOUCHER, code: genCode("VCH"), issuedDate: new Date().toISOString().slice(0, 10) });
+  const [form, setForm] = useState(() => {
+    if (!voucher) {
+      return {
+        ...EMPTY_VOUCHER,
+        code: genCode("VCH"),
+        issuedDate: new Date().toISOString().slice(0, 10),
+      };
+    }
+    return {
+      ...voucher,
+      issuedDate:  toDateInput(voucher.issuedDate),
+      expiryDate:  toDateInput(voucher.expiryDate),
+      value:       voucher.value ?? "",
+      minOrder:    voucher.minOrder ?? 0,
+      maxDiscount: voucher.maxDiscount ?? "",
+      type:        voucher.type || "percent",
+      status:      voucher.status || "active",
+      desc:        voucher.desc || "",
+      userId:      voucher.userId != null ? String(voucher.userId) : "",
+      issuedTo:    voucher.issuedTo || "",
+    };
+  });
   const [errors, setErrors] = useState({});
 
   const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: undefined })); };
@@ -202,7 +255,12 @@ function VoucherForm({ voucher, users, onClose, onSave }) {
   const handleSave = () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-    onSave({ ...form, id: voucher?.id || Date.now(), value: Number(form.value), minOrder: Number(form.minOrder || 0), maxDiscount: Number(form.maxDiscount || 0) });
+    onSave({
+      ...form,
+      value:      Number(form.value),
+      minOrder:   Number(form.minOrder || 0),
+      maxDiscount: Number(form.maxDiscount || 0),
+    });
   };
 
   return (
@@ -564,10 +622,12 @@ export default function AdminPromotions() {
   // Coupon handlers
   const handleSaveCoupon = async (data) => {
     try {
-      if (coupons.find(c => c.id === data.id)) {
-        await adminPromotionService.updateCoupon(data.id, data);
+      if (couponForm !== null) {
+        // couponForm là object = đang edit
+        await adminPromotionService.updateCoupon(couponForm.id, data);
         showToast(`Đã cập nhật mã "${data.code}".`);
       } else {
+        // couponForm === null = tạo mới
         await adminPromotionService.createCoupon(data);
         showToast(`Đã tạo mã khuyến mãi "${data.code}".`);
       }
@@ -575,17 +635,19 @@ export default function AdminPromotions() {
       await loadData();
     } catch (err) {
       console.error(err);
-      setError(err.message || "Không thể lưu mã khuyến mãi.");
+      showToast(`❌ ${err.message || "Không thể lưu mã khuyến mãi."}`);
     }
   };
 
   // Voucher handlers
   const handleSaveVoucher = async (data) => {
     try {
-      if (vouchers.find(v => v.id === data.id)) {
-        await adminPromotionService.updateVoucher(data.id, data);
+      if (voucherForm !== null) {
+        // voucherForm là object = đang edit
+        await adminPromotionService.updateVoucher(voucherForm.id, data);
         showToast(`Đã cập nhật voucher "${data.code}".`);
       } else {
+        // voucherForm === null = tạo mới
         await adminPromotionService.createVoucher(data);
         showToast(`Đã cấp voucher "${data.code}" cho ${data.issuedTo}.`);
       }
@@ -593,7 +655,7 @@ export default function AdminPromotions() {
       await loadData();
     } catch (err) {
       console.error(err);
-      setError(err.message || "Không thể lưu voucher.");
+      showToast(`❌ ${err.message || "Không thể lưu voucher."}`);
     }
   };
 

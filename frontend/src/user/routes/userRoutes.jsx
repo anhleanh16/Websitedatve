@@ -4,6 +4,8 @@ import MovieDetail from "../pages/MovieDetails/MovieDetail";
 import Film from "../pages/Films/Film";
 import Booking from "../pages/Bookings/Booking";
 import Payment from "../pages/Payment/Payment";
+import PaymentPending from "../pages/Payment/PaymentPending";
+import PaymentResult from "../pages/Payment/PaymentResult";
 import News from "../pages/News/News";
 import NewsDetail from "../pages/News/NewsDetail";
 import Blog from "../pages/Blog/Blog";
@@ -28,6 +30,8 @@ export function UserRoutes() {
         <Route path="/booking" element={<Booking />} />
         <Route path="/Bookings/Booking" element={<Booking />} />
         <Route path="/payment" element={<Payment />} />
+        <Route path="/payment/pending" element={<PaymentPending />} />
+        <Route path="/payment/result" element={<PaymentResult />} />
         <Route path="/news" element={<News />} />
         <Route path="/news/:slug" element={<NewsDetail />} />
         <Route path="/blog" element={<Blog />} />

@@ -35,14 +35,16 @@ const normalizeShowtimePayload = (body = {}) => ({
 
 export const getShowtimes = async (req, res) => {
   try {
-    // #region debug-point A:getShowtimes-entry
     reportDebugEvent({
       hypothesisId: "A",
       location: "showtimeController.js:getShowtimes",
       msg: "[DEBUG] getShowtimes entry",
     });
-    // #endregion
-    const showtimes = await ShowtimeModel.findAll();
+    const { cinemaId, date } = req.query;
+    const filters = {};
+    if (cinemaId) filters.cinemaId = cinemaId;
+    if (date) filters.date = date;
+    const showtimes = await ShowtimeModel.findAll(filters);
     res.json({ showtimes });
   } catch (err) {
     console.error("Error in getShowtimes:", err);

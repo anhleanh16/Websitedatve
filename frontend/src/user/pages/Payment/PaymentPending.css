@@ -1,0 +1,448 @@
+/* =============================================
+   PAYMENT PENDING PAGE
+============================================= */
+
+.pp-page {
+  padding: 32px 24px 64px;
+  color: #dbe6ff;
+  max-width: 960px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* ── Status banner ── */
+.pp-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(79, 70, 229, 0.14));
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  border-radius: 20px;
+  padding: 1.4rem 1.6rem;
+  margin-bottom: 1.4rem;
+}
+
+.pp-status-banner.expired {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(79, 70, 229, 0.10));
+  border-color: rgba(239, 68, 68, 0.30);
+}
+
+.pp-status-icon-ring {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(251, 191, 36, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pp-status-banner.expired .pp-status-icon-ring {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.pp-status-icon {
+  font-size: 1.5rem;
+  color: #fbbf24;
+  animation: pp-spin 4s linear infinite;
+}
+
+.pp-status-icon.expired-icon {
+  color: #ef4444;
+  animation: none;
+}
+
+@keyframes pp-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.pp-status-text h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.pp-status-text p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+/* ── Countdown ── */
+.pp-countdown-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1.6rem;
+  font-size: 0.9rem;
+  color: #cbd5e1;
+}
+
+.pp-countdown-icon {
+  color: #fbbf24;
+  font-size: 0.95rem;
+}
+
+.pp-countdown-timer {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #fbbf24;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  margin-left: 2px;
+}
+
+.pp-countdown-timer.urgent {
+  color: #ef4444;
+  animation: pp-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes pp-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+/* ── Layout ── */
+.pp-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.4rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .pp-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Ticket card ── */
+.pp-ticket-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 1.4rem;
+}
+
+.pp-ticket-header {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #a78bfa;
+  margin-bottom: 1rem;
+}
+
+.pp-ticket-icon {
+  font-size: 1rem;
+}
+
+.pp-ticket-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  font-size: 0.88rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pp-ticket-row:last-of-type {
+  border-bottom: none;
+}
+
+.pp-ticket-row span {
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.pp-ticket-row strong {
+  color: #dbe6ff;
+  text-align: right;
+  max-width: 60%;
+}
+
+.pp-ticket-row.highlight .pp-booking-code {
+  color: #a78bfa;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+
+.pp-ticket-divider {
+  display: flex;
+  align-items: center;
+  margin: 1rem -1.4rem;
+  position: relative;
+}
+
+.pp-notch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #0f172a;
+  flex-shrink: 0;
+}
+
+.pp-dashed {
+  flex: 1;
+  border-top: 2px dashed rgba(255, 255, 255, 0.12);
+}
+
+.pp-ticket-row.total-row span {
+  font-weight: 600;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.pp-final-price {
+  color: #a78bfa !important;
+  font-size: 1.1rem !important;
+}
+
+.pp-status-badge-row {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.pp-status-badge {
+  display: inline-block;
+  padding: 0.35rem 1rem;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.pp-status-badge.pending {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.pp-status-badge.cancelled {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* ── Right col ── */
+.pp-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+/* ── QR card ── */
+.pp-qr-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 1.2rem;
+  text-align: center;
+}
+
+.pp-qr-card h3 {
+  margin: 0 0 0.9rem;
+  font-size: 0.95rem;
+  color: #a78bfa;
+  font-weight: 700;
+}
+
+.pp-qr-image {
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: #fff;
+  padding: 8px;
+  display: block;
+  margin: 0 auto;
+}
+
+.pp-vietqr-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #0062b2, #00a0e9);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin: 6px auto 10px;
+}
+
+.pp-qr-info-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin: 6px 0;
+}
+
+.pp-qr-info-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+}
+
+.pp-qr-info-row span {
+  color: #7a8fc4;
+}
+
+.pp-qr-info-row strong {
+  color: #dbe6ff;
+  font-family: monospace;
+  text-align: right;
+  max-width: 60%;
+  word-break: break-all;
+}
+
+.pp-qr-amount {
+  color: #a78bfa !important;
+  font-size: 0.95rem !important;
+}
+
+.pp-qr-note {
+  margin: 0.6rem 0 0.3rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.pp-pay-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #818cf8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pp-pay-link:hover {
+  color: #a78bfa;
+  text-decoration: underline;
+}
+
+/* ── Guide card ── */
+.pp-guide-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 1.2rem;
+}
+
+.pp-guide-card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  color: #a78bfa;
+  font-weight: 700;
+}
+
+.pp-guide-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.pp-guide-list li {
+  font-size: 0.86rem;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-bottom: 0.35rem;
+}
+
+.pp-guide-list li strong {
+  color: #dbe6ff;
+}
+
+/* ── Points banner ── */
+.pp-points-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(124, 58, 237, 0.12));
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+}
+
+.pp-points-icon {
+  color: #fbbf24;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.pp-points-title {
+  font-size: 0.85rem;
+  color: #fef3c7;
+  font-weight: 600;
+}
+
+.pp-points-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+  margin-top: 0.1rem;
+}
+
+.pp-points-sub {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  margin-top: 0.15rem;
+}
+
+/* ── Actions ── */
+.pp-actions {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.pp-btn-profile,
+.pp-btn-home,
+.pp-btn-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.7rem 1.4rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.18s;
+}
+
+.pp-btn-profile {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  color: #fff;
+}
+
+.pp-btn-home {
+  background: rgba(255, 255, 255, 0.07);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pp-btn-retry {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+}
+
+.pp-btn-profile:hover,
+.pp-btn-home:hover,
+.pp-btn-retry:hover {
+  opacity: 0.85;
+}

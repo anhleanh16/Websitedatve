@@ -74,8 +74,9 @@ const addMinutes = (value, minutes) => {
 export const ShowtimeModel = {
   /**
    * Lấy tất cả lịch chiếu, kết hợp thông tin phim, rạp và phòng chiếu.
+   * Hỗ trợ filter theo cinemaId và date (YYYY-MM-DD).
    */
-  async findAll() {
+  async findAll(filters = {}) {
     const caps = await getSchemaCapabilities();
     const priceStandardExpr = caps.showtimes.hasPriceStandard
       ? "COALESCE(s.price_standard, s.price)"
@@ -86,6 +87,21 @@ export const ShowtimeModel = {
     const priceCoupleExpr = caps.showtimes.hasPriceCouple
       ? "COALESCE(s.price_couple, s.price)"
       : priceStandardExpr;
+
+    const whereClauses = [];
+    const params = [];
+
+    if (filters.cinemaId) {
+      whereClauses.push("r.cinema_id = ?");
+      params.push(filters.cinemaId);
+    }
+
+    if (filters.date) {
+      whereClauses.push("DATE(CONVERT_TZ(s.start_time, '+00:00', '+07:00')) = ?");
+      params.push(filters.date);
+    }
+
+    const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
     const [showtimes] = await db.query(`
       SELECT 
@@ -105,6 +121,7 @@ export const ShowtimeModel = {
         m.title AS movie_title,
         m.duration,
         c.cinema_name,
+        c.cinemas_id AS cinema_id_check,
         r.room_name,
         r.room_type,
         r.total_seat
@@ -112,8 +129,9 @@ export const ShowtimeModel = {
       JOIN Movies m ON s.movie_id = m.movie_id
       JOIN Rooms r ON s.room_id = r.room_id
       JOIN Cinemas c ON r.cinema_id = c.cinemas_id
-      ORDER BY s.start_time DESC
-    `);
+      ${whereSQL}
+      ORDER BY s.start_time ASC
+    `, params);
     return showtimes;
   },
 

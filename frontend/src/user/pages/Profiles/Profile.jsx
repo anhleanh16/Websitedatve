@@ -5,28 +5,43 @@ import {
   FaUser, FaEdit, FaLock, FaCamera, FaTicketAlt,
   FaHistory, FaBell, FaCrown, FaHeadset, FaRobot,
   FaChevronRight, FaEye, FaEyeSlash, FaSave, FaTimes,
-  FaStar, FaMapMarkerAlt, FaClock, FaCheck
+  FaStar, FaMapMarkerAlt, FaClock, FaCheck, FaQrcode, FaSpinner
 } from 'react-icons/fa'
 import './profile.css'
 
-/* ── Mock data ── */
-const MOCK_TICKETS = [
-  { id: 1, movie: 'Doraemon: Vũ Trụ Tí Hon', cinema: 'Sweetstar Movie Đà Nẵng', date: '10/06/2026', time: '14:00', seats: 'C5, C6', format: '2D', status: 'upcoming' },
-  { id: 2, movie: 'Avengers: Secret Wars',   cinema: 'Sweetstar Movie Đà Nẵng', date: '08/06/2026', time: '20:00', seats: 'E3',     format: 'IMAX', status: 'upcoming' },
-]
+/* ── Helpers ── */
+const formatDate = (dateStr) => {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d)) return dateStr
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+const formatTime = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d)) return ''
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+}
+const formatMoney = (amount) => {
+  if (amount == null) return '—'
+  return Number(amount).toLocaleString('vi-VN') + 'đ'
+}
 
-const MOCK_HISTORY = [
-  { id: 1, movie: 'Inside Out 3',   cinema: 'Sweetstar Movie Đà Nẵng', date: '01/06/2026', seats: 2, total: '180.000đ', status: 'done' },
-  { id: 2, movie: 'Spider-Man 4',   cinema: 'Sweetstar Movie Đà Nẵng', date: '25/05/2026', seats: 1, total: '110.000đ', status: 'done' },
-  { id: 3, movie: 'Dune: Part 3',   cinema: 'Sweetstar Movie Đà Nẵng', date: '15/05/2026', seats: 2, total: '220.000đ', status: 'done' },
-  { id: 4, movie: 'Moana 3',        cinema: 'Sweetstar Movie Đà Nẵng', date: '02/05/2026', seats: 3, total: '270.000đ', status: 'cancelled' },
-]
+/* Trạng thái đơn → label + class */
+const STATUS_MAP = {
+  confirmed:  { label: 'Sắp chiếu',  cls: 'upcoming'   },
+  pending:    { label: 'Chờ xác nhận', cls: 'pending'   },
+  completed:  { label: 'Hoàn thành', cls: 'done'        },
+  cancelled:  { label: 'Đã huỷ',     cls: 'cancelled'  },
+  checked_in: { label: 'Đã check-in', cls: 'done'       },
+}
+const getStatus = (status) => STATUS_MAP[status] || { label: status, cls: '' }
 
 const MOCK_NOTIFS = [
-  { id: 1, title: 'Vé xem phim đã xác nhận', desc: 'Vé Doraemon ngày 10/06 đã được xác nhận.', time: '2 giờ trước', read: false },
+  { id: 1, title: 'Vé xem phim đã xác nhận', desc: 'Vé đã được xác nhận.', time: '2 giờ trước', read: false },
   { id: 2, title: 'Ưu đãi thành viên Gold',  desc: 'Bạn đủ điều kiện nhận voucher sinh nhật 100K.', time: '1 ngày trước', read: false },
-  { id: 3, title: 'Phim mới ra mắt',          desc: 'Avengers: Secret Wars mở bán vé từ hôm nay.', time: '3 ngày trước', read: true },
-  { id: 4, title: 'Điểm tích lũy cập nhật',  desc: '+50 điểm từ giao dịch ngày 01/06.', time: '5 ngày trước', read: true },
+  { id: 3, title: 'Phim mới ra mắt',          desc: 'Mở bán vé từ hôm nay.', time: '3 ngày trước', read: true },
+  { id: 4, title: 'Điểm tích lũy cập nhật',  desc: '+50 điểm từ giao dịch gần nhất.', time: '5 ngày trước', read: true },
 ]
 
 const SIDEBAR_ITEMS = [
@@ -51,6 +66,11 @@ export default function Profile() {
   const [notifs,     setNotifs]     = useState(MOCK_NOTIFS)
   const [saved,      setSaved]      = useState(false)
   const [pointsSummary, setPointsSummary] = useState(null)
+
+  /* bookings */
+  const [bookings,      setBookings]      = useState([])
+  const [bookingsLoading, setBookingsLoading] = useState(false)
+  const [bookingsError,   setBookingsError]   = useState(null)
 
   /* edit form */
   const [editForm, setEditForm] = useState({
@@ -86,6 +106,30 @@ export default function Profile() {
     }
 
     loadPoints()
+  }, [profile?.id])
+
+  /* Load danh sách vé từ CSDL */
+  useEffect(() => {
+    const loadBookings = async () => {
+      if (!profile?.id) return
+      setBookingsLoading(true)
+      setBookingsError(null)
+      try {
+        const token = localStorage.getItem('token')
+        const res = await fetch(`/api/user/${profile.id}/bookings`, {
+          headers: { Authorization: `Bearer ${token || ''}` },
+        })
+        if (!res.ok) throw new Error('Không thể tải danh sách vé')
+        const data = await res.json()
+        setBookings(data.bookings || [])
+      } catch (err) {
+        console.error('Failed to load bookings', err)
+        setBookingsError(err.message)
+      } finally {
+        setBookingsLoading(false)
+      }
+    }
+    loadBookings()
   }, [profile?.id])
 
   const handleEditChange = (e) => setEditForm(p => ({ ...p, [e.target.name]: e.target.value }))
@@ -127,6 +171,18 @@ export default function Profile() {
   const userInitial = userName?.[0]?.toUpperCase() || 'U'
   const totalPoints = pointsSummary?.user?.points ?? 0
   const tierName = pointsSummary?.user?.tier?.name || 'Silver'
+
+  /* Thống kê từ bookings thực */
+  const totalBookings   = bookings.length
+  const completedMovies = bookings.filter(b => ['completed', 'checked_in'].includes(b.status)).length
+  /* Vé sắp chiếu: trạng thái confirmed và suất chiếu chưa qua */
+  const upcomingTickets = bookings.filter(b =>
+    b.status === 'confirmed' && new Date(b.start_time) > new Date()
+  )
+  /* Lịch sử: tất cả trừ vé đang confirmed tương lai */
+  const historyBookings = bookings.filter(b =>
+    b.status !== 'confirmed' || new Date(b.start_time) <= new Date()
+  )
 
   return (
     <div className='profile-page'>
@@ -208,10 +264,10 @@ export default function Profile() {
             {/* Stats strip */}
             <div className='profile-stats'>
               {[
-                { icon: <FaTicketAlt />, num: '12',    label: 'Vé đã đặt',   color: '#7c3aed' },
-                { icon: <FaStar />,      num: totalPoints.toLocaleString(),   label: 'Điểm tích lũy', color: '#f59e0b' },
-                { icon: <FaHistory />,   num: '8',     label: 'Phim đã xem', color: '#0ea5e9' },
-                { icon: <FaCrown />,     num: 'Gold',  label: 'Hạng thành viên', color: '#f59e0b' },
+                { icon: <FaTicketAlt />, num: totalBookings,              label: 'Vé đã đặt',      color: '#7c3aed' },
+                { icon: <FaStar />,      num: totalPoints.toLocaleString(), label: 'Điểm tích lũy', color: '#f59e0b' },
+                { icon: <FaHistory />,   num: completedMovies,             label: 'Phim đã xem',    color: '#0ea5e9' },
+                { icon: <FaCrown />,     num: tierName,                    label: 'Hạng thành viên', color: '#f59e0b' },
               ].map((s, i) => (
                 <div key={i} className='pstat-card'>
                   <span className='pstat-icon' style={{ color: s.color, background: s.color + '22' }}>{s.icon}</span>
@@ -357,29 +413,57 @@ export default function Profile() {
               <FaTicketAlt />
               <h2>Vé của tôi</h2>
             </div>
+
+            {bookingsLoading && (
+              <div className='booking-loading'><FaSpinner className='spin' /> Đang tải vé...</div>
+            )}
+            {bookingsError && (
+              <div className='booking-error'>⚠️ {bookingsError}</div>
+            )}
+            {!bookingsLoading && !bookingsError && upcomingTickets.length === 0 && (
+              <div className='booking-empty'>Bạn chưa có vé nào sắp chiếu.</div>
+            )}
+
             <div className='tickets-list'>
-              {MOCK_TICKETS.map(t => (
-                <div key={t.id} className='ticket-card'>
-                  <div className='ticket-left'>
-                    <div className='ticket-movie'>{t.movie}</div>
-                    <div className='ticket-meta'>
-                      <span><FaMapMarkerAlt /> {t.cinema}</span>
-                      <span><FaClock /> {t.date} – {t.time}</span>
+              {upcomingTickets.map(t => {
+                const st = getStatus(t.status)
+                const roomType = t.room_type || '2D'
+                return (
+                  <div key={t.booking_id} className='ticket-card'>
+                    <div className='ticket-left'>
+                      <div className='ticket-movie'>{t.movie_title}</div>
+                      <div className='ticket-meta'>
+                        <span><FaMapMarkerAlt /> {t.cinema_name}</span>
+                        <span><FaClock /> {formatDate(t.start_time)} – {formatTime(t.start_time)}</span>
+                      </div>
+                      <div className='ticket-meta'>
+                        <span>Ghế: <strong>{t.seat_codes || '—'}</strong></span>
+                        <span
+                          className='ticket-format'
+                          style={{
+                            background: roomType === 'IMAX' ? '#f59e0b22' : '#3b82f622',
+                            color:      roomType === 'IMAX' ? '#f59e0b'   : '#60a5fa',
+                          }}
+                        >
+                          {roomType}
+                        </span>
+                      </div>
+                      <div className='ticket-meta'>
+                        <span>Mã vé: <strong>{t.booking_code}</strong></span>
+                      </div>
                     </div>
-                    <div className='ticket-meta'>
-                      <span>Ghế: <strong>{t.seats}</strong></span>
-                      <span className='ticket-format' style={{ background: t.format === 'IMAX' ? '#f59e0b22' : '#3b82f622', color: t.format === 'IMAX' ? '#f59e0b' : '#60a5fa' }}>
-                        {t.format}
-                      </span>
+                    <div className='ticket-right'>
+                      <span className={`ticket-status ${st.cls}`}>{st.label}</span>
+                      {t.primary_qr_code && (
+                        <button className='ticket-qr-btn' title='Xem mã QR'>
+                          <FaQrcode /> Xem QR
+                        </button>
+                      )}
                     </div>
+                    <div className='ticket-tear' />
                   </div>
-                  <div className='ticket-right'>
-                    <span className='ticket-status upcoming'>Sắp chiếu</span>
-                    <button className='ticket-qr-btn'>Xem QR</button>
-                  </div>
-                  <div className='ticket-tear' />
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -391,6 +475,17 @@ export default function Profile() {
               <FaHistory />
               <h2>Lịch sử đặt vé</h2>
             </div>
+
+            {bookingsLoading && (
+              <div className='booking-loading'><FaSpinner className='spin' /> Đang tải lịch sử...</div>
+            )}
+            {bookingsError && (
+              <div className='booking-error'>⚠️ {bookingsError}</div>
+            )}
+            {!bookingsLoading && !bookingsError && historyBookings.length === 0 && (
+              <div className='booking-empty'>Chưa có lịch sử đặt vé.</div>
+            )}
+
             <div className='history-table-wrap'>
               <table className='history-table'>
                 <thead>
@@ -404,20 +499,21 @@ export default function Profile() {
                   </tr>
                 </thead>
                 <tbody>
-                  {MOCK_HISTORY.map(h => (
-                    <tr key={h.id}>
-                      <td className='ht-movie'>{h.movie}</td>
-                      <td>{h.cinema}</td>
-                      <td>{h.date}</td>
-                      <td>{h.seats} vé</td>
-                      <td className='ht-price'>{h.total}</td>
-                      <td>
-                        <span className={`ht-status ${h.status}`}>
-                          {h.status === 'done' ? 'Hoàn thành' : 'Đã huỷ'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {historyBookings.map(h => {
+                    const st = getStatus(h.status)
+                    return (
+                      <tr key={h.booking_id}>
+                        <td className='ht-movie'>{h.movie_title}</td>
+                        <td>{h.cinema_name}</td>
+                        <td>{formatDate(h.start_time)}</td>
+                        <td>{h.ticket_count} vé</td>
+                        <td className='ht-price'>{formatMoney(h.total_price)}</td>
+                        <td>
+                          <span className={`ht-status ${st.cls}`}>{st.label}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

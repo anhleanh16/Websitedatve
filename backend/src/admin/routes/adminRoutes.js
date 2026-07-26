@@ -230,6 +230,27 @@ router.get("/showtimes/cinemas", getShowtimeCinemas);
 router.get("/showtimes/rooms", getShowtimeRooms);
 router.get("/showtimes", getShowtimes);
 router.get("/showtimes/:id", getShowtimeById);
+router.get("/showtimes/:id/sold-seats", async (req, res) => {
+  try {
+    const { db } = await import("../../../config/db.js");
+    const showtimeId = Number(req.params.id);
+    if (!showtimeId) return res.status(400).json({ soldSeats: [] });
+    const [rows] = await db.query(
+      `SELECT UPPER(s.seat_code) AS seat_code
+       FROM Tickets t
+       JOIN Seats s ON s.seat_id = t.seat_id
+       JOIN Orders o ON o.order_id = t.order_id
+       WHERE t.showtime_id = ?
+         AND t.ticket_status <> 'cancelled'
+         AND o.status <> 'cancelled'`,
+      [showtimeId],
+    );
+    res.json({ soldSeats: rows.map(r => r.seat_code) });
+  } catch (err) {
+    console.error("Error in sold-seats:", err);
+    res.status(500).json({ soldSeats: [] });
+  }
+});
 router.post("/showtimes/recurring", createRecurringShowtime);
 router.post("/showtimes", createShowtime);
 router.put("/showtimes/:id", updateShowtime);

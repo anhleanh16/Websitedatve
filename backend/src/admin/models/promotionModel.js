@@ -97,6 +97,15 @@ const mapPromotionPayload = (payload = {}, type = "coupon") => {
   };
 };
 
+/** Chuyển Date object hoặc string bất kỳ về YYYY-MM-DD (giờ VN UTC+7) */
+const toDateStr = (val) => {
+  if (!val) return "";
+  const d = val instanceof Date ? val : new Date(val);
+  if (isNaN(d.getTime())) return String(val).slice(0, 10);
+  // Dùng toLocaleDateString với locale en-CA cho format YYYY-MM-DD
+  return d.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+};
+
 const formatCouponRow = (row) => ({
   id: row.promotion_id,
   code: row.code,
@@ -105,8 +114,8 @@ const formatCouponRow = (row) => ({
   value: Number(row.discount_value || 0),
   minOrder: Number(row.min_order || 0),
   maxDiscount: Number(row.max_discount || 0),
-  startDate: row.start_date ? String(row.start_date).slice(0, 10) : "",
-  endDate: row.end_date ? String(row.end_date).slice(0, 10) : "",
+  startDate: toDateStr(row.start_date),
+  endDate:   toDateStr(row.end_date),
   usageLimit: Number(row.usage_limit || 0),
   usedCount: Number(row.used_count || 0),
   applicableTo: row.applicable_to || "all",
@@ -124,10 +133,10 @@ const formatVoucherRow = (row) => ({
   maxDiscount: Number(row.max_discount || 0),
   userId: row.user_id,
   issuedTo: row.full_name || "",
-  issuedDate: row.issued_at ? String(row.issued_at).slice(0, 10) : "",
-  expiryDate: row.end_date ? String(row.end_date).slice(0, 10) : "",
+  issuedDate: toDateStr(row.issued_at),
+  expiryDate: toDateStr(row.end_date),
   status: row.assignment_status || row.status || "active",
-  usedDate: row.used_at ? String(row.used_at).slice(0, 10) : null,
+  usedDate: row.used_at ? toDateStr(row.used_at) : null,
   desc: row.description || "",
 });
 

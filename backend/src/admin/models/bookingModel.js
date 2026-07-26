@@ -74,6 +74,11 @@ const normalizeFoodItems = (foodItems = []) => {
 const generateBookingCode = () =>
   `LNX${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
+const shouldMarkAsPaidImmediately = (paymentMethod = "") => {
+  const normalizedPaymentMethod = String(paymentMethod || "").trim().toLowerCase();
+  return normalizedPaymentMethod === "cash" || normalizedPaymentMethod === "cashier";
+};
+
 const awardBookingPoints = async (connection, userId, orderId, totalAmount, seatUnits = [], foodItems = []) => {
   await PointsModel.ensureSchema();
 
@@ -187,9 +192,128 @@ const ensureBookingSchema = async () => {
 
 export const BookingModel = {
   /**
+   * Lấy danh sách booking của một user cụ thể (dùng cho trang profile user).
+   * Trả về đầy đủ thông tin để hiển thị "Vé của tôi" và "Lịch sử đặt vé".
+   */
+  async expirePendingBookings() {
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [pendingOrders] = await connection.query(
+        `
+        SELECT order_id, booking_code
+        FROM Orders
+        WHERE status = 'pending'
+          AND payment_status IN ('pending', 'unpaid')
+          AND created_at < NOW() - INTERVAL 5 MINUTE
+        FOR UPDATE
+        `,
+      );
+
+      for (const order of pendingOrders) {
+        const [ticketRows] = await connection.query(
+          `
+          SELECT showtime_id, COUNT(*) AS ticket_count
+          FROM Tickets
+          WHERE order_id = ?
+          GROUP BY showtime_id
+          `,
+          [order.order_id],
+        );
+
+        for (const ticketRow of ticketRows) {
+          await connection.query(
+            `
+            UPDATE Showtimes
+            SET available_seats = COALESCE(available_seats, 0) + ?
+            WHERE showtime_id = ?
+            `,
+            [Number(ticketRow.ticket_count || 0), ticketRow.showtime_id],
+          );
+        }
+
+        await connection.query(
+          `
+          UPDATE Tickets
+          SET ticket_status = 'cancelled'
+          WHERE order_id = ?
+          `,
+          [order.order_id],
+        );
+
+        await connection.query(
+          `
+          UPDATE Orders
+          SET status = 'cancelled', payment_status = 'expired'
+          WHERE order_id = ?
+          `,
+          [order.order_id],
+        );
+      }
+
+      await connection.commit();
+      return pendingOrders.length;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  async findByUserId(userId) {
+    await this.expirePendingBookings();
+    const [bookings] = await db.query(
+      `
+      SELECT
+        o.order_id      AS booking_id,
+        o.booking_code,
+        o.total_amount  AS total_price,
+        o.payment_method,
+        o.payment_status,
+        o.status,
+        o.created_at,
+        MIN(m.title)        AS movie_title,
+        MIN(m.poster)       AS poster,
+        MIN(s.start_time)   AS start_time,
+        MIN(s.end_time)     AS end_time,
+        MIN(c.cinema_name)  AS cinema_name,
+        MIN(r.room_name)    AS room_name,
+        MIN(r.room_type)    AS room_type,
+        GROUP_CONCAT(DISTINCT seat.seat_code ORDER BY seat.seat_code SEPARATOR ', ') AS seat_codes,
+        COUNT(DISTINCT t.ticket_id) AS ticket_count,
+        MIN(t.qr_code)      AS primary_qr_code,
+        MAX(t.check_in_time) AS check_in_time
+      FROM Orders o
+      LEFT JOIN Tickets t    ON t.order_id    = o.order_id
+      LEFT JOIN Showtimes s  ON t.showtime_id = s.showtime_id
+      LEFT JOIN Movies m     ON s.movie_id    = m.movie_id
+      LEFT JOIN Rooms r      ON s.room_id     = r.room_id
+      LEFT JOIN Cinemas c    ON r.cinema_id   = c.cinemas_id
+      LEFT JOIN Seats seat   ON seat.seat_id  = t.seat_id
+      WHERE o.user_id = ?
+      GROUP BY
+        o.order_id,
+        o.booking_code,
+        o.total_amount,
+        o.payment_method,
+        o.payment_status,
+        o.status,
+        o.created_at
+      ORDER BY o.created_at DESC
+      `,
+      [userId],
+    );
+    return bookings;
+  },
+
+  /**
    * Lấy danh sách booking với các tùy chọn filter và search.
    */
   async findAll(filters = {}) {
+    await this.expirePendingBookings();
     let query = `
       SELECT
         o.order_id AS booking_id,
@@ -261,6 +385,7 @@ export const BookingModel = {
    * Lấy chi tiết một booking bằng ID.
    */
   async findById(id) {
+    await this.expirePendingBookings();
     const [bookingDetails] = await db.query(
       `
       SELECT
@@ -430,7 +555,7 @@ export const BookingModel = {
     showtimeId,
     seatUnits = [],
     foodItems = [],
-    paymentMethod = "momo",
+    paymentMethod = "zalopay",
   }) {
     await ensureBookingSchema();
 
@@ -438,6 +563,8 @@ export const BookingModel = {
     const normalizedShowtimeId = Number(showtimeId || 0);
     const normalizedSeatUnits = normalizeSeatUnits(seatUnits);
     const normalizedFoodItems = normalizeFoodItems(foodItems);
+    const initialPaymentStatus = shouldMarkAsPaidImmediately(paymentMethod) ? 'paid' : 'pending';
+    const initialOrderStatus = shouldMarkAsPaidImmediately(paymentMethod) ? 'confirmed' : 'pending';
 
     if (!normalizedUserId) {
       throw buildBookingError("Không xác định được người dùng đặt vé.");
@@ -585,9 +712,9 @@ export const BookingModel = {
           booking_code,
           status
         )
-        VALUES (?, ?, ?, 'paid', NOW(), ?, 'confirmed')
+        VALUES (?, ?, ?, ?, NOW(), ?, ?)
       `,
-        [normalizedUserId, totalAmount, String(paymentMethod || "momo").trim(), bookingCode],
+        [normalizedUserId, totalAmount, String(paymentMethod || "zalopay").trim(), initialPaymentStatus, bookingCode, initialOrderStatus],
       );
 
       const orderId = Number(orderResult.insertId);

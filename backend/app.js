@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import adminRoutes from './src/admin/routes/adminRoutes.js';
 import userRoutes from './src/user/routes/userRoutes.js';
+import zalopayRoutes from './src/user/routes/zalopayRoutes.js';
 import authRoutes from './src/admin/routes/authRoutes.js';
 import blogRoutes from './src/admin/routes/blogRoutes.js';
 import reviewRoutes from './src/admin/routes/reviewRoutes.js';
@@ -62,5 +63,8 @@ app.use('/api', pointsRoutes);
 
 // User routes
 app.use('/api/user', userRoutes);
+
+// ZaloPay Gateway routes
+app.use('/api/user', zalopayRoutes);
 
 export default app;

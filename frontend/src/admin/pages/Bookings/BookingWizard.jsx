@@ -19,6 +19,12 @@ const getSeatPrice = (type) =>
 
 const fmtMoney = (n) => `${Number(n || 0).toLocaleString("vi-VN")} ₫`;
 
+/** Trả về ngày theo giờ VN (UTC+7) dạng "YYYY-MM-DD" */
+const toVNDateString = (date = new Date()) => {
+  const vn = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+  return vn.toISOString().slice(0, 10);
+};
+
 export default function BookingWizard({ onToast, onBookingSuccess }) {
   const [step, setStep] = useState(1);
   // Step 1: Customer
@@ -37,16 +43,14 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
   const [selectedCinemaId, setSelectedCinemaId] = useState("");
   const [showtimes, setShowtimes] = useState([]);
   const [showtimeLoading, setShowtimeLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    return d.toISOString().slice(0, 10);
-  });
+  const [selectedDate, setSelectedDate] = useState(() => toVNDateString());
   const [selectedShowtime, setSelectedShowtime] = useState(null);
 
   // Step 3: Seats
   const [seats, setSeats] = useState([]);
   const [seatLoading, setSeatLoading] = useState(false);
   const [soldSeatCodes, setSoldSeatCodes] = useState(new Set());
+  const [roomSeatGaps, setRoomSeatGaps] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [seatError, setSeatError] = useState("");
 
@@ -126,7 +130,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
         const list = Array.isArray(res?.showtimes) ? res.showtimes : (Array.isArray(res) ? res : []);
         const filtered = list.filter(st => {
           if (!st?.start_time) return true;
-          const stDate = new Date(st.start_time).toISOString().slice(0, 10);
+          const stDate = toVNDateString(new Date(st.start_time));
           return stDate === selectedDate;
         });
         setShowtimes(filtered);
@@ -153,20 +157,38 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
       setSeatError("");
       try {
         const roomId = selectedShowtime.room_id;
-        const [seatRes, bookingRes] = await Promise.all([
+        const showtimeId = selectedShowtime.showtime_id || selectedShowtime.id;
+        const cinemaId = selectedShowtime.cinema_id || selectedShowtime.cinemaId || selectedShowtime.cinemas_id;
+
+        const [seatRes, soldRes] = await Promise.all([
           adminSeatService.getSeatsByRoom(roomId).catch(() => ({ seats: [] })),
-          adminBookingService.getAllBookings({ status: "confirmed" }).catch(() => ({ bookings: [] })),
+          adminBookingService.getSoldSeats(showtimeId).catch(() => ({ soldSeats: [] })),
         ]);
         if (ignore) return;
+
         const seatList = Array.isArray(seatRes?.seats) ? seatRes.seats : (Array.isArray(seatRes) ? seatRes : []);
         setSeats(seatList);
 
-        const sold = new Set();
-        (Array.isArray(bookingRes?.bookings) ? bookingRes.bookings : []).forEach(b => {
-          if (!b?.seat_codes) return;
-          String(b.seat_codes).split(",").map(s => s.trim()).filter(Boolean).forEach(c => sold.add(c.toUpperCase()));
-        });
+        // Sold seats chính xác theo suất chiếu
+        const sold = new Set(
+          (Array.isArray(soldRes?.soldSeats) ? soldRes.soldSeats : [])
+            .map(c => String(c).toUpperCase())
+        );
         setSoldSeatCodes(sold);
+
+        // Load room seat gaps
+        try {
+          if (cinemaId) {
+            const cinemaRes = await adminCinemaService.getCinemaById(cinemaId).catch(() => ({}));
+            const rooms = Array.isArray(cinemaRes?.cinema?.rooms) ? cinemaRes.cinema.rooms : [];
+            const room = rooms.find(r => Number(r.room_id || r.id) === Number(roomId));
+            setRoomSeatGaps(Array.isArray(room?.seat_gaps) ? room.seat_gaps : []);
+          } else {
+            setRoomSeatGaps([]);
+          }
+        } catch (e) {
+          setRoomSeatGaps([]);
+        }
       } catch (e) {
         if (!ignore) setSeatError("Không thể tải ghế.");
       } finally {
@@ -230,6 +252,93 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     });
     Array.from(map.values()).forEach(arr => arr.sort((a, b) => a.num - b.num));
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], "en"));
+  }, [seats]);
+
+  // Build seat layout (grid) similar to frontend user booking
+  const parseSeatCode = (seatCode) => {
+    const match = String(seatCode || "").trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
+    if (!match) return null;
+    return { row: match[1], number: Number(match[2]) };
+  };
+
+  const normalizeSeatType = (seatType) => {
+    const normalized = String(seatType || "Standard").toLowerCase();
+    if (normalized === "vip") return "vip";
+    if (normalized === "couple") return "couple";
+    return "regular";
+  };
+
+  const seatLayout = useMemo(() => {
+    const parsedSeats = (seats || []).map((seat) => {
+      const parsed = parseSeatCode(seat.seat_code);
+      if (!parsed) return null;
+      return {
+        ...seat,
+        row: parsed.row,
+        number: parsed.number,
+        normalizedType: normalizeSeatType(seat.seat_type),
+      };
+    }).filter(Boolean).sort((a, b) => (a.row !== b.row ? a.row.localeCompare(b.row, 'en') : a.number - b.number));
+
+    if (parsedSeats.length === 0) return { rows: [], totalVisualColumns: 1 };
+
+    const minSeatNumber = Math.min(...parsedSeats.map(s => s.number));
+    const maxSeatNumber = Math.max(...parsedSeats.map(s => s.number));
+
+    const gaps = (Array.isArray(roomSeatGaps) ? roomSeatGaps : [])
+      .map((gap) => ({
+        from: Number(gap?.gap_from ?? gap?.from ?? 0) || 0,
+        to: Number(gap?.gap_to ?? gap?.to ?? 0) || 0,
+        sortOrder: Number(gap?.sort_order ?? 0) || 0,
+      }))
+      .filter((gap) => gap.from > 0 && gap.to > gap.from)
+      .sort((a, b) => a.from - b.from || a.sortOrder - b.sortOrder);
+
+    const getGapOffset = (seatNumber) => gaps.filter((gap) => gap.to <= seatNumber).length;
+    const totalGapSeats = gaps.length;
+
+    const rowsByName = new Map();
+    parsedSeats.forEach((seat) => {
+      if (!rowsByName.has(seat.row)) rowsByName.set(seat.row, []);
+      rowsByName.get(seat.row).push(seat);
+    });
+
+    const rows = Array.from(rowsByName.entries()).map(([rowName, rowSeats]) => {
+      const units = [];
+      for (let i = 0; i < rowSeats.length; i += 1) {
+        const current = rowSeats[i];
+        const next = rowSeats[i + 1];
+        if (current.normalizedType === 'couple' && next && next.normalizedType === 'couple' && next.number === current.number + 1) {
+          units.push({
+            id: `${current.seat_code}_${next.seat_code}`,
+            label: `${current.number}-${next.number}`,
+            seatCodes: [current.seat_code, next.seat_code],
+            startNumber: current.number,
+            endNumber: next.number,
+            type: 'couple',
+            sold: current.status !== 'active' || next.status !== 'active',
+            columnStart: Math.max(1, current.number - minSeatNumber + 1) + getGapOffset(current.number),
+            span: 2,
+          });
+          i += 1;
+          continue;
+        }
+        units.push({
+          id: current.seat_code,
+          label: current.seat_code,
+          seatCodes: [current.seat_code],
+          startNumber: current.number,
+          endNumber: current.number,
+          type: current.normalizedType,
+          sold: current.status !== 'active',
+          columnStart: Math.max(1, current.number - minSeatNumber + 1) + getGapOffset(current.number),
+          span: 1,
+        });
+      }
+      return { row: rowName, units };
+    });
+
+    return { rows, totalVisualColumns: Math.max(1, maxSeatNumber - minSeatNumber + 1 + totalGapSeats) };
   }, [seats]);
 
   const handleSubmit = async () => {
@@ -377,12 +486,17 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <div style={{ minHeight: 280, maxHeight: 340, overflowY: "auto", border: "1px solid #1e2a55", borderRadius: 10 }}>
+                <div style={{ minHeight: 200, maxHeight: 340, overflowY: "auto", border: "1px solid #1e2a55", borderRadius: 10 }}>
                   {searchLoading ? (
                     <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff" }}>Đang tìm…</div>
+                  ) : !searchQuery.trim() ? (
+                    <div style={{ padding: 32, textAlign: "center", color: "#4b5563" }}>
+                      <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
+                      <div style={{ fontSize: 13 }}>Nhập tên, email hoặc số điện thoại để tìm khách hàng</div>
+                    </div>
                   ) : searchResults.length === 0 ? (
-                    <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff" }}>
-                      {searchQuery ? "Không tìm thấy tài khoản nào." : "Nhập từ khóa để tìm khách hàng."}
+                    <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", fontSize: 13 }}>
+                      Không tìm thấy tài khoản nào khớp với &ldquo;{searchQuery}&rdquo;
                     </div>
                   ) : (
                     searchResults.map(u => (
@@ -482,11 +596,30 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
         )}
 
         {/* STEP 2: Showtime */}
-        {step === 2 && (
-          <div>
-            <h3 style={{ marginBottom: 16 }}>Bước 2: Chọn suất chiếu</h3>
-            <div className="sf-field-row">
-              <div className="sf-field">
+        {step === 2 && (() => {
+          // Build quick date buttons: hôm nay + 6 ngày tiếp theo
+          const quickDates = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() + i);
+            const iso = toVNDateString(d);
+            const label = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' });
+            return { iso, label };
+          });
+
+          // Group showtimes by movie
+          const grouped = showtimes.reduce((acc, st) => {
+            const key = st.movie_title || `Phim #${st.movie_id}`;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(st);
+            return acc;
+          }, {});
+
+          return (
+            <div>
+              <h3 style={{ marginBottom: 16 }}>Bước 2: Chọn suất chiếu</h3>
+
+              {/* Rạp */}
+              <div className="sf-field" style={{ marginBottom: 14 }}>
                 <label>Rạp chiếu</label>
                 <select value={selectedCinemaId} onChange={(e) => { setSelectedCinemaId(e.target.value); setSelectedShowtime(null); }}>
                   <option value="">-- Chọn rạp --</option>
@@ -497,61 +630,147 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                   ))}
                 </select>
               </div>
-              <div className="sf-field">
-                <label>Ngày</label>
-                <input type="date" value={selectedDate} onChange={(e) => { setSelectedDate(e.target.value); setSelectedShowtime(null); }} />
-              </div>
-            </div>
 
-            <div style={{ minHeight: 280, maxHeight: 360, overflowY: "auto", marginTop: 16, border: "1px solid #1e2a55", borderRadius: 10 }}>
-              {showtimeLoading ? (
-                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff" }}>Đang tải suất…</div>
+              {/* Date picker nhanh */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 13, color: "#8fa6ff", marginBottom: 8, fontWeight: 500 }}>Chọn ngày</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  {quickDates.map(({ iso, label }) => (
+                    <button
+                      key={iso}
+                      type="button"
+                      onClick={() => { setSelectedDate(iso); setSelectedShowtime(null); }}
+                      className={`sf-btn sm ${selectedDate === iso ? "sf-btn-add" : "sf-btn-secondary"}`}
+                      style={{ fontSize: 12, padding: "6px 12px" }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  {/* Input ngày tùy chọn */}
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => { setSelectedDate(e.target.value); setSelectedShowtime(null); }}
+                    style={{
+                      background: "rgba(30,42,85,0.7)", border: "1px solid rgba(124,97,255,0.3)",
+                      borderRadius: 8, color: "#eef4ff", padding: "6px 10px", fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Danh sách suất chiếu */}
+              {!selectedCinemaId ? (
+                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>
+                  Vui lòng chọn rạp trước.
+                </div>
+              ) : showtimeLoading ? (
+                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>
+                  Đang tải suất chiếu…
+                </div>
               ) : showtimes.length === 0 ? (
-                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff" }}>
-                  {selectedCinemaId ? "Không có suất chiếu vào ngày đã chọn." : "Vui lòng chọn rạp và ngày."}
+                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>
+                  Không có suất chiếu vào ngày đã chọn.
                 </div>
               ) : (
-                showtimes.map(st => {
-                  const isSelected = selectedShowtime?.showtime_id === st.showtime_id || selectedShowtime?.id === st.id;
-                  return (
-                    <div
-                      key={st.showtime_id || st.id}
-                      onClick={() => setSelectedShowtime(st)}
-                      style={{
-                        padding: "14px 16px", cursor: "pointer",
-                        borderBottom: "1px solid #182047",
-                        background: isSelected ? "rgba(124,97,255,0.18)" : "transparent",
-                        display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap",
-                      }}
-                    >
-                      <div>
-                        <strong style={{ color: "#eef4ff" }}>🎬 {st.movie_title || st.title || `Phim #${st.movie_id}`}</strong>
-                        <div style={{ fontSize: 12, color: "#7a8fc0", marginTop: 4 }}>
-                          {st.room_name || `Phòng #${st.room_id}`}
-                          {st.cinema_name ? ` · ${st.cinema_name}` : ""}
-                        </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {Object.entries(grouped).map(([movieName, sts]) => (
+                    <div key={movieName}>
+                      {/* Movie header */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "8px 12px", background: "rgba(124,97,255,0.08)", borderRadius: 8 }}>
+                        <span style={{ fontSize: 16 }}>🎬</span>
+                        <strong style={{ color: "#c4b5fd", fontSize: 14 }}>{movieName}</strong>
+                        <span style={{ fontSize: 12, color: "#7a8fc0", marginLeft: "auto" }}>{sts.length} suất</span>
                       </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontWeight: 700, color: "#7c61ff" }}>
-                          {st.start_time ? new Date(st.start_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—"}
-                        </div>
-                        <div style={{ fontSize: 12, color: "#93c5fd" }}>
-                          {fmtMoney(st.price || st.price_standard || 80000)}
-                        </div>
-                      </div>
-                      {isSelected && <span style={{ color: "#4ade80", fontWeight: 700 }}>✓</span>}
-                    </div>
-                  );
-                })
-              )}
-            </div>
 
-            <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between" }}>
-              <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(1)}>← Quay lại</button>
-              <button className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep3} disabled={!canGoStep3()}>Tiếp theo →</button>
+                      {/* Showtime buttons grouped by room */}
+                      {(() => {
+                        const byRoom = sts.reduce((acc, st) => {
+                          const rk = st.room_name || `Phòng #${st.room_id}`;
+                          if (!acc[rk]) acc[rk] = [];
+                          acc[rk].push(st);
+                          return acc;
+                        }, {});
+                        return Object.entries(byRoom).map(([roomName, roomSts]) => (
+                          <div key={roomName} style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: 12, color: "#7a8fc0", marginBottom: 6, paddingLeft: 4 }}>
+                              📍 {roomName} · {roomSts[0]?.room_type || ""}
+                            </div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                              {roomSts
+                                .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+                                .map(st => {
+                                  const isSelected = selectedShowtime?.showtime_id === st.showtime_id;
+                                  const isEnded = st.status === 'ended';
+                                  const timeLabel = st.start_time
+                                    ? new Date(st.start_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+                                    : "—";
+                                  return (
+                                    <button
+                                      key={st.showtime_id}
+                                      type="button"
+                                      disabled={isEnded}
+                                      onClick={() => setSelectedShowtime(st)}
+                                      style={{
+                                        padding: "8px 14px",
+                                        borderRadius: 10,
+                                        border: isSelected ? "2px solid #7c61ff" : "1px solid rgba(255,255,255,0.12)",
+                                        background: isSelected ? "rgba(124,97,255,0.25)" : isEnded ? "rgba(255,255,255,0.04)" : "rgba(30,42,85,0.7)",
+                                        color: isEnded ? "#4b5563" : isSelected ? "#c4b5fd" : "#eef4ff",
+                                        cursor: isEnded ? "not-allowed" : "pointer",
+                                        fontSize: 13,
+                                        fontWeight: isSelected ? 700 : 400,
+                                        minWidth: 70,
+                                        textAlign: "center",
+                                        position: "relative",
+                                      }}
+                                    >
+                                      <div>{timeLabel}</div>
+                                      <div style={{ fontSize: 11, color: isSelected ? "#a78bfa" : "#7a8fc0", marginTop: 2 }}>
+                                        {fmtMoney(st.price_standard || st.price || 80000)}
+                                      </div>
+                                      {st.available_seats !== undefined && (
+                                        <div style={{ fontSize: 10, color: st.available_seats > 0 ? "#4ade80" : "#f87171", marginTop: 1 }}>
+                                          {st.available_seats > 0 ? `${st.available_seats} ghế` : "Hết ghế"}
+                                        </div>
+                                      )}
+                                      {isEnded && (
+                                        <div style={{ fontSize: 10, color: "#6b7280", marginTop: 1 }}>Đã chiếu</div>
+                                      )}
+                                      {isSelected && (
+                                        <div style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, background: "#7c61ff", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10 }}>✓</div>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Suất đã chọn summary */}
+              {selectedShowtime && (
+                <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 10, background: "rgba(124,97,255,0.1)", border: "1px solid rgba(124,97,255,0.25)", fontSize: 13 }}>
+                  ✅ Đã chọn: <strong style={{ color: "#c4b5fd" }}>{selectedShowtime.movie_title}</strong>
+                  {" · "}{selectedShowtime.room_name}
+                  {" · "}<strong style={{ color: "#7c61ff" }}>
+                    {new Date(selectedShowtime.start_time).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+                  </strong>
+                </div>
+              )}
+
+              <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between" }}>
+                <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(1)}>← Quay lại</button>
+                <button className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep3} disabled={!canGoStep3()}>Tiếp theo →</button>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* STEP 3: Seats */}
         {step === 3 && (
@@ -568,54 +787,81 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
               <div style={{ padding: 30, textAlign: "center", color: "#8fa6ff" }}>Đang tải ghế…</div>
             ) : seatError ? (
               <div style={{ padding: 20, textAlign: "center", color: "#f87171" }}>{seatError}</div>
-            ) : seatsByRow.length === 0 ? (
+            ) : seatLayout.rows.length === 0 ? (
               <div style={{ padding: 30, textAlign: "center", color: "#8fa6ff" }}>Không có dữ liệu ghế cho phòng này.</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-                {seatsByRow.map(([rowName, rowSeats]) => (
-                  <div key={rowName} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 28, textAlign: "center", fontWeight: 700, color: "#7a8fc0" }}>{rowName}</div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {rowSeats.map(seat => {
-                        const code = String(seat.seat_code || "").toUpperCase();
-                        const sold = soldSeatCodes.has(code);
-                        const selected = selectedSeats.some(s => s.seat_id === seat.seat_id);
-                        const t = String(seat.seat_type || "Standard").toLowerCase();
-                        const bg = sold
-                          ? "#3f3f46"
-                          : selected
-                            ? (t === "vip" ? "#fbbf24" : t === "couple" ? "#ec4899" : "#7c61ff")
-                            : (t === "vip" ? "#7d6608" : t === "couple" ? "#831843" : "#1e2a55");
-                        const w = t === "couple" ? 64 : 32;
-                        return (
-                          <button
-                            key={seat.seat_id}
-                            type="button"
-                            disabled={sold}
-                            onClick={() => toggleSeat(seat)}
-                            title={`${code} · ${seat.seat_type} · ${fmtMoney(getSeatPrice(seat.seat_type))}`}
-                            style={{
-                              width: w, height: 28, fontSize: 11, border: "none", borderRadius: 6,
-                              color: (sold || selected) ? "#0b1020" : "#eef4ff",
-                              background: bg,
-                              cursor: sold ? "not-allowed" : "pointer",
-                              opacity: sold ? 0.6 : 1,
-                              fontWeight: 600,
-                            }}
-                          >{seat.num}</button>
-                        );
-                      })}
-                    </div>
-                    <div style={{ width: 28, textAlign: "center", fontWeight: 700, color: "#7a8fc0" }}>{rowName}</div>
+              <div className="admin-seat-scroll">
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content", margin: "0 auto" }}>
+                  <div
+                    className="booking-seat-grid-map"
+                    style={{
+                      "--booking-grid-columns": seatLayout.totalVisualColumns,
+                      "--booking-seat-size": "42px",
+                      "--booking-seat-gap": "8px",
+                    }}
+                  >
+                    {seatLayout.rows.map((row) => (
+                      <div className="admin-seat-row" key={row.row}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                          <div style={{ width: 28, minWidth: 28, textAlign: "center", fontWeight: 700, color: "#7a8fc0", fontSize: 13 }}>{row.row}</div>
+                          <div
+                            className="booking-seat-grid-row"
+                            style={{ "--booking-grid-columns": seatLayout.totalVisualColumns }}
+                          >
+                            {row.units.map((unit) => {
+                              const isSold = unit.sold || unit.seatCodes.some(c => soldSeatCodes.has(String(c).toUpperCase()));
+                              const isSelected = unit.seatCodes.some(code => selectedSeats.some(s => String(s.seat_code || "").toUpperCase() === String(code).toUpperCase()));
+                              const t = unit.type || "regular";
+                              return (
+                                <button
+                                  key={unit.id}
+                                  type="button"
+                                  disabled={isSold}
+                                  onClick={() => {
+                                    if (isSold) return;
+                                    unit.seatCodes.forEach((code) => {
+                                      const obj = seats.find(s => String(s.seat_code || "").toUpperCase() === String(code).toUpperCase());
+                                      if (obj) toggleSeat(obj);
+                                    });
+                                  }}
+                                  title={unit.seatCodes.join(", ")}
+                                  className={`booking-seat booking-seat-${t}${isSold ? " booking-seat-sold" : ""}${isSelected ? " selected" : ""}`}
+                                  style={{ gridColumn: `${unit.columnStart} / span ${unit.span}` }}
+                                >
+                                  <span className="booking-seat-text">{unit.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div style={{ width: 28, minWidth: 28, textAlign: "center", fontWeight: 700, color: "#7a8fc0", fontSize: 13 }}>{row.row}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
             )}
-            <div style={{ display: "flex", gap: 16, marginTop: 20, justifyContent: "center", flexWrap: "wrap", fontSize: 13 }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, background: "#1e2a55", borderRadius: 4 }}></span> Ghế thường (80k)</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, background: "#7d6608", borderRadius: 4 }}></span> Ghế VIP (100k)</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, background: "#831843", borderRadius: 4 }}></span> Ghế Couple (120k)</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, background: "#3f3f46", borderRadius: 4 }}></span> Đã bán</span>
+            <div style={{ display: "flex", gap: 16, marginTop: 24, justifyContent: "center", flexWrap: "wrap", fontSize: 13 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(180deg,rgba(61,74,110,.92),rgba(43,54,87,.98))", border: "1px solid rgba(255,255,255,.09)", display: "inline-block" }} />
+                Ghế thường (80k)
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(180deg,#ffd36f,#eb9830)", display: "inline-block" }} />
+                Ghế VIP (100k)
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(180deg,#ff7084,#f43f5e)", display: "inline-block" }} />
+                Ghế Đôi (120k)
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(135deg,#7f6bff,#6552ff)", display: "inline-block" }} />
+                Đang chọn
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.16)", display: "inline-block" }} />
+                Đã bán
+              </span>
             </div>
             {seatError && <p style={{ color: "#f87171", marginTop: 12, textAlign: "center" }}>{seatError}</p>}
             <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

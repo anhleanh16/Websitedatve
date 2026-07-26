@@ -1,115 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import './bookings.css';
 import BookingWizard from "./BookingWizard.jsx";
-
-// ─── Sample Data ──────────────────────────────────────────────────────────────
-const sampleBookings = [
-  {
-    id: "B0087",
-    orderId: "ORD001",
-    user: "Nguyen Van An",
-    email: "an.nguyen@email.com",
-    phone: "0901234567",
-    movie: "Đêm Thiên Cầu",
-    cinema: "Sweetstar Movie CGV Hà Nội",
-    room: "Phòng 3D - P03",
-    showtime: "08/06/2026 19:30",
-    seats: ["B5", "B6"],
-    combo: "Combo Đôi (Bắp + 2 Nước)",
-    totalAmount: 250000,
-    paymentMethod: "VNPay",
-    paymentStatus: "paid",
-    status: "confirmed",
-    bookingCode: "LNX-2026-0087",
-    qrCode: "QR_LNX_0087",
-    checkInTime: null,
-    createdAt: "07/06/2026 14:22",
-  },
-  {
-    id: "B0091",
-    orderId: "ORD002",
-    user: "Tran Thi Binh",
-    email: "binh.tran@email.com",
-    phone: "0912345678",
-    movie: "Tiếng vọng im lặng",
-    cinema: "Sweetstar Movie Lotte TP.HCM",
-    room: "Phòng IMAX - P01",
-    showtime: "09/06/2026 21:00",
-    seats: ["D3"],
-    combo: null,
-    totalAmount: 120000,
-    paymentMethod: "MoMo",
-    paymentStatus: "pending",
-    status: "pending",
-    bookingCode: "LNX-2026-0091",
-    qrCode: "QR_LNX_0091",
-    checkInTime: null,
-    createdAt: "07/06/2026 16:05",
-  },
-  {
-    id: "B0095",
-    orderId: "ORD003",
-    user: "Le Minh Chi",
-    email: "chi.le@email.com",
-    phone: "0923456789",
-    movie: "Hỗn loạn Tokyo",
-    cinema: "Sweetstar Movie CGV Đà Nẵng",
-    room: "Phòng 2D - P02",
-    showtime: "09/06/2026 15:15",
-    seats: ["A1", "A2", "A3"],
-    combo: "Combo Gia Đình (2 Bắp + 4 Nước)",
-    totalAmount: 390000,
-    paymentMethod: "Thẻ ngân hàng",
-    paymentStatus: "failed",
-    status: "cancelled",
-    bookingCode: "LNX-2026-0095",
-    qrCode: "QR_LNX_0095",
-    checkInTime: null,
-    createdAt: "06/06/2026 10:30",
-  },
-  {
-    id: "B0102",
-    orderId: "ORD004",
-    user: "Pham Duc Hung",
-    email: "hung.pham@email.com",
-    phone: "0934567890",
-    movie: "Đêm Thiên Cầu",
-    cinema: "Sweetstar Movie CGV Hà Nội",
-    room: "Phòng VIP - P05",
-    showtime: "10/06/2026 20:00",
-    seats: ["G7", "G8"],
-    combo: "Combo VIP (Bắp Lớn + 2 Nước)",
-    totalAmount: 480000,
-    paymentMethod: "VNPay",
-    paymentStatus: "paid",
-    status: "confirmed",
-    bookingCode: "LNX-2026-0102",
-    qrCode: "QR_LNX_0102",
-    checkInTime: "10/06/2026 19:55",
-    createdAt: "08/06/2026 09:15",
-  },
-  {
-    id: "B0110",
-    orderId: "ORD005",
-    user: "Nguyen Thi Lan",
-    email: "lan.nguyen@email.com",
-    phone: "0945678901",
-    movie: "Ánh Sao Cuối Trời",
-    cinema: "Sweetstar Movie BHD TP.HCM",
-    room: "Phòng 3D - P04",
-    showtime: "11/06/2026 17:45",
-    seats: ["C4", "C5"],
-    combo: "Combo Đôi (Bắp + 2 Nước)",
-    totalAmount: 280000,
-    paymentMethod: "ZaloPay",
-    paymentStatus: "paid",
-    status: "completed",
-    bookingCode: "LNX-2026-0110",
-    qrCode: "QR_LNX_0110",
-    checkInTime: "11/06/2026 17:40",
-    createdAt: "09/06/2026 11:00",
-  },
-];
+import { adminBookingService } from "../../services/adminApi";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const STATUS_MAP = {
@@ -130,6 +22,34 @@ function formatMoney(n) {
   return n?.toLocaleString("vi-VN") + " ₫";
 }
 
+function mapBookingFromApi(item) {
+  const seatCodes = Array.isArray(item?.seats)
+    ? item.seats
+    : (item?.seat_codes ? String(item.seat_codes).split(",").map((s) => s.trim()).filter(Boolean) : []);
+
+  return {
+    id: String(item?.booking_id || item?.id || `B${Date.now()}`),
+    orderId: String(item?.booking_id || item?.order_id || item?.id || ""),
+    user: item?.full_name || item?.user || "Khách hàng",
+    email: item?.email || "",
+    phone: item?.phone || item?.phone_number || "",
+    movie: item?.movie_title || item?.movie || "",
+    cinema: item?.cinema_name || item?.cinema || "",
+    room: item?.room_name || item?.room || "",
+    showtime: item?.start_time ? new Date(item.start_time).toLocaleString("vi-VN") : "",
+    seats: seatCodes,
+    combo: item?.combo_name || item?.combo || null,
+    totalAmount: Number(item?.total_price || item?.total_amount || 0),
+    paymentMethod: item?.payment_method || "",
+    paymentStatus: item?.payment_status || "pending",
+    status: item?.status || "pending",
+    bookingCode: item?.booking_code || "",
+    qrCode: item?.primary_qr_code || item?.booking_code || "",
+    checkInTime: item?.check_in_time ? new Date(item.check_in_time).toLocaleString("vi-VN") : null,
+    createdAt: item?.created_at ? new Date(item.created_at).toLocaleString("vi-VN") : "",
+  };
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** Danh sách vé */
@@ -138,12 +58,18 @@ function BookingList({ bookings, onView, onCheck }) {
   const [filterStatus, setFilterStatus] = useState("all");
 
   const filtered = bookings.filter((b) => {
-    const q = search.toLowerCase();
-    const matchSearch =
-      b.id.toLowerCase().includes(q) ||
-      b.user.toLowerCase().includes(q) ||
-      b.movie.toLowerCase().includes(q) ||
-      b.bookingCode.toLowerCase().includes(q);
+    const q = String(search || "").toLowerCase();
+    const searchableText = [
+      b.id,
+      b.user,
+      b.movie,
+      b.bookingCode,
+      b.phone,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const matchSearch = searchableText.includes(q);
     const matchStatus = filterStatus === "all" || b.status === filterStatus;
     return matchSearch && matchStatus;
   });
@@ -463,10 +389,30 @@ function Toast({ message, type, onClose }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminBookings() {
-  const [bookings, setBookings] = useState(sampleBookings);
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("list"); // "list" | "detail" | "refund" | "check"
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        setLoading(true);
+        const res = await adminBookingService.getAllBookings();
+        const list = Array.isArray(res?.bookings) ? res.bookings : [];
+        setBookings(list.map(mapBookingFromApi));
+      } catch (error) {
+        console.error("Failed to load admin bookings", error);
+        showToast(error.message || "Không thể tải danh sách vé", "error");
+        setBookings([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBookings();
+  }, []);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -486,22 +432,28 @@ export default function AdminBookings() {
   };
 
   // Xác nhận check-in
-  const handleConfirmCheckIn = (booking) => {
-    const now = new Date();
-    const timeStr = now.toLocaleString("vi-VN", {
-      day: "2-digit", month: "2-digit", year: "numeric",
-      hour: "2-digit", minute: "2-digit",
-    });
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === booking.id
-          ? { ...b, status: "completed", checkInTime: timeStr }
-          : b
-      )
-    );
-    showToast(`Check-in vé ${booking.bookingCode} thành công!`, "success");
-    setActiveTab("list");
-    setSelectedBooking(null);
+  const handleConfirmCheckIn = async (booking) => {
+    try {
+      const res = await adminBookingService.checkInBooking(booking.orderId || booking.id);
+      const updatedBooking = res?.booking ? mapBookingFromApi(res.booking) : {
+        ...booking,
+        status: "completed",
+        checkInTime: new Date().toLocaleString("vi-VN"),
+      };
+      setBookings((prev) =>
+        prev.map((b) =>
+          (b.id === booking.id || b.orderId === booking.orderId)
+            ? updatedBooking
+            : b
+        )
+      );
+      showToast(`Check-in vé ${booking.bookingCode} thành công!`, "success");
+      setActiveTab("list");
+      setSelectedBooking(null);
+    } catch (error) {
+      console.error("Check-in failed", error);
+      showToast(error.message || "Không thể check-in vé", "error");
+    }
   };
 
   const handleClose = () => {
@@ -565,11 +517,17 @@ export default function AdminBookings() {
 
       {/* Tab content */}
       {activeTab === "list" && (
-        <BookingList
-          bookings={bookings}
-          onView={handleView}
-          onCheck={handleCheck}
-        />
+        loading ? (
+          <div className="table-card" style={{ padding: 24, textAlign: "center", color: "#8fa6ff" }}>
+            Đang tải danh sách vé...
+          </div>
+        ) : (
+          <BookingList
+            bookings={bookings}
+            onView={handleView}
+            onCheck={handleCheck}
+          />
+        )
       )}
 
       {activeTab === "create" && (

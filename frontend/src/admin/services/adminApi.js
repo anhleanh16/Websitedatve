@@ -240,6 +240,10 @@ export const adminBookingService = {
   /** Xác minh mã vé / QR */
   verifyCode: (code) =>
     apiFetch(`/admin/bookings/verify/${encodeURIComponent(code)}`),
+
+  /** Lấy danh sách ghế đã bán theo suất chiếu */
+  getSoldSeats: (showtimeId) =>
+    apiFetch(`/admin/showtimes/${encodeURIComponent(showtimeId)}/sold-seats`),
 };
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────

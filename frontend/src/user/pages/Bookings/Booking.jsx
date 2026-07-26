@@ -63,6 +63,7 @@ const buildSeatLayout = (room) => {
 
   const minSeatNumber = Math.min(...parsedSeats.map((seat) => seat.number));
   const maxSeatNumber = Math.max(...parsedSeats.map((seat) => seat.number));
+
   const getGapOffset = (seatNumber) =>
     gaps.filter((gap) => gap.to <= seatNumber).length;
 
@@ -480,7 +481,7 @@ export default function Booking() {
       setSeatError("");
 
       try {
-        const data = await userCinemaService.getById(cinemaId);
+        const data = await userCinemaService.getById(cinemaId, showtimeId);
 
         if (ignore) return;
 
@@ -511,7 +512,7 @@ export default function Booking() {
     return () => {
       ignore = true;
     };
-  }, [cinemaId]);
+  }, [cinemaId, showtimeId]);
 
   useEffect(() => {
     setSelectedSeats([]);
@@ -1050,12 +1051,16 @@ export default function Booking() {
                           className={`booking-seat booking-seat-${seat.type} ${seat.sold ? "booking-seat-sold" : ""} ${selectedSeats.includes(seat.id) ? "selected" : ""}`}
                           onClick={() => !seat.sold && toggleSeat(seat.id)}
                           disabled={seat.sold}
+                          aria-disabled={seat.sold}
+                          tabIndex={seat.sold ? -1 : 0}
                           aria-label={`${seat.label} ${seat.sold ? "đã bán" : "còn trống"}`}
                           title={seat.seatCodes.join(", ")}
                           style={{
                             gridColumn: `${seat.columnStart} / span ${seat.span}`,
                           }}
-                        />
+                        >
+                          <span className="booking-seat-text">{seat.sold ? "×" : seat.label}</span>
+                        </button>
                       ))}
                     </div>
                   </div>
