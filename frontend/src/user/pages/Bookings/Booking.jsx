@@ -224,7 +224,42 @@ const validateSeatSelectionRules = (selectedSeatIds, selectionMeta) => {
     selectedByRow.get(unit.rowIndex).push(unit);
   });
 
+  // ── RULE: Trong cùng một hàng, không được bỏ trống ghế ở giữa ──
   const rowIndexes = Array.from(selectedByRow.keys()).sort((a, b) => a - b);
+  for (const rowIndex of rowIndexes) {
+    const selectedRowUnits = [...selectedByRow.get(rowIndex)].sort(
+      (a, b) => a.unitIndex - b.unitIndex,
+    );
+    const availableRowUnits =
+      availableBySectionRow?.get(activeSectionIndex)?.get(rowIndex) || [];
+
+    if (selectedRowUnits.length <= 1) continue;
+
+    const minUnitIndex = selectedRowUnits[0].unitIndex;
+    const maxUnitIndex = selectedRowUnits[selectedRowUnits.length - 1].unitIndex;
+
+    // Tìm tất cả ghế CÓ SẴN (chưa bán) trong khoảng [min, max]
+    const availableBetween = availableRowUnits.filter(
+      (unit) =>
+        unit.unitIndex >= minUnitIndex && unit.unitIndex <= maxUnitIndex,
+    );
+
+    // Tất cả các ghế có sẵn ở giữa PHẢI được chọn hết
+    const selectedIds = new Set(selectedRowUnits.map((u) => u.id));
+    const unselectedAvailable = availableBetween.filter(
+      (unit) => !selectedIds.has(unit.id),
+    );
+
+    if (unselectedAvailable.length > 0) {
+      const firstGap = unselectedAvailable[0];
+      return (
+        `Không được bỏ trống ghế giữa các ghế đã chọn. ` +
+        `Ghế ${firstGap.label || firstGap.id} còn trống và nằm giữa ghế đã chọn, ` +
+        `vui lòng chọn thêm ghế này hoặc điều chỉnh vị trí.`
+      );
+    }
+  }
+
   for (let index = 1; index < rowIndexes.length; index += 1) {
     if (rowIndexes[index] !== rowIndexes[index - 1] + 1) {
       return "Chỉ được chọn thêm ghế ở hàng trên hoặc dưới liền kề.";
@@ -990,7 +1025,7 @@ export default function Booking() {
 
           {movieTitle && !loadingSeats && !seatError && selectedRoomId && (
             <div className="booking-seat-rule-note">
-              Chọn ghế trong cùng một nhánh và dừng ở khoảng cách giữa. Bạn có thể chọn vị trí bất kỳ trong hàng, nhưng khi một hàng ngang trong nhánh chưa kín thì chưa thể chọn sang hàng trên hoặc dưới.
+              Chọn ghế trong cùng một nhánh và dừng ở khoảng cách giữa. <strong>Trong cùng một hàng phải chọn ghế liền nhau, không được bỏ trống ghế ở giữa.</strong> Khi một hàng ngang trong nhánh chưa kín thì chưa thể chọn sang hàng trên hoặc dưới.
             </div>
           )}
 

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import {
@@ -50,6 +50,7 @@ export default function Profile() {
   const [avatarSrc,  setAvatarSrc]  = useState(null)
   const [notifs,     setNotifs]     = useState(MOCK_NOTIFS)
   const [saved,      setSaved]      = useState(false)
+  const [pointsSummary, setPointsSummary] = useState(null)
 
   /* edit form */
   const [editForm, setEditForm] = useState({
@@ -67,6 +68,25 @@ export default function Profile() {
   const [pwdMsg,  setPwdMsg]  = useState('')
 
   const fileRef = useRef(null)
+
+  useEffect(() => {
+    const loadPoints = async () => {
+      if (!profile?.id) return
+      try {
+        const token = localStorage.getItem('token')
+        const res = await fetch(`/api/points/user/${profile.id}`, {
+          headers: { Authorization: `Bearer ${token || ''}` },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        setPointsSummary(data)
+      } catch (error) {
+        console.error('Failed to load points summary', error)
+      }
+    }
+
+    loadPoints()
+  }, [profile?.id])
 
   const handleEditChange = (e) => setEditForm(p => ({ ...p, [e.target.name]: e.target.value }))
 
@@ -105,6 +125,8 @@ export default function Profile() {
   const userName  = profile?.name  || editForm.name
   const userEmail = profile?.email || editForm.email
   const userInitial = userName?.[0]?.toUpperCase() || 'U'
+  const totalPoints = pointsSummary?.user?.points ?? 0
+  const tierName = pointsSummary?.user?.tier?.name || 'Silver'
 
   return (
     <div className='profile-page'>
@@ -122,7 +144,7 @@ export default function Profile() {
           <div className='ps-user-info'>
             <div className='ps-name'>{userName}</div>
             <div className='ps-email'>{userEmail}</div>
-            <div className='ps-tier'><FaCrown style={{ color: '#f59e0b' }} /> Thành viên Gold</div>
+            <div className='ps-tier'><FaCrown style={{ color: '#f59e0b' }} /> Thành viên {tierName}</div>
           </div>
         </div>
 
@@ -161,7 +183,7 @@ export default function Profile() {
                   {avatarSrc ? <img src={avatarSrc} alt='avatar' /> : <span>{userInitial}</span>}
                 </div>
                 <div className='pi-name'>{userName}</div>
-                <div className='pi-role'>Thành viên Gold · 720 điểm</div>
+                <div className='pi-role'>Thành viên {tierName} · {totalPoints.toLocaleString()} điểm</div>
                 <button className='pi-edit-btn' onClick={() => setTab('edit')}>
                   <FaEdit /> Chỉnh sửa
                 </button>
@@ -187,7 +209,7 @@ export default function Profile() {
             <div className='profile-stats'>
               {[
                 { icon: <FaTicketAlt />, num: '12',    label: 'Vé đã đặt',   color: '#7c3aed' },
-                { icon: <FaStar />,      num: '720',   label: 'Điểm tích lũy', color: '#f59e0b' },
+                { icon: <FaStar />,      num: totalPoints.toLocaleString(),   label: 'Điểm tích lũy', color: '#f59e0b' },
                 { icon: <FaHistory />,   num: '8',     label: 'Phim đã xem', color: '#0ea5e9' },
                 { icon: <FaCrown />,     num: 'Gold',  label: 'Hạng thành viên', color: '#f59e0b' },
               ].map((s, i) => (

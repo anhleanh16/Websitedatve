@@ -46,7 +46,9 @@ import {
 } from "../controllers/showtimeController.js";
 import {
   getAdminUsers,
+  createAdminUser,
   deactivateAdminUser,
+  resetAdminUserPassword,
 } from "../controllers/userController.js";
 import {
   getAdminNotifications,
@@ -92,7 +94,9 @@ router.get("/statistics", getStatistics);
 
 // ─── User Management ─────────────────────────────────────────────────────────
 router.get("/users", getAdminUsers);
+router.post("/users", authMiddleware, adminOnly, createAdminUser);
 router.put("/users/:userId/deactivate", deactivateAdminUser);
+router.put("/users/:userId/reset-password", authMiddleware, adminOnly, resetAdminUserPassword);
 
 // ─── Notifications Management ────────────────────────────────────────────────
 router.get("/notifications", authMiddleware, adminOnly, getAdminNotifications);

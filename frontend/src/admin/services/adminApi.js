@@ -92,6 +92,16 @@ export const adminCategoryService = {
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const adminUserService = {
   getAllUsers: () => apiFetch("/admin/users"),
+  createUser: (data) =>
+    apiFetch("/admin/users", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  resetPassword: (id, data) =>
+    apiFetch(`/admin/users/${id}/reset-password`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   deactivateUser: (id) =>
     apiFetch(`/admin/users/${id}/deactivate`, { method: "PUT" }),
   lockUser: (id) => apiFetch(`/admin/users/${id}/lock`, { method: "PUT" }),

@@ -75,6 +75,8 @@ export default function UsersPage() {
   const [activeTab, setActiveTab] = useState("list");
   const [selectedUser, setSelectedUser] = useState(null);
   const [adjustPointsUser, setAdjustPointsUser] = useState(null);
+  const [resetPwUser, setResetPwUser] = useState(null);
+  const [createUserOpen, setCreateUserOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -126,6 +128,10 @@ export default function UsersPage() {
     setAdjustPointsUser(user);
   };
 
+  const handleResetPassword = (user) => {
+    setResetPwUser(user);
+  };
+
   if (loading)
     return (
       <div className="us-page">
@@ -143,7 +149,15 @@ export default function UsersPage() {
 
   return (
     <div className="us-page">
-      <h1>Quản lý người dùng</h1>
+      <div className="us-page-header">
+        <h1>Quản lý người dùng</h1>
+        <button
+          className="us-btn us-btn-primary"
+          onClick={() => setCreateUserOpen(true)}
+        >
+          + Thêm người dùng
+        </button>
+      </div>
       <div className="us-tabs">
         <button
           className={activeTab === "list" ? "active" : ""}
@@ -159,6 +173,7 @@ export default function UsersPage() {
           users={users}
           onView={setSelectedUser}
           onToggleStatus={handleToggleStatus}
+          onResetPassword={handleResetPassword}
         />
       )}
 
@@ -167,6 +182,7 @@ export default function UsersPage() {
         onClose={() => setSelectedUser(null)}
         onToggleStatus={handleToggleStatus}
         onAdjustPoints={handleAdjustPoints}
+        onResetPassword={handleResetPassword}
       />
 
       {adjustPointsUser && (
@@ -179,6 +195,24 @@ export default function UsersPage() {
           }}
         />
       )}
+
+      {resetPwUser && (
+        <ResetPasswordModal
+          user={resetPwUser}
+          onClose={() => setResetPwUser(null)}
+          onConfirm={() => setResetPwUser(null)}
+        />
+      )}
+
+      {createUserOpen && (
+        <CreateUserModal
+          onClose={() => setCreateUserOpen(false)}
+          onConfirm={() => {
+            fetchUsers();
+            setCreateUserOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -186,7 +220,7 @@ export default function UsersPage() {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** 1. Danh sách khách hàng */
-function UserList({ users, onView, onToggleStatus }) {
+function UserList({ users, onView, onToggleStatus, onResetPassword }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFS] = useState("all");
   const [filterRole, setFR] = useState("all");
@@ -325,6 +359,12 @@ function UserList({ users, onView, onToggleStatus }) {
                         >
                           Chi tiết
                         </button>
+                        <button
+                          className="us-btn us-btn-secondary"
+                          onClick={() => onResetPassword(u)}
+                        >
+                          Cấp lại MK
+                        </button>
                         {u.can_be_locked && (
                           <button
                             className={`us-btn ${u.status === "blocked" ? "us-btn-unblock" : "us-btn-block"}`}
@@ -350,7 +390,7 @@ function UserList({ users, onView, onToggleStatus }) {
 }
 
 /** Chi tiết người dùng (modal) */
-function UserDetail({ user, onClose, onToggleStatus, onAdjustPoints }) {
+function UserDetail({ user, onClose, onToggleStatus, onAdjustPoints, onResetPassword }) {
   if (!user) return null;
   const st = STATUS_MAP[user.status] || STATUS_MAP.inactive;
   const rl = ROLE_MAP[user.role] || ROLE_MAP.user;
@@ -507,6 +547,12 @@ function UserDetail({ user, onClose, onToggleStatus, onAdjustPoints }) {
             </div>
           )}
           <button
+            className="us-btn us-btn-secondary us-btn-lg"
+            onClick={() => onResetPassword(user)}
+          >
+            Cấp lại mật khẩu
+          </button>
+          <button
             className="us-btn us-btn-view us-btn-lg"
             onClick={() => onAdjustPoints(user)}
           >
@@ -577,6 +623,473 @@ function AdjustPointsModal({ user, onClose, onConfirm }) {
             Hủy
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Modal cấp lại mật khẩu - yêu cầu nhập đủ thông tin xác minh */
+function ResetPasswordModal({ user, onClose, onConfirm }) {
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    birthday: "",
+    new_password: "",
+    confirm_password: "",
+  });
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  if (!user) return null;
+
+  const set = (k, v) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    if (errors[k]) {
+      setErrors((e) => ({ ...e, [k]: undefined }));
+    }
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!form.full_name.trim()) e.full_name = "Nhập họ tên.";
+    if (!form.email.trim()) e.email = "Nhập email.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      e.email = "Email không hợp lệ.";
+    if (!form.phone.trim()) e.phone = "Nhập số điện thoại.";
+    if (!form.birthday) e.birthday = "Chọn ngày sinh.";
+    if (!form.new_password) e.new_password = "Nhập mật khẩu mới.";
+    else if (form.new_password.length < 6)
+      e.new_password = "Mật khẩu mới ít nhất 6 ký tự.";
+    if (!form.confirm_password) e.confirm_password = "Xác nhận mật khẩu mới.";
+    else if (form.confirm_password !== form.new_password)
+      e.confirm_password = "Mật khẩu xác nhận không trùng khớp.";
+    return e;
+  };
+
+  const handleSubmit = async (ev) => {
+    ev.preventDefault();
+    const e = validate();
+    setErrors(e);
+    if (Object.keys(e).length > 0) return;
+
+    setSubmitting(true);
+    setApiError("");
+    setSuccess(false);
+    try {
+      await adminUserService.resetPassword(user.id, {
+        full_name: form.full_name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        birthday: form.birthday,
+        new_password: form.new_password,
+      });
+      setSuccess(true);
+      setTimeout(() => {
+        onConfirm && onConfirm();
+      }, 1200);
+    } catch (err) {
+      console.error("Failed to reset password", err);
+      setApiError(
+        err?.message || "Không thể cấp lại mật khẩu. Vui lòng thử lại.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="us-modal-overlay" onClick={onClose}>
+      <div
+        className="us-modal us-modal-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="us-modal-header">
+            <h2>Cấp lại mật khẩu: {user.name}</h2>
+            <button
+              type="button"
+              className="us-modal-close"
+              onClick={onClose}
+            >
+              ✕
+            </button>
+          </div>
+          <div className="us-modal-body">
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: "rgba(147,197,253,0.12)",
+                color: "#93c5fd",
+                fontSize: 13,
+                marginBottom: 14,
+              }}
+            >
+              ⓘ Vui lòng nhập đầy đủ thông tin cá nhân của khách hàng để xác
+              minh trước khi cấp lại mật khẩu.
+            </div>
+
+            <div className="us-detail-grid">
+              <div className="us-detail-card">
+                <h4>Thông tin xác minh *</h4>
+                <div className="us-form-field">
+                  <label>Họ và tên</label>
+                  <input
+                    type="text"
+                    className={`us-input ${errors.full_name ? "error" : ""}`}
+                    placeholder="Trùng khớp với thông tin tài khoản"
+                    value={form.full_name}
+                    onChange={(e) => set("full_name", e.target.value)}
+                  />
+                  {errors.full_name && (
+                    <span className="us-field-error">{errors.full_name}</span>
+                  )}
+                </div>
+
+                <div className="us-form-field">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    className={`us-input ${errors.email ? "error" : ""}`}
+                    placeholder="Trùng khớp với thông tin tài khoản"
+                    value={form.email}
+                    onChange={(e) => set("email", e.target.value)}
+                  />
+                  {errors.email && (
+                    <span className="us-field-error">{errors.email}</span>
+                  )}
+                </div>
+
+                <div className="us-form-field">
+                  <label>Số điện thoại</label>
+                  <input
+                    type="tel"
+                    className={`us-input ${errors.phone ? "error" : ""}`}
+                    placeholder="Trùng khớp với thông tin tài khoản"
+                    value={form.phone}
+                    onChange={(e) => set("phone", e.target.value)}
+                  />
+                  {errors.phone && (
+                    <span className="us-field-error">{errors.phone}</span>
+                  )}
+                </div>
+
+                <div className="us-form-field">
+                  <label>Ngày sinh</label>
+                  <input
+                    type="date"
+                    className={`us-input ${errors.birthday ? "error" : ""}`}
+                    value={form.birthday}
+                    onChange={(e) => set("birthday", e.target.value)}
+                  />
+                  {errors.birthday && (
+                    <span className="us-field-error">{errors.birthday}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="us-detail-card">
+                <h4>Mật khẩu mới *</h4>
+                <div className="us-form-field">
+                  <label>Mật khẩu mới</label>
+                  <input
+                    type="password"
+                    className={`us-input ${errors.new_password ? "error" : ""}`}
+                    placeholder="Ít nhất 6 ký tự"
+                    value={form.new_password}
+                    onChange={(e) => set("new_password", e.target.value)}
+                  />
+                  {errors.new_password && (
+                    <span className="us-field-error">
+                      {errors.new_password}
+                    </span>
+                  )}
+                </div>
+
+                <div className="us-form-field">
+                  <label>Xác nhận mật khẩu mới</label>
+                  <input
+                    type="password"
+                    className={`us-input ${errors.confirm_password ? "error" : ""}`}
+                    placeholder="Nhập lại mật khẩu mới"
+                    value={form.confirm_password}
+                    onChange={(e) => set("confirm_password", e.target.value)}
+                  />
+                  {errors.confirm_password && (
+                    <span className="us-field-error">
+                      {errors.confirm_password}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {success && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: "rgba(52,211,153,0.12)",
+                  color: "#34d399",
+                  fontSize: 13,
+                }}
+              >
+                ✓ Cấp lại mật khẩu thành công. Đang đóng...
+              </div>
+            )}
+
+            {apiError && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: "rgba(248,113,113,0.12)",
+                  color: "#f87171",
+                  fontSize: 13,
+                }}
+              >
+                {apiError}
+              </div>
+            )}
+          </div>
+          <div className="us-modal-footer">
+            <button
+              type="submit"
+              className="us-btn us-btn-primary"
+              disabled={submitting || success}
+            >
+              {submitting ? "Đang xử lý..." : "Xác nhận cấp lại"}
+            </button>
+            <button
+              type="button"
+              className="us-btn us-btn-secondary"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Hủy
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/** Modal tạo người dùng mới */
+function CreateUserModal({ onClose, onConfirm }) {
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    phone: "",
+    birthday: "",
+    sex: "",
+    status: "active",
+  });
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState("");
+
+  const set = (k, v) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    if (errors[k]) {
+      setErrors((e) => ({ ...e, [k]: undefined }));
+    }
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!form.full_name.trim()) e.full_name = "Nhập họ tên.";
+    if (!form.email.trim()) e.email = "Nhập email.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      e.email = "Email không hợp lệ.";
+    if (!form.password) e.password = "Nhập mật khẩu.";
+    else if (form.password.length < 6)
+      e.password = "Mật khẩu ít nhất 6 ký tự.";
+    return e;
+  };
+
+  const handleSubmit = async (ev) => {
+    ev.preventDefault();
+    const e = validate();
+    setErrors(e);
+    if (Object.keys(e).length > 0) return;
+
+    setSubmitting(true);
+    setApiError("");
+    try {
+      await adminUserService.createUser({
+        full_name: form.full_name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        phone: form.phone.trim() || null,
+        birthday: form.birthday || null,
+        sex: form.sex || null,
+        role: "user",
+        status: form.status,
+      });
+      onConfirm && onConfirm();
+    } catch (err) {
+      console.error("Failed to create user", err);
+      setApiError(err?.message || "Không thể tạo người dùng. Vui lòng thử lại.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="us-modal-overlay" onClick={onClose}>
+      <div
+        className="us-modal us-modal-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="us-modal-header">
+            <h2>Thêm người dùng mới</h2>
+            <button
+              type="button"
+              className="us-modal-close"
+              onClick={onClose}
+            >
+              ✕
+            </button>
+          </div>
+          <div className="us-modal-body">
+            <div className="us-detail-grid">
+              <div className="us-detail-card">
+                <h4>Thông tin cơ bản *</h4>
+                <div className="us-form-field">
+                  <label>Họ và tên</label>
+                  <input
+                    type="text"
+                    className={`us-input ${errors.full_name ? "error" : ""}`}
+                    placeholder="Nguyễn Văn A"
+                    value={form.full_name}
+                    onChange={(e) => set("full_name", e.target.value)}
+                  />
+                  {errors.full_name && (
+                    <span className="us-field-error">{errors.full_name}</span>
+                  )}
+                </div>
+
+                <div className="us-form-field">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    className={`us-input ${errors.email ? "error" : ""}`}
+                    placeholder="example@email.com"
+                    value={form.email}
+                    onChange={(e) => set("email", e.target.value)}
+                  />
+                  {errors.email && (
+                    <span className="us-field-error">{errors.email}</span>
+                  )}
+                </div>
+
+                <div className="us-form-field">
+                  <label>Mật khẩu</label>
+                  <input
+                    type="password"
+                    className={`us-input ${errors.password ? "error" : ""}`}
+                    placeholder="Ít nhất 6 ký tự"
+                    value={form.password}
+                    onChange={(e) => set("password", e.target.value)}
+                  />
+                  {errors.password && (
+                    <span className="us-field-error">{errors.password}</span>
+                  )}
+                </div>
+
+                <div className="us-form-field">
+                  <label>Số điện thoại</label>
+                  <input
+                    type="tel"
+                    className="us-input"
+                    placeholder="09xxxxxxxx"
+                    value={form.phone}
+                    onChange={(e) => set("phone", e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="us-detail-card">
+                <h4>Thông tin bổ sung</h4>
+                <div className="us-form-field">
+                  <label>Ngày sinh</label>
+                  <input
+                    type="date"
+                    className="us-input"
+                    value={form.birthday}
+                    onChange={(e) => set("birthday", e.target.value)}
+                  />
+                </div>
+
+                <div className="us-form-field">
+                  <label>Giới tính</label>
+                  <select
+                    className="us-select"
+                    value={form.sex}
+                    onChange={(e) => set("sex", e.target.value)}
+                  >
+                    <option value="">Không chọn</option>
+                    <option value="male">Nam</option>
+                    <option value="female">Nữ</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
+
+                <div className="us-form-field">
+                  <label>Trạng thái</label>
+                  <select
+                    className="us-select"
+                    value={form.status}
+                    onChange={(e) => set("status", e.target.value)}
+                  >
+                    <option value="active">Hoạt động</option>
+                    <option value="inactive">Không hoạt động</option>
+                    <option value="blocked">Bị khóa</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {apiError && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: "rgba(248,113,113,0.12)",
+                  color: "#f87171",
+                  fontSize: 13,
+                }}
+              >
+                {apiError}
+              </div>
+            )}
+          </div>
+          <div className="us-modal-footer">
+            <button
+              type="submit"
+              className="us-btn us-btn-primary"
+              disabled={submitting}
+            >
+              {submitting ? "Đang lưu..." : "Tạo người dùng"}
+            </button>
+            <button
+              type="button"
+              className="us-btn us-btn-secondary"
+              onClick={onClose}
+            >
+              Hủy
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

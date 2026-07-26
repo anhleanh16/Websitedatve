@@ -5,7 +5,6 @@ import { db } from "../../../config/db.js";
 import { NotificationModel } from "../../admin/models/notificationModel.js";
 import { PromotionModel } from "../../admin/models/promotionModel.js";
 import { NewsModel } from "../../admin/models/newsModel.js";
-import { ComboModel } from "../../admin/models/comboModel.js";
 
 const normalizeCinemaImagePath = (cinema) => {
   if (!cinema) return cinema;
@@ -320,16 +319,6 @@ export const userGetMovieById = async (req, res) => {
   }
 };
 
-export const userGetCombos = async (req, res) => {
-  try {
-    const combos = await ComboModel.findActive();
-    res.json({ combos });
-  } catch (error) {
-    console.error("Error in userGetCombos:", error);
-    res.status(500).json({ message: "Error getting combos", combos: [] });
-  }
-};
-
 export const userUpdateProfile = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -516,5 +505,31 @@ export const userGetNewsBySlug = async (req, res) => {
   } catch (error) {
     console.error("Error in userGetNewsBySlug:", error);
     res.status(500).json({ message: "Không thể tải chi tiết bài viết.", article: null, related: [] });
+  }
+};
+
+export const userGetCombos = async (req, res) => {
+  try {
+    const [combos] = await db.query(
+      `SELECT * FROM Combos WHERE is_active = 1 ORDER BY sort_order ASC, combo_id ASC`,
+    );
+
+    const formattedCombos = combos.map((combo) => ({
+      combo_id: combo.combo_id,
+      combo_name: combo.combo_name,
+      description: combo.description,
+      price: combo.price,
+      image: combo.image,
+      category: combo.category,
+      popcorn_quantity: combo.popcorn_quantity,
+      drink_quantity: combo.drink_quantity,
+      popcorn_options: combo.popcorn_options ? JSON.parse(combo.popcorn_options) : [],
+      drink_options: combo.drink_options ? JSON.parse(combo.drink_options) : [],
+    }));
+
+    res.json({ combos: formattedCombos });
+  } catch (error) {
+    console.error("Error in userGetCombos:", error);
+    res.status(500).json({ message: "Không thể tải danh sách combo", combos: [] });
   }
 };

@@ -7,6 +7,19 @@ const couponNotificationContent = (payload) =>
 const voucherNotificationContent = (payload) =>
   `${payload.title || payload.code}: ${payload.desc || payload.description || "Ban vua nhan duoc mot voucher moi."}`;
 
+const validateDiscountPayload = (payload = {}) => {
+  const discountType = (payload.type || payload.discountType || "percent").toLowerCase();
+  const discountValue = Number(payload.value || payload.discountValue || 0);
+
+  if (discountType === "percent" && discountValue > 50) {
+    return "Giảm giá theo phần trăm không được vượt quá 50%.";
+  }
+  if (discountValue < 0) {
+    return "Giá trị giảm không được là số âm.";
+  }
+  return "";
+};
+
 export const getAdminPromotions = async (req, res) => {
   try {
     const [coupons, vouchers] = await Promise.all([
@@ -33,6 +46,10 @@ export const getPromotionRecipients = async (req, res) => {
 export const createCoupon = async (req, res) => {
   try {
     const payload = { ...(req.body || {}), createdBy: req.userId || null };
+    const validationError = validateDiscountPayload(payload);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
     const promotionId = await PromotionModel.createCoupon(payload);
 
     if ((payload.status || "active") === "active") {
@@ -49,26 +66,35 @@ export const createCoupon = async (req, res) => {
     res.status(201).json({ message: "Tạo mã khuyến mãi thành công.", promotionId });
   } catch (error) {
     console.error("Error in createCoupon:", error);
-    res.status(500).json({ message: "Không thể tạo mã khuyến mãi." });
+    res.status(500).json({ message: error.message || "Không thể tạo mã khuyến mãi." });
   }
 };
 
 export const updateCoupon = async (req, res) => {
   try {
-    const success = await PromotionModel.updateCoupon(req.params.id, req.body || {});
+    const payload = req.body || {};
+    const validationError = validateDiscountPayload(payload);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+    const success = await PromotionModel.updateCoupon(req.params.id, payload);
     if (!success) {
       return res.status(404).json({ message: "Không tìm thấy mã khuyến mãi." });
     }
     res.json({ message: "Cập nhật mã khuyến mãi thành công." });
   } catch (error) {
     console.error("Error in updateCoupon:", error);
-    res.status(500).json({ message: "Không thể cập nhật mã khuyến mãi." });
+    res.status(500).json({ message: error.message || "Không thể cập nhật mã khuyến mãi." });
   }
 };
 
 export const createVoucher = async (req, res) => {
   try {
     const payload = { ...(req.body || {}), createdBy: req.userId || null };
+    const validationError = validateDiscountPayload(payload);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
     const promotionId = await PromotionModel.createVoucher(payload);
 
     if (payload.userId) {
@@ -85,20 +111,25 @@ export const createVoucher = async (req, res) => {
     res.status(201).json({ message: "Cấp voucher thành công.", promotionId });
   } catch (error) {
     console.error("Error in createVoucher:", error);
-    res.status(500).json({ message: "Không thể cấp voucher." });
+    res.status(500).json({ message: error.message || "Không thể cấp voucher." });
   }
 };
 
 export const updateVoucher = async (req, res) => {
   try {
-    const success = await PromotionModel.updateVoucher(req.params.id, req.body || {});
+    const payload = req.body || {};
+    const validationError = validateDiscountPayload(payload);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+    const success = await PromotionModel.updateVoucher(req.params.id, payload);
     if (!success) {
       return res.status(404).json({ message: "Không tìm thấy voucher." });
     }
     res.json({ message: "Cập nhật voucher thành công." });
   } catch (error) {
     console.error("Error in updateVoucher:", error);
-    res.status(500).json({ message: "Không thể cập nhật voucher." });
+    res.status(500).json({ message: error.message || "Không thể cập nhật voucher." });
   }
 };
 

@@ -5,34 +5,29 @@ import { blogService } from '../../services/blogService'
 import { toAbsoluteAssetUrl } from '../../../utils/api'
 import './Blog.css'
 
-const CATEGORY_OPTIONS = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'intro', label: 'Giới thiệu' },
-  { value: 'guide', label: 'Hướng dẫn sử dụng' },
-  { value: 'utility', label: 'Tiện ích online' },
-  { value: 'gift', label: 'Thẻ quà tặng' },
-  { value: 'recruitment', label: 'Tuyển dụng' },
-  { value: 'terms', label: 'Điều khoản sử dụng' },
-  { value: 'general', label: 'Điều khoản chung' },
-  { value: 'transaction', label: 'Điều khoản giao dịch' },
-  { value: 'privacy', label: 'Chính sách bảo mật' },
-  { value: 'payment', label: 'Chính sách thanh toán' },
-  { value: 'cinema', label: 'Quy định tại rạp' }
-]
-
-const getCategoryLabel = (value) =>
-  CATEGORY_OPTIONS.find((item) => item.value === value)?.label || value
-
 const estimateReadTime = (content = '') => {
   const words = String(content).trim().split(/\s+/).filter(Boolean).length
   return `${Math.max(1, Math.ceil(words / 180))} phút`
 }
+
+const stripHtml = (value = '') =>
+  String(value)
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&(nbsp|#160);/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
 
 export default function Blog() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || 'all')
   const [searchQuery, setSearchQuery] = useState('')
   const [blogs, setBlogs] = useState([])
+  const [categories, setCategories] = useState([{ value: 'all', label: 'Tất cả' }])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -40,7 +35,11 @@ export default function Blog() {
 
   useEffect(() => {
     loadBlogs()
-  }, [currentPage])
+  }, [currentPage, activeCategory])
+
+  useEffect(() => {
+    loadCategories()
+  }, [])
 
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category')
@@ -52,6 +51,16 @@ export default function Blog() {
   const loadBlogs = async () => {
     try {
       setLoading(true)
+
+      if (activeCategory !== 'all') {
+        const data = await blogService.getByCategory(activeCategory)
+        const categoryBlogs = data.blogs || []
+        setBlogs(categoryBlogs)
+        setTotalBlogs(categoryBlogs.length)
+        setError('')
+        return
+      }
+
       const data = await blogService.getPublished(currentPage)
       setBlogs(data.blogs || [])
       setTotalBlogs(data.total || 0)
@@ -64,13 +73,39 @@ export default function Blog() {
     }
   }
 
+  const loadCategories = async () => {
+    try {
+      const data = await blogService.getCategoriesPublic()
+      const normalized = (data.categories || []).map((item) => ({
+        value: item.category_name,
+        label: item.description || item.category_name,
+      }))
+      setCategories([{ value: 'all', label: 'Tất cả' }, ...normalized])
+    } catch (err) {
+      console.error(err)
+      setCategories([{ value: 'all', label: 'Tất cả' }])
+    }
+  }
+
+  const getCategoryLabel = (value) =>
+    categories.find((item) => item.value === value)?.label || value
+
   const filteredBlogs = blogs.filter(blog => {
-    const matchCat = activeCategory === 'all' || blog.category === activeCategory
     const matchSearch = !searchQuery.trim() || 
       blog.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      blog.summary?.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchCat && matchSearch
+      stripHtml(blog.summary || '').toLowerCase().includes(searchQuery.toLowerCase())
+    return matchSearch
   })
+
+  const handleCategoryChange = (value) => {
+    setActiveCategory(value)
+    if (value === 'all') {
+      setSearchParams({})
+    } else {
+      setSearchParams({ category: value })
+    }
+    setCurrentPage(1)
+  }
 
   return (
     <div className='blog-user-page'>
@@ -104,26 +139,6 @@ export default function Blog() {
 
       <div className='blog-main'>
         <div className='blog-content'>
-          <div className='blog-filter-bar'>
-            {CATEGORY_OPTIONS.map((cat) => (
-              <button
-                key={cat.value}
-                className={`filter-btn ${activeCategory === cat.value ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveCategory(cat.value)
-                  if (cat.value === 'all') {
-                    setSearchParams({})
-                  } else {
-                    setSearchParams({ category: cat.value })
-                  }
-                  setCurrentPage(1)
-                }}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
           {loading ? (
             <div className='blog-empty'>
               <span>📰</span>
@@ -161,9 +176,10 @@ export default function Blog() {
                         </span>
                       </div>
                       <h3 className='blog-card-title'>{blog.title}</h3>
-                      <div className='blog-card-excerpt' dangerouslySetInnerHTML={{ 
-                        __html: blog.summary || blog.content.substring(0, 150) + '...' 
-                      }} />
+                      <p className='blog-card-excerpt'>
+                        {stripHtml(blog.summary || blog.content).slice(0, 170) || 'Nội dung đang được cập nhật.'}
+                        {stripHtml(blog.summary || blog.content).length > 170 ? '...' : ''}
+                      </p>
                       <div className='blog-card-footer'>
                         <span className='blog-views'>
                           <FaEye /> {blog.views || 0}
@@ -177,26 +193,28 @@ export default function Blog() {
                 ))}
               </div>
 
-              <div className='blog-pagination'>
-                <button 
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(p => p - 1)}
-                >
-                  ← Trước
-                </button>
-                <span className='page-info'>Trang {currentPage}</span>
-                <button 
-                  disabled={currentPage * 10 >= totalBlogs}
-                  onClick={() => setCurrentPage(p => p + 1)}
-                >
-                  Sau →
-                </button>
-              </div>
+              {activeCategory === 'all' && (
+                <div className='blog-pagination'>
+                  <button 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => p - 1)}
+                  >
+                    ← Trước
+                  </button>
+                  <span className='page-info'>Trang {currentPage}</span>
+                  <button 
+                    disabled={currentPage * 10 >= totalBlogs}
+                    onClick={() => setCurrentPage(p => p + 1)}
+                  >
+                    Sau →
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <div className='blog-empty'>
               <span>🔍</span>
-              <p>Không tìm thấy bài viết phù hợp</p>
+              <p>Chưa có bài viết trong danh mục này. Vui lòng chọn danh mục khác hoặc xem mục Tất cả.</p>
             </div>
           )}
         </div>
@@ -208,15 +226,11 @@ export default function Blog() {
               <h3>Danh mục</h3>
             </div>
             <div className='category-list'>
-              {CATEGORY_OPTIONS.slice(1).map(cat => (
+              {categories.map(cat => (
                 <button
                   key={cat.value}
                   className={`category-link ${activeCategory === cat.value ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveCategory(cat.value)
-                    setSearchParams({ category: cat.value })
-                    setCurrentPage(1)
-                  }}
+                  onClick={() => handleCategoryChange(cat.value)}
                 >
                   <FaTag /> {cat.label}
                 </button>

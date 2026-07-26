@@ -6,14 +6,7 @@ import { useEffect } from 'react'
 import { userPromotionService } from '../../services/userApi'
 import './membership.css'
 
-const MOCK_REWARDS = [
-  { id: 1, points: 200, title: 'Vé xem phim 2D', icon: '🎟️' },
-  { id: 2, points: 350, title: 'Combo bắp rang + nước lớn', icon: '🍿' },
-  { id: 3, points: 500, title: 'Vé IMAX miễn phí', icon: '🎬' },
-  { id: 4, points: 100, title: 'Giảm 20.000đ', icon: '🏷️' },
-  { id: 5, points: 150, title: 'Nước uống miễn phí', icon: '🥤' },
-  { id: 6, points: 800, title: 'Gói VIP 1 tháng', icon: '👑' },
-]
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const MOCK_BENEFITS = [
   { icon: '🎟️', title: 'Đặt vé ưu tiên', desc: 'Đặt trước 30 phút so với khách thường' },
@@ -22,15 +15,6 @@ const MOCK_BENEFITS = [
   { icon: '⭐', title: 'Điểm nhân đôi', desc: 'Tích điểm x2 vào mỗi thứ 3 hàng tuần' },
   { icon: '🎬', title: 'Suất chiếu sớm', desc: 'Xem phim trước công chiếu 1-2 ngày' },
   { icon: '🅿️', title: 'Bãi đậu xe miễn phí', desc: 'Miễn phí 2 giờ cho thành viên Gold trở lên' },
-]
-
-const MOCK_HISTORY = [
-  { id: 1, date: '07/06/2026', desc: 'Đặt vé phim Doraemon', points: +50, type: 'earn' },
-  { id: 2, date: '05/06/2026', desc: 'Đổi thưởng: Giảm 20.000đ', points: -100, type: 'spend' },
-  { id: 3, date: '01/06/2026', desc: 'Đặt vé phim Avengers IMAX', points: +120, type: 'earn' },
-  { id: 4, date: '28/05/2026', desc: 'Đặt vé phim Inside Out 2', points: +60, type: 'earn' },
-  { id: 5, date: '20/05/2026', desc: 'Đổi thưởng: Combo bắp + nước', points: -350, type: 'spend' },
-  { id: 6, date: '15/05/2026', desc: 'Sinh nhật thành viên', points: +200, type: 'bonus' },
 ]
 
 const TIERS = [
@@ -79,13 +63,18 @@ export default function Membership() {
   const [openFaq, setOpenFaq] = useState(null)
   const [vouchers, setVouchers] = useState([])
   const [coupons, setCoupons] = useState([])
+  const [rewards, setRewards] = useState([])
+  const [history, setHistory] = useState([])
+  const [pointsSummary, setPointsSummary] = useState(null)
   const [loadingPromotions, setLoadingPromotions] = useState(false)
   const [promotionError, setPromotionError] = useState('')
+  const [redeemingId, setRedeemingId] = useState(null)
+  const [showRedeemConfirm, setShowRedeemConfirm] = useState(false)
+  const [pendingReward, setPendingReward] = useState(null)
 
-  // Mock data cho user
   const memberCode = profile ? `LNX-${String(profile.id || 10001).padStart(6, '0')}` : 'LNX-010001'
   const memberName = profile?.name || 'Khách hàng'
-  const totalPoints = 720
+  const totalPoints = pointsSummary?.user?.points ?? 0
   const tier = getTier(totalPoints)
   const nextTier = getNextTier(totalPoints)
   const progress = nextTier
@@ -103,6 +92,9 @@ export default function Membership() {
       if (!profile?.id) {
         setVouchers([])
         setCoupons([])
+        setRewards([])
+        setHistory([])
+        setPointsSummary(null)
         return
       }
 
@@ -112,6 +104,16 @@ export default function Membership() {
         const data = await userPromotionService.getAll(profile.id)
         setVouchers(Array.isArray(data?.vouchers) ? data.vouchers : [])
         setCoupons(Array.isArray(data?.coupons) ? data.coupons : [])
+
+        const res = await fetch(`${API_BASE}/points/user/${profile.id}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+        })
+        const pointData = await res.json()
+        if (res.ok) {
+          setPointsSummary(pointData)
+          setRewards(Array.isArray(pointData?.rewards) ? pointData.rewards : [])
+          setHistory(Array.isArray(pointData?.history) ? pointData.history : [])
+        }
       } catch (err) {
         console.error(err)
         setPromotionError(err.message || 'Không thể tải khuyến mãi.')
@@ -122,6 +124,45 @@ export default function Membership() {
 
     loadPromotions()
   }, [profile?.id])
+
+  const handleRedeem = async (rewardId) => {
+    if (!profile?.id) return
+    try {
+      setRedeemingId(rewardId)
+      const res = await fetch(`${API_BASE}/points/user/${profile.id}/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+        body: JSON.stringify({ rewardId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.message || 'Không thể đổi quà.')
+      const res2 = await fetch(`${API_BASE}/points/user/${profile.id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
+      })
+      const pointData = await res2.json()
+      if (res2.ok) {
+        setPointsSummary(pointData)
+        setRewards(Array.isArray(pointData?.rewards) ? pointData.rewards : [])
+        setHistory(Array.isArray(pointData?.history) ? pointData.history : [])
+      }
+    } catch (err) {
+      setPromotionError(err.message || 'Không thể đổi quà.')
+    } finally {
+      setRedeemingId(null)
+    }
+  }
+
+  const openRedeemConfirm = (reward) => {
+    setPendingReward(reward)
+    setShowRedeemConfirm(true)
+  }
+
+  const confirmRedeem = async () => {
+    if (!pendingReward) return
+    await handleRedeem(pendingReward.id)
+    setShowRedeemConfirm(false)
+    setPendingReward(null)
+  }
 
   const TABS = [
     { key: 'overview', label: 'Tổng quan', icon: <MdCardMembership /> },
@@ -196,6 +237,23 @@ export default function Membership() {
         ))}
       </div>
 
+      {showRedeemConfirm && pendingReward && (
+        <div className='redeem-modal-overlay' onClick={() => setShowRedeemConfirm(false)}>
+          <div className='redeem-modal-card card-glass' onClick={(e) => e.stopPropagation()}>
+            <div className='redeem-modal-icon'>🎁</div>
+            <h3>Xác nhận đổi quà</h3>
+            <p>
+              Bạn có chắc chắn đổi <strong>{pendingReward.rewardName}</strong> lấy{' '}
+              <strong>{pendingReward.requiredPoints} điểm</strong> không?
+            </p>
+            <div className='redeem-modal-actions'>
+              <button className='redeem-modal-cancel' onClick={() => setShowRedeemConfirm(false)}>Huỷ</button>
+              <button className='redeem-modal-confirm' onClick={confirmRedeem}>Xác nhận đổi</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div className='membership-content'>
 
@@ -262,14 +320,14 @@ export default function Membership() {
             <div className='card-glass recent-card'>
               <h3>Giao dịch gần đây</h3>
               <div className='history-list'>
-                {MOCK_HISTORY.slice(0, 4).map(h => (
+                {history.slice(0, 4).map((h) => (
                   <div key={h.id} className='history-item'>
-                    <div className={`history-dot ${h.type}`} />
+                    <div className={`history-dot ${h.points > 0 ? 'earn' : 'spend'}`} />
                     <div className='history-info'>
-                      <span className='history-desc'>{h.desc}</span>
-                      <span className='history-date'>{h.date}</span>
+                      <span className='history-desc'>{h.description}</span>
+                      <span className='history-date'>{new Date(h.createdAt).toLocaleDateString('vi-VN')}</span>
                     </div>
-                    <span className={`history-pts ${h.type}`}>
+                    <span className={`history-pts ${h.points > 0 ? 'earn' : 'spend'}`}>
                       {h.points > 0 ? `+${h.points}` : h.points} điểm
                     </span>
                   </div>
@@ -294,19 +352,21 @@ export default function Membership() {
               </div>
             </div>
             <div className='rewards-grid'>
-              {MOCK_REWARDS.map(r => (
+              {rewards.map((r) => (
                 <div key={r.id} className='reward-card card-glass'>
-                  <div className='reward-icon'>{r.icon}</div>
-                  <div className='reward-title'>{r.title}</div>
+                  <div className='reward-icon'>{r.rewardType === 'gift' ? '🎁' : r.rewardType === 'coupon' ? '🏷️' : '🎟️'}</div>
+                  <div className='reward-title'>{r.rewardName}</div>
                   <div className='reward-cost'>
                     <FaStar style={{ color: '#f59e0b' }} />
-                    <span>{r.points} điểm</span>
+                    <span>{r.requiredPoints} điểm</span>
                   </div>
+                  <div className='reward-desc'>{r.rewardValue}</div>
                   <button
-                    className={`reward-btn${totalPoints < r.points ? ' disabled' : ''}`}
-                    disabled={totalPoints < r.points}
+                    className={`reward-btn${totalPoints < r.requiredPoints ? ' disabled' : ''}`}
+                    disabled={totalPoints < r.requiredPoints || redeemingId === r.id}
+                    onClick={() => openRedeemConfirm(r)}
                   >
-                    {totalPoints >= r.points ? 'Đổi ngay' : 'Không đủ điểm'}
+                    {redeemingId === r.id ? 'Đang xử lý...' : totalPoints >= r.requiredPoints ? 'Đổi ngay' : 'Không đủ điểm'}
                   </button>
                 </div>
               ))}
@@ -421,7 +481,7 @@ export default function Membership() {
                 <FaStar />
                 <div>
                   <div className='hs-label'>Tổng điểm đã kiếm</div>
-                  <div className='hs-value'>+{MOCK_HISTORY.filter(h => h.points > 0).reduce((s, h) => s + h.points, 0)} điểm</div>
+                  <div className='hs-value'>+{history.filter(h => h.points > 0).reduce((s, h) => s + h.points, 0)} điểm</div>
                 </div>
               </div>
               <div className='hs-divider' />
@@ -429,7 +489,7 @@ export default function Membership() {
                 <FaGift />
                 <div>
                   <div className='hs-label'>Tổng điểm đã dùng</div>
-                  <div className='hs-value'>{MOCK_HISTORY.filter(h => h.points < 0).reduce((s, h) => s + h.points, 0)} điểm</div>
+                  <div className='hs-value'>{history.filter(h => h.points < 0).reduce((s, h) => s + h.points, 0)} điểm</div>
                 </div>
               </div>
               <div className='hs-divider' />
@@ -445,14 +505,14 @@ export default function Membership() {
             <div className='card-glass history-full'>
               <h3>Tất cả giao dịch</h3>
               <div className='history-list'>
-                {MOCK_HISTORY.map(h => (
+                {history.map((h) => (
                   <div key={h.id} className='history-item'>
-                    <div className={`history-dot ${h.type}`} />
+                    <div className={`history-dot ${h.points > 0 ? 'earn' : 'spend'}`} />
                     <div className='history-info'>
-                      <span className='history-desc'>{h.desc}</span>
-                      <span className='history-date'>{h.date}</span>
+                      <span className='history-desc'>{h.description}</span>
+                      <span className='history-date'>{new Date(h.createdAt).toLocaleDateString('vi-VN')}</span>
                     </div>
-                    <span className={`history-pts ${h.type}`}>
+                    <span className={`history-pts ${h.points > 0 ? 'earn' : 'spend'}`}>
                       {h.points > 0 ? `+${h.points}` : h.points} điểm
                     </span>
                   </div>

@@ -45,7 +45,7 @@ function CouponForm({ coupon, onClose, onSave }) {
     const e = {};
     if (!form.code.trim())            e.code      = "Nhập mã khuyến mãi.";
     if (!form.value || form.value <= 0) e.value   = "Nhập giá trị giảm giá.";
-    if (form.type === "percent" && form.value > 100) e.value = "Phần trăm không vượt quá 100%.";
+    if (form.type === "percent" && form.value > 50) e.value = "Phần trăm không được vượt quá 50%.";
     if (!form.startDate)              e.startDate = "Chọn ngày bắt đầu.";
     if (!form.endDate)                e.endDate   = "Chọn ngày kết thúc.";
     if (form.startDate && form.endDate && form.startDate > form.endDate) e.endDate = "Ngày kết thúc phải sau ngày bắt đầu.";
@@ -96,7 +96,7 @@ function CouponForm({ coupon, onClose, onSave }) {
                 <div className="pr-field">
                   <label>Giá trị giảm *</label>
                   <div className="pr-input-suffix">
-                    <input type="number" min={1} className={errors.value ? "error" : ""}
+                    <input type="number" min={1} max={form.type === "percent" ? 50 : undefined} className={errors.value ? "error" : ""}
                       value={form.value} onChange={e => set("value", e.target.value)} />
                     <span>{TYPE_LABEL[form.type]}</span>
                   </div>
@@ -191,6 +191,7 @@ function VoucherForm({ voucher, users, onClose, onSave }) {
     const e = {};
     if (!form.code.trim())              e.code       = "Nhập mã voucher.";
     if (!form.value || form.value <= 0) e.value      = "Nhập giá trị.";
+    if (form.type === "percent" && form.value > 50) e.value = "Phần trăm không được vượt quá 50%.";
     if (!form.issuedTo.trim())          e.issuedTo   = "Chọn hoặc nhập tên người nhận.";
     if (!form.issuedDate)               e.issuedDate = "Chọn ngày cấp.";
     if (!form.expiryDate)               e.expiryDate = "Chọn ngày hết hạn.";
@@ -255,7 +256,7 @@ function VoucherForm({ voucher, users, onClose, onSave }) {
                 <div className="pr-field">
                   <label>Giá trị *</label>
                   <div className="pr-input-suffix">
-                    <input type="number" min={1} className={errors.value ? "error" : ""}
+                    <input type="number" min={1} max={form.type === "percent" ? 50 : undefined} className={errors.value ? "error" : ""}
                       value={form.value} onChange={e => set("value", e.target.value)} />
                     <span>{TYPE_LABEL[form.type]}</span>
                   </div>

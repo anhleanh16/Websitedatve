@@ -3,11 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import QuickBookWidget from '../../Components/QuickBookWidget/QuickBookWidget'
 import {
   FaPlay, FaTicketAlt, FaStar, FaMapMarkerAlt, FaClock,
-  FaFire, FaRobot, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt
+  FaFire, FaRobot, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt, FaEye
 } from 'react-icons/fa'
 import { MdLocalOffer } from 'react-icons/md'
 import { useSelector } from 'react-redux'
 import { userNewsService, userMovieService, userCinemaService, userPromotionService, userComboService, userShowtimeService } from '../../services/userApi'
+import { blogService } from '../../services/blogService'
 import { toAbsoluteAssetUrl } from '../../../utils/api'
 import './home.css'
 
@@ -50,6 +51,8 @@ const HOME_NEWS_GROUPS = [
   { key: 'promotion', label: 'Khuyến mãi', color: '#f59e0b', icon: '🎁' },
   { key: 'event', label: 'Sự kiện', color: '#22c55e', icon: '🎉' },
 ]
+
+const HOME_BLOG_PRIORITY = ['guide', 'payment', 'cinema']
 
 const formatReviewCount = (count) => {
   const value = Number(count || 0)
@@ -96,6 +99,27 @@ const formatRelativeTime = (value) => {
   }
 
   return date.toLocaleDateString('vi-VN')
+}
+
+const sanitizeNewsExcerpt = (value) => {
+  if (!value) return ''
+
+  return String(value)
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&(nbsp|#160);/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const formatBlogCategoryFallback = (value = '') => {
+  const text = String(value).replace(/_/g, ' ').trim()
+  if (!text) return 'Blog'
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
 const getNewsTag = (category) => {
@@ -145,7 +169,19 @@ const normalizeHomeNews = (item) => ({
   time: formatRelativeTime(item.published_at || item.created_at),
   image: item.thumbnail ? toAbsoluteAssetUrl(item.thumbnail) : '',
   icon: getNewsFallbackIcon(item.category),
-  excerpt: item.short_description || '',
+  excerpt: sanitizeNewsExcerpt(item.short_description),
+})
+
+const normalizeHomeBlog = (item, categoryMap = {}) => ({
+  id: item.blog_id,
+  slug: item.slug,
+  title: item.title || 'Bài viết mới',
+  image: item.thumbnail ? toAbsoluteAssetUrl(item.thumbnail) : '',
+  category: item.category,
+  categoryLabel: categoryMap[item.category] || formatBlogCategoryFallback(item.category),
+  time: formatRelativeTime(item.created_at),
+  views: Number(item.views || 0),
+  excerpt: sanitizeNewsExcerpt(item.summary || item.content || ''),
 })
 
 const buildHeroBackground = (poster, fallbackBg) =>
@@ -267,9 +303,11 @@ export default function Home() {
   const [loadingMovies, setLoadingMovies] = useState(false)
   const [loadingShowtimes, setLoadingShowtimes] = useState(false)
   const [homeNews, setHomeNews] = useState([])
+  const [homeBlogs, setHomeBlogs] = useState([])
   const [moviesError, setMoviesError] = useState('')
   const [showtimesError, setShowtimesError] = useState('')
   const [newsError, setNewsError] = useState('')
+  const [blogError, setBlogError] = useState('')
 
   const heroTimer = useRef(null)
   const adTimer   = useRef(null)
@@ -343,6 +381,37 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    const loadHomeBlogs = async () => {
+      setBlogError('')
+
+      try {
+        const [blogData, categoryData] = await Promise.all([
+          blogService.getPublished(1),
+          blogService.getCategoriesPublic(),
+        ])
+
+        const categoryMap = Object.fromEntries(
+          (categoryData?.categories || []).map((item) => [
+            item.category_name,
+            item.description || formatBlogCategoryFallback(item.category_name),
+          ]),
+        )
+
+        const nextBlogs = Array.isArray(blogData?.blogs)
+          ? blogData.blogs.map((item) => normalizeHomeBlog(item, categoryMap))
+          : []
+        setHomeBlogs(nextBlogs)
+      } catch (err) {
+        console.error(err)
+        setHomeBlogs([])
+        setBlogError('Không thể tải blog từ database.')
+      }
+    }
+
+    loadHomeBlogs()
+  }, [])
+
+  useEffect(() => {
     if (!selectedCinemaId) {
       setShowtimes([])
       return
@@ -394,6 +463,20 @@ export default function Home() {
       })),
     [homeNews],
   )
+  const featuredHomeBlogs = useMemo(() => {
+    const score = (category = '') => {
+      const index = HOME_BLOG_PRIORITY.indexOf(category)
+      return index === -1 ? HOME_BLOG_PRIORITY.length + 1 : index
+    }
+
+    return [...homeBlogs]
+      .sort((a, b) => {
+        const scoreDiff = score(a.category) - score(b.category)
+        if (scoreDiff !== 0) return scoreDiff
+        return b.id - a.id
+      })
+      .slice(0, 3)
+  }, [homeBlogs])
 
   useEffect(() => {
     setMovieOff((prev) => Math.min(prev, maxOff))
@@ -752,6 +835,51 @@ export default function Home() {
                     )}
                   </div>
                 </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Blog hữu ích */}
+          <div className='home-blog-block'>
+            <div className='sec-header'>
+              <div className='sec-title-group'>
+                <h2>Blog hữu ích</h2>
+                <p>Hướng dẫn và chính sách quan trọng giúp bạn đặt vé nhanh hơn.</p>
+              </div>
+              <Link to='/Blog' className='sec-link'>Xem tất cả →</Link>
+            </div>
+
+            <div className='home-blog-grid'>
+              {blogError && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
+                  {blogError}
+                </div>
+              )}
+
+              {!blogError && featuredHomeBlogs.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
+                  Chưa có bài blog để hiển thị.
+                </div>
+              )}
+
+              {!blogError && featuredHomeBlogs.map((blog) => (
+                <Link to={`/blog/${blog.slug}`} key={blog.id} className='home-blog-card'>
+                  <div
+                    className='home-blog-image'
+                    style={blog.image ? { backgroundImage: `url(${blog.image})` } : undefined}
+                  >
+                    {!blog.image && <span>📝</span>}
+                  </div>
+                  <div className='home-blog-body'>
+                    <span className='news-tag'>{blog.categoryLabel}</span>
+                    <h3 className='home-blog-title'>{blog.title}</h3>
+                    <p className='home-blog-excerpt'>{blog.excerpt || 'Nội dung đang được cập nhật.'}</p>
+                    <div className='home-blog-meta'>
+                      <span><FaClock /> {blog.time}</span>
+                      <span><FaEye /> {blog.views.toLocaleString('vi-VN')}</span>
+                    </div>
+                  </div>
+                </Link>
               ))}
             </div>
           </div>

@@ -11,6 +11,30 @@ const NEWS_CATEGORIES = new Set([
 
 const NEWS_STATUSES = new Set(["draft", "published", "hidden"]);
 
+const sanitizeShortDescription = (value) => {
+  if (!value) return "";
+
+  return String(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(nbsp|#160);/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const sanitizeNewsRow = (row) => {
+  if (!row) return row;
+
+  return {
+    ...row,
+    short_description: sanitizeShortDescription(row.short_description || "") || null,
+  };
+};
+
 const slugify = (value = "") =>
   String(value)
     .normalize("NFD")
@@ -75,7 +99,9 @@ const resolveEmployeeIdByUserId = async (userId, connection = db) => {
 const mapNewsPayload = async (payload = {}, { excludeNewsId = null, connection = db } = {}) => {
   const title = String(payload.title || "").trim();
   const content = String(payload.content || "").trim();
-  const shortDescription = String(payload.short_description || payload.shortDescription || "").trim();
+  const shortDescription = sanitizeShortDescription(
+    payload.short_description || payload.shortDescription || "",
+  );
   const thumbnail = String(payload.thumbnail || "").trim();
   const category = String(payload.category || "").trim();
   const status = String(payload.status || "draft").trim();
@@ -170,7 +196,7 @@ export const NewsModel = {
       params,
     );
 
-    return rows;
+    return rows.map(sanitizeNewsRow);
   },
 
   async findById(newsId) {
@@ -204,7 +230,7 @@ export const NewsModel = {
       [newsId],
     );
 
-    return row || null;
+    return sanitizeNewsRow(row) || null;
   },
 
   async findBySlug(slug) {
@@ -238,7 +264,7 @@ export const NewsModel = {
       [slug],
     );
 
-    return row || null;
+    return sanitizeNewsRow(row) || null;
   },
 
   async findPublic(filters = {}) {
@@ -294,7 +320,7 @@ export const NewsModel = {
       params,
     );
 
-    return rows;
+    return rows.map(sanitizeNewsRow);
   },
 
   async findPublicBySlugAndIncreaseView(slug) {
@@ -343,10 +369,10 @@ export const NewsModel = {
       );
 
       await connection.commit();
-      return {
+      return sanitizeNewsRow({
         ...row,
         view_count: Number(row.view_count || 0) + 1,
-      };
+      });
     } catch (error) {
       await connection.rollback();
       throw error;

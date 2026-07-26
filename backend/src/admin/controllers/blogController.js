@@ -1,6 +1,63 @@
 import { BlogModel } from '../models/blogModel.js'
 
 export const blogController = {
+  getAdminCategories: async (req, res) => {
+    try {
+      const categories = await BlogModel.getAllCategories()
+      res.json({ success: true, categories })
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ success: false, message: 'Lỗi tải danh mục blog' })
+    }
+  },
+
+  createCategory: async (req, res) => {
+    try {
+      const { category_name, description } = req.body || {}
+      const category = await BlogModel.createCategory({ category_name, description })
+      res.status(201).json({ success: true, category, message: 'Tạo danh mục thành công' })
+    } catch (error) {
+      console.error(error)
+      res.status(400).json({ success: false, message: error.message || 'Lỗi tạo danh mục blog' })
+    }
+  },
+
+  updateCategory: async (req, res) => {
+    try {
+      const { categoryId } = req.params
+      const { category_name, description } = req.body || {}
+      const category = await BlogModel.updateCategory(Number(categoryId), {
+        category_name,
+        description,
+      })
+      res.json({ success: true, category, message: 'Cập nhật danh mục thành công' })
+    } catch (error) {
+      console.error(error)
+      res.status(400).json({ success: false, message: error.message || 'Lỗi cập nhật danh mục blog' })
+    }
+  },
+
+  deleteCategory: async (req, res) => {
+    try {
+      const { categoryId } = req.params
+      await BlogModel.deleteCategory(Number(categoryId))
+      res.json({ success: true, message: 'Xóa danh mục thành công' })
+    } catch (error) {
+      console.error(error)
+      res.status(400).json({ success: false, message: error.message || 'Lỗi xóa danh mục blog' })
+    }
+  },
+
+  getPublicCategories: async (req, res) => {
+    try {
+      const categories = await BlogModel.getPublicCategories()
+      res.json({ success: true, categories })
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ success: false, message: 'Lỗi tải danh mục blog' })
+    }
+  },
+
   // Get all blogs (admin)
   getAllBlogs: async (req, res) => {
     try {
@@ -36,7 +93,7 @@ export const blogController = {
       res.status(201).json({ success: true, blog: result, message: 'Tạo blog thành công' })
     } catch (error) {
       console.error(error)
-      res.status(500).json({ success: false, message: 'Lỗi tạo blog' })
+      res.status(400).json({ success: false, message: error.message || 'Lỗi tạo blog' })
     }
   },
 
@@ -64,7 +121,7 @@ export const blogController = {
       res.json({ success: true, blog: result, message: 'Cập nhật blog thành công' })
     } catch (error) {
       console.error(error)
-      res.status(500).json({ success: false, message: 'Lỗi cập nhật blog' })
+      res.status(400).json({ success: false, message: error.message || 'Lỗi cập nhật blog' })
     }
   },
 

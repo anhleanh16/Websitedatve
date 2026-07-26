@@ -117,36 +117,6 @@
   flex: 1;
 }
 
-.blog-filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 30px;
-  padding: 15px;
-  background: rgba(124, 97, 255, 0.05);
-  border-radius: 8px;
-}
-
-.filter-btn {
-  padding: 8px 16px;
-  background: rgba(124, 97, 255, 0.1);
-  border: 1px solid rgba(124, 97, 255, 0.2);
-  border-radius: 6px;
-  color: #8fa6ff;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.3s;
-  white-space: nowrap;
-}
-
-.filter-btn:hover,
-.filter-btn.active {
-  background: linear-gradient(135deg, #7c61ff, #a78bfa);
-  border-color: #7c61ff;
-  color: #eef4ff;
-}
-
 .blog-grid {
   display: grid;
   gap: 25px;
@@ -247,6 +217,7 @@
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 

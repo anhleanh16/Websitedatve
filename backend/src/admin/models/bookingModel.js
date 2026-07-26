@@ -1,4 +1,5 @@
 import { db } from "../../../config/db.js";
+import { PointsModel } from "./pointsModel.js";
 
 const UNIT_PRICE_BY_TYPE = {
   regular: 80000,
@@ -72,6 +73,80 @@ const normalizeFoodItems = (foodItems = []) => {
 
 const generateBookingCode = () =>
   `LNX${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+const awardBookingPoints = async (connection, userId, orderId, totalAmount, seatUnits = [], foodItems = []) => {
+  await PointsModel.ensureSchema();
+
+  const [ruleRows] = await connection.query(
+    `
+    SELECT rule_id, rule_name, rule_scope, rule_key, spending_amount, earned_points, points_value, expires_in_months
+    FROM Point_Rules
+    WHERE status = TRUE
+    ORDER BY spending_amount ASC, rule_id ASC
+    `,
+  );
+
+  const normalizedTotalAmount = Number(totalAmount || 0);
+  const seatRules = ruleRows.filter((rule) => String(rule.rule_scope || 'order').toLowerCase() === 'seat');
+  const comboRules = ruleRows.filter((rule) => String(rule.rule_scope || 'order').toLowerCase() === 'combo');
+  const orderRules = ruleRows.filter((rule) => String(rule.rule_scope || 'order').toLowerCase() === 'order');
+
+  const seatPoints = (Array.isArray(seatUnits) ? seatUnits : []).reduce((sum, unit) => {
+    const seatType = String(unit?.type || '').trim().toLowerCase();
+    const rule = seatRules.find((candidate) => String(candidate.rule_key || '').trim().toLowerCase() === seatType);
+    if (!rule) return sum;
+    return sum + Number(rule.points_value || 0);
+  }, 0);
+
+  const comboPoints = (Array.isArray(foodItems) ? foodItems : []).reduce((sum, item) => {
+    const comboKey = String(item?.comboType || item?.combo_key || item?.comboName || '').trim().toLowerCase();
+    const rule = comboRules.find((candidate) => String(candidate.rule_key || '').trim().toLowerCase() === comboKey);
+    if (!rule) return sum;
+    return sum + Number(rule.points_value || 0) * Number(item?.quantity || 0);
+  }, 0);
+
+  let earnedPoints = seatPoints + comboPoints;
+
+  if (normalizedTotalAmount > 0 && orderRules.length > 0) {
+    const candidates = orderRules.filter((rule) => Number(rule.spending_amount || 0) > 0);
+    if (candidates.length > 0) {
+      const bestRule = candidates.reduce((best, current) => {
+        const currentThreshold = Number(current.spending_amount || 0);
+        const bestThreshold = Number(best.spending_amount || 0);
+        if (currentThreshold > normalizedTotalAmount) {
+          return best;
+        }
+        const currentPoints = Math.floor(normalizedTotalAmount / currentThreshold) * Number(current.earned_points || 0);
+        const bestPoints = Math.floor(normalizedTotalAmount / bestThreshold) * Number(best.earned_points || 0);
+        return currentPoints > bestPoints ? current : best;
+      }, candidates[0]);
+
+      const threshold = Number(bestRule.spending_amount || 0);
+      earnedPoints += threshold > 0 ? Math.floor(normalizedTotalAmount / threshold) * Number(bestRule.earned_points || 0) : 0;
+    }
+  }
+
+  if (!earnedPoints) {
+    return { earnedPoints: 0, newPoints: Number((await connection.query(`SELECT point FROM User WHERE id = ?`, [userId]))[0][0]?.point || 0) };
+  }
+
+  const [userRows] = await connection.query(`SELECT point FROM User WHERE id = ?`, [userId]);
+  const currentPoints = Number(userRows[0]?.point || 0);
+  const nextPoints = currentPoints + earnedPoints;
+  const expiresAt = new Date();
+  expiresAt.setMonth(expiresAt.getMonth() + 12);
+
+  await connection.query(`UPDATE User SET point = ? WHERE id = ?`, [nextPoints, userId]);
+  await connection.query(
+    `
+    INSERT INTO Point_History (user_id, points_change, description, expires_at)
+    VALUES (?, ?, ?, ?)
+    `,
+    [userId, earnedPoints, `Tích điểm đặt vé #${orderId}`, expiresAt],
+  );
+
+  return { earnedPoints, newPoints: nextPoints, expiresAt };
+};
 
 const ensureBookingSchema = async () => {
   if (bookingSchemaPromise) return bookingSchemaPromise;
@@ -574,8 +649,15 @@ export const BookingModel = {
         [requestedSeatCodes.length, normalizedShowtimeId],
       );
 
+      const pointsResult = await awardBookingPoints(connection, normalizedUserId, orderId, totalAmount, normalizedSeatUnits, normalizedFoodItems);
+
       await connection.commit();
-      return this.findById(orderId);
+      const booking = await this.findById(orderId);
+      return {
+        ...booking,
+        pointsAwarded: Number(pointsResult?.earnedPoints || 0),
+        pointsBalance: Number(pointsResult?.newPoints || 0),
+      };
     } catch (error) {
       await connection.rollback();
       throw error;

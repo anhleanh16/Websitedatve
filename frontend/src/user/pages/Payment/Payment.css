@@ -2,6 +2,41 @@
    PAYMENT PAGE
 ============================================= */
 
+.success-points-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(124, 58, 237, 0.14));
+  border: 1px solid rgba(251, 191, 36, 0.24);
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+  margin: 1rem 0 1.25rem;
+}
+
+.success-points-icon {
+  color: #fbbf24;
+  font-size: 1.35rem;
+}
+
+.success-points-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fef3c7;
+}
+
+.success-points-value {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+  margin-top: 0.15rem;
+}
+
+.success-points-sub {
+  font-size: 0.9rem;
+  color: #cbd5e1;
+  margin-top: 0.2rem;
+}
+
 .payment-page {
   padding: 24px 0 60px;
   color: #dbe6ff;

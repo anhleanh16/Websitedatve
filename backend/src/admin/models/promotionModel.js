@@ -67,28 +67,35 @@ export const ensurePromotionSchema = async () => {
   return ensurePromotionSchemaPromise;
 };
 
-const mapPromotionPayload = (payload = {}, type = "coupon") => ({
-  code: String(payload.code || "").trim().toUpperCase(),
-  title: String(
-    payload.title ||
-      (type === "voucher"
-        ? `Voucher ${payload.code || ""}`.trim()
-        : `Khuyen mai ${payload.code || ""}`.trim()),
-  ),
-  description: String(payload.desc || payload.description || "").trim(),
-  promotionType: type,
-  discountType: payload.type || payload.discountType || "percent",
-  discountValue: Number(payload.value || payload.discountValue || 0),
-  minOrder: Number(payload.minOrder || payload.min_order || 0),
-  maxDiscount: Number(payload.maxDiscount || payload.max_discount || 0),
-  startDate: payload.startDate || payload.start_date || payload.issuedDate || null,
-  endDate: payload.endDate || payload.end_date || payload.expiryDate || null,
-  usageLimit: Number(payload.usageLimit || payload.usage_limit || 0),
-  usedCount: Number(payload.usedCount || payload.used_count || 0),
-  applicableTo: payload.applicableTo || payload.applicable_to || "all",
-  status: payload.status || "active",
-  createdBy: payload.createdBy || null,
-});
+const mapPromotionPayload = (payload = {}, type = "coupon") => {
+  const discountType = payload.type || payload.discountType || "percent";
+  const rawDiscountValue = Number(payload.value || payload.discountValue || 0);
+  const discountValue =
+    discountType === "percent" ? Math.min(rawDiscountValue, 50) : rawDiscountValue;
+
+  return {
+    code: String(payload.code || "").trim().toUpperCase(),
+    title: String(
+      payload.title ||
+        (type === "voucher"
+          ? `Voucher ${payload.code || ""}`.trim()
+          : `Khuyen mai ${payload.code || ""}`.trim()),
+    ),
+    description: String(payload.desc || payload.description || "").trim(),
+    promotionType: type,
+    discountType,
+    discountValue,
+    minOrder: Number(payload.minOrder || payload.min_order || 0),
+    maxDiscount: Number(payload.maxDiscount || payload.max_discount || 0),
+    startDate: payload.startDate || payload.start_date || payload.issuedDate || null,
+    endDate: payload.endDate || payload.end_date || payload.expiryDate || null,
+    usageLimit: Number(payload.usageLimit || payload.usage_limit || 0),
+    usedCount: Number(payload.usedCount || payload.used_count || 0),
+    applicableTo: payload.applicableTo || payload.applicable_to || "all",
+    status: payload.status || "active",
+    createdBy: payload.createdBy || null,
+  };
+};
 
 const formatCouponRow = (row) => ({
   id: row.promotion_id,
