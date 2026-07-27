@@ -481,6 +481,9 @@ export default function MovieDetail() {
         showtimeId: selectedTime.id,
         day: scheduleLabel(activeDay),
         time: selectedTime.timeLabel,
+        priceStandard: selectedTime.priceStandard,
+        priceVip: selectedTime.priceVip,
+        priceCouple: selectedTime.priceCouple,
       },
     });
   };

@@ -161,3 +161,32 @@
 }
 
 .pr-btn:hover { opacity: 0.82; }
+
+/* Waiting state */
+.pr-card.waiting { border-color: rgba(251, 191, 36, 0.3); }
+
+.pr-icon-ring.waiting { background: rgba(251, 191, 36, 0.15); }
+
+.pr-icon.waiting-icon { color: #fbbf24; font-size: 2.2rem; }
+
+.pr-error-msg {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  font-size: 0.875rem;
+  color: #fca5a5;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.pr-btn.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pr-spin-sm {
+  font-size: 0.9rem;
+  animation: pr-spin 1s linear infinite;
+  margin-right: 6px;
+}

@@ -236,21 +236,12 @@ function BookingDetail({ booking, onClose, onCheck }) {
             <div className="bk-detail-card bk-qr-card">
               <h4>Mã QR vé</h4>
               <div className="bk-qr-box">
-                <div className="bk-qr-mock">
-                  <svg viewBox="0 0 80 80" width="120" height="120">
-                    <rect width="80" height="80" fill="none"/>
-                    {/* QR mock pattern */}
-                    {[0,1,2,3,4,5,6].map(r =>
-                      [0,1,2,3,4,5,6].map(c => {
-                        const inTopLeft = r < 3 && c < 3;
-                        const inTopRight = r < 3 && c > 3;
-                        const inBottomLeft = r > 3 && c < 3;
-                        const fill = (inTopLeft || inTopRight || inBottomLeft || ((r + c) % 2 === 0))
-                          ? "rgba(200,210,255,0.9)" : "transparent";
-                        return <rect key={`${r}-${c}`} x={c*11+1} y={r*11+1} width={9} height={9} fill={fill} rx={1}/>;
-                      })
-                    )}
-                  </svg>
+                <div className="bk-qr-real">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(booking.qrCode)}&bgcolor=ffffff&color=1a1a2e&margin=2`}
+                    alt="QR vé"
+                    className="bk-qr-img"
+                  />
                 </div>
                 <p className="bk-qr-label">{booking.qrCode}</p>
               </div>

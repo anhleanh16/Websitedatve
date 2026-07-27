@@ -81,6 +81,10 @@ export const userBookingService = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  confirmCardPayment: (userId, orderId) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/bookings/${encodeURIComponent(orderId)}/confirm-card`, {
+      method: "POST",
+    }),
   createZaloPayOrder: (userId, data) =>
     apiFetch(`/user/${encodeURIComponent(userId)}/payments/zalopay`, {
       method: "POST",
@@ -88,6 +92,11 @@ export const userBookingService = {
     }),
   queryZaloPayOrder: (appTransId) =>
     apiFetch(`/user/payments/zalopay/query?app_trans_id=${encodeURIComponent(appTransId)}`),
+  confirmZaloPayOrder: (appTransId) =>
+    apiFetch(`/user/payments/zalopay/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ app_trans_id: appTransId }),
+    }),
   // legacy alias
   createZaloPayPayment: (userId, data) =>
     apiFetch(`/user/${encodeURIComponent(userId)}/payments/zalopay`, {

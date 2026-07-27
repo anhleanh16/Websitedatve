@@ -431,6 +431,9 @@ export default function Booking() {
     roomType: initialRoomType = "",
     day = "Hôm nay",
     time = "10:00 - 2D",
+    priceStandard: showtimePriceStandard = null,
+    priceVip: showtimePriceVip = null,
+    priceCouple: showtimePriceCouple = null,
   } = location.state ?? {};
   const movieSelectionState = {
     bookingContext: {
@@ -675,10 +678,11 @@ export default function Booking() {
     ? Math.max(2, Math.min(5, Math.round(seatSize * 0.14)))
     : Math.max(6, Math.min(10, Math.round(seatSize * 0.16)));
 
+  // Giá vé theo loại ghế: ưu tiên giá từ suất chiếu, fallback về mặc định
   const seatPrices = {
-    regular: 80000,
-    vip: 100000,
-    couple: 120000,
+    regular: Number(showtimePriceStandard) > 0 ? Number(showtimePriceStandard) : 80000,
+    vip:     Number(showtimePriceVip)      > 0 ? Number(showtimePriceVip)      : 100000,
+    couple:  Number(showtimePriceCouple)   > 0 ? Number(showtimePriceCouple)   : 120000,
   };
 
   const toggleSeat = (seatId) => {

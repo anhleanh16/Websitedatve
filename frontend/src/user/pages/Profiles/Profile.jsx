@@ -5,7 +5,8 @@ import {
   FaUser, FaEdit, FaLock, FaCamera, FaTicketAlt,
   FaHistory, FaBell, FaCrown, FaHeadset, FaRobot,
   FaChevronRight, FaEye, FaEyeSlash, FaSave, FaTimes,
-  FaStar, FaMapMarkerAlt, FaClock, FaCheck, FaQrcode, FaSpinner
+  FaStar, FaMapMarkerAlt, FaClock, FaCheck, FaQrcode, FaSpinner,
+  FaDownload
 } from 'react-icons/fa'
 import './profile.css'
 
@@ -71,6 +72,7 @@ export default function Profile() {
   const [bookings,      setBookings]      = useState([])
   const [bookingsLoading, setBookingsLoading] = useState(false)
   const [bookingsError,   setBookingsError]   = useState(null)
+  const [qrModal, setQrModal] = useState(null) // { qrCode, bookingCode, movieTitle, seats, showtime }
 
   /* edit form */
   const [editForm, setEditForm] = useState({
@@ -455,7 +457,19 @@ export default function Profile() {
                     <div className='ticket-right'>
                       <span className={`ticket-status ${st.cls}`}>{st.label}</span>
                       {t.primary_qr_code && (
-                        <button className='ticket-qr-btn' title='Xem mã QR'>
+                        <button
+                          className='ticket-qr-btn'
+                          title='Xem mã QR'
+                          onClick={() => setQrModal({
+                            qrCode:      t.primary_qr_code,
+                            bookingCode: t.booking_code,
+                            movieTitle:  t.movie_title,
+                            cinema:      t.cinema_name,
+                            seats:       t.seat_codes || '—',
+                            showtime:    `${formatDate(t.start_time)} – ${formatTime(t.start_time)}`,
+                            roomType:    t.room_type || '2D',
+                          })}
+                        >
                           <FaQrcode /> Xem QR
                         </button>
                       )}
@@ -585,6 +599,53 @@ export default function Profile() {
         )}
 
       </main>
+
+      {/* ── QR Modal ── */}
+      {qrModal && (
+        <div className='qr-modal-overlay' onClick={() => setQrModal(null)}>
+          <div className='qr-modal' onClick={e => e.stopPropagation()}>
+            <button className='qr-modal-close' onClick={() => setQrModal(null)}>
+              <FaTimes />
+            </button>
+
+            <div className='qr-modal-header'>
+              <FaQrcode className='qr-modal-icon' />
+              <h2>Mã QR Check-in</h2>
+            </div>
+
+            <div className='qr-modal-info'>
+              <div className='qr-info-row'><span>Phim</span><strong>{qrModal.movieTitle}</strong></div>
+              <div className='qr-info-row'><span>Rạp</span><strong>{qrModal.cinema}</strong></div>
+              <div className='qr-info-row'><span>Suất chiếu</span><strong>{qrModal.showtime}</strong></div>
+              <div className='qr-info-row'><span>Ghế</span><strong>{qrModal.seats}</strong></div>
+              <div className='qr-info-row'><span>Định dạng</span><strong>{qrModal.roomType}</strong></div>
+            </div>
+
+            <div className='qr-modal-code-wrap'>
+              <img
+                className='qr-modal-img'
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrModal.qrCode)}&bgcolor=ffffff&color=1a1a2e&margin=2`}
+                alt='QR Code vé'
+              />
+              <p className='qr-modal-code-text'>{qrModal.bookingCode}</p>
+            </div>
+
+            <p className='qr-modal-hint'>
+              📱 Xuất trình mã QR này tại quầy check-in của rạp
+            </p>
+
+            <a
+              className='qr-modal-download'
+              href={`https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=${encodeURIComponent(qrModal.qrCode)}&bgcolor=ffffff&color=1a1a2e&margin=4`}
+              download={`ve-${qrModal.bookingCode}.png`}
+              target='_blank'
+              rel='noreferrer'
+            >
+              <FaDownload /> Tải QR về máy
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

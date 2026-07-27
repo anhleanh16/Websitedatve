@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSelector } from 'react-redux'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
-import { FaCreditCard, FaUniversity, FaMobileAlt, FaLock, FaEye, FaEyeSlash, FaTag, FaShieldAlt, FaTicketAlt, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaChair } from 'react-icons/fa'
+import { FaCreditCard, FaUniversity, FaMobileAlt, FaLock, FaTag, FaShieldAlt, FaTicketAlt, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaChair } from 'react-icons/fa'
 import './Payment.css'
 import { userBookingService, userPromotionService } from '../../services/userApi'
 import { buildVietQROnlyImageUrl } from '../../utils/vietqr'
@@ -79,8 +79,6 @@ export default function Payment() {
   const [method, setMethod] = useState('zalopay')
   const [bank, setBank] = useState('VCB')
   const [bankSearch, setBankSearch] = useState('')
-  const [card, setCard] = useState({ number: '', name: '', expiry: '', cvv: '' })
-  const [showCVV, setShowCVV] = useState(false)
   const [promo, setPromo] = useState('')
   const [promoOk, setPromoOk] = useState(false)
   const [promoErr, setPromoErr] = useState('')
@@ -91,7 +89,7 @@ export default function Payment() {
   const [err, setErr] = useState('')
   const errRef = useRef(null)
 
-  const detectedCard = useMemo(() => card.number ? CARD_TYPES.find(t => t.pattern.test(card.number)) : null, [card.number])
+  const detectedCard = useMemo(() => null, []) // unused — card handled by ZaloPay Gateway
   const seats = selectedSeatLabels.length > 0 ? selectedSeatLabels : selectedSeats
   const seatTot  = Number(seatTotal  || 0)
   const snackTot = Number(snackTotal || 0)
@@ -101,7 +99,29 @@ export default function Payment() {
   const disc = promoOk && promoData ? promoData.discountAmount : 0
   const fee = 5000
   const total2 = base + fee - disc
-  const note = `${BANK_INFO.prefix} ${seats.join('')}`
+  // Hàm loại bỏ dấu tiếng Việt và ký tự đặc biệt để tạo nội dung chuyển tiền
+  const toTransferSlug = (str) =>
+    String(str || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/gi, 'd')
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .trim()
+      .replace(/\s+/g, ' ')
+
+  // Format: tenrap_tenphim_ngayvakhunggio_suatchieu_ghe
+  // Ví dụ: LuneXa Da Nang_Avatar 2_Thu 6 21/02_10:00 2D_A1 A2
+  const note = [
+    toTransferSlug(cinema),
+    toTransferSlug(movieTitle),
+    toTransferSlug(day),
+    toTransferSlug(time),
+    seats.join(' '),
+  ]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join('_')
+    .slice(0, 150) // ZaloPay giới hạn độ dài description
 
   const qrOnly = useMemo(() => buildVietQROnlyImageUrl({
     bankBin: BANK_BIN_MAP[bank] || VIETQR_BANK_BIN['Vietcombank'],
@@ -121,27 +141,46 @@ export default function Payment() {
 
   const pay = async () => {
     if (!agreed || busy) return
-    if (method === 'card') {
-      if (!card.number || card.number.length < 13) { setErr('Vui lòng nhập số thẻ hợp lệ'); return }
-      if (!card.name?.trim()) { setErr('Vui lòng nhập tên chủ thẻ'); return }
-      if (!card.expiry) { setErr('Vui lòng chọn ngày hết hạn'); return }
-      if (!card.cvv || card.cvv.length < 3) { setErr('Vui lòng nhập CVV hợp lệ'); return }
-    }
     if (!currentUser?.id) { setErr('Vui lòng đăng nhập trước khi thanh toán.'); navigate('/login'); return }
     if (!showtimeId) { setErr('Không xác định được suất chiếu.'); return }
     if (!selectedSeatUnits?.length) { setErr('Bạn chưa chọn ghế hợp lệ.'); return }
     setBusy(true); setErr('')
     try {
+      // ZaloPay / Visa / Master / JCB — tạo ZaloPay order TRƯỚC, booking tạo sau khi callback
+      if (method === 'zalopay' || method === 'card') {
+        const preferredMethod = method === 'card' ? 'international_card' : 'zalopay_wallet'
+        const zlp = await userBookingService.createZaloPayOrder(currentUser.id, {
+          amount: Math.round(total2), // ZaloPay yêu cầu integer VND
+          description: note,
+          preferredMethod,
+          // booking data — backend lưu tạm, tạo booking khi callback thành công
+          movieId,
+          showtimeId,
+          seatUnits: selectedSeatUnits,
+          foodItems: foods,
+          paymentMethod: method,
+        })
+        // Lưu context vào sessionStorage để hiển thị khi redirect về
+        sessionStorage.setItem('zlp_pending', JSON.stringify({
+          appTransId: zlp.appTransId,
+          movieTitle, cinema, day, time,
+          displaySeats: seats,
+          foods,
+          finalTotal: Math.round(total2),
+          method,
+        }))
+        // Mở ZaloPay trong tab mới — tab app vẫn còn để detect khi user quay lại
+        window.open(zlp.orderUrl, '_blank', 'noopener')
+        // Chuyển sang trang chờ xác nhận
+        navigate('/payment/result', { replace: true })
+        return
+      }
+
+      // Chuyển khoản ngân hàng — tạo booking ngay (pending, không lock ghế theo ZaloPay)
       const pm = method === 'banking' && bank ? `${method}:${bank}` : method
       const res = await userBookingService.create(currentUser.id, { movieId, showtimeId, seatUnits: selectedSeatUnits, foodItems: foods, paymentMethod: pm })
       const booking = res?.booking || null
-      if (method === 'zalopay') {
-        const zlp = await userBookingService.createZaloPayOrder(currentUser.id, { amount: total2, description: note, bookingCode: booking?.booking_code || '', preferredMethod: 'zalopay_wallet' })
-        sessionStorage.setItem('zlp_pending', JSON.stringify({ appTransId: zlp.appTransId, createdBooking: booking, movieTitle, cinema, day, time, displaySeats: seats, foods, finalTotal: total2, method, pointsAwarded: booking?.pointsAwarded??0, pointsBalance: booking?.pointsBalance??0 }))
-        window.location.href = zlp.orderUrl
-        return
-      }
-      navigate('/payment/pending', { replace: true, state: { createdBooking: booking, movieTitle, cinema, day, time, displaySeats: seats, groupedFoodItems: foods, finalTotal: total2, paymentLink: '', paymentQrUrl: qrOnly, vietQROnlyUrl: qrOnly, bankTransferNote: note, method, selectedBank: BANKS.find(b=>b.id===bank)?.label || bank, accountNumber: BANK_INFO.accountNumber, accountName: BANK_INFO.accountName, pointsAwarded: booking?.pointsAwarded??0, pointsBalance: booking?.pointsBalance??0 } })
+      navigate('/payment/pending', { replace: true, state: { createdBooking: booking, movieTitle, cinema, day, time, displaySeats: seats, groupedFoodItems: foods, finalTotal: total2, paymentLink: '', paymentQrUrl: qrOnly, vietQROnlyUrl: qrOnly, bankTransferNote: note, method, selectedBank: BANKS.find(b=>b.id===bank)?.label || bank, accountNumber: BANK_INFO.accountNumber, accountName: BANK_INFO.accountName, pointsAwarded: booking?.pointsAwarded??0, pointsBalance: booking?.pointsBalance??0, currentUserId: currentUser.id } })
     } catch (e) { setErr(e.message || 'Không thể lưu đơn thanh toán.') }
     finally { setBusy(false) }
   }
@@ -293,32 +332,28 @@ export default function Payment() {
             </div>
           )}
 
-          {/* Card form */}
+          {/* Visa / Master / JCB qua ZaloPay Gateway */}
           {method === 'card' && (
-            <div className="pay-card">
-              <h3 className="pay-card-title">Thông tin thẻ</h3>
-              <div className="pay-card-preview" style={{ background: detectedCard?.color || 'linear-gradient(135deg,#4f46e5,#7c3aed)' }}>
-                <div className="pcp-top"><span>💳</span>{detectedCard && <span className="pcp-type">{detectedCard.icon}</span>}</div>
-                <div className="pcp-number">{card.number ? card.number.replace(/(.{4})/g,'$1 ').trim() : '**** **** **** ****'}</div>
-                <div className="pcp-bottom"><span>{card.name||'TÊN CHỦ THẺ'}</span><span>{card.expiry||'MM/YY'}</span></div>
-              </div>
-              <div className="pay-form-grid">
-                <div className="pay-fg span2"><label>Số thẻ</label>
-                  <input type="text" placeholder="1234 5678 9012 3456" value={card.number.replace(/(.{4})/g,'$1 ').trim()} onChange={e => setCard({...card, number: e.target.value.replace(/\D/g,'').slice(0,16)})} />
-                </div>
-                <div className="pay-fg span2"><label>Tên chủ thẻ</label>
-                  <input type="text" placeholder="NGUYEN VAN A" value={card.name} onChange={e => setCard({...card, name: e.target.value.toUpperCase()})} />
-                </div>
-                <div className="pay-fg"><label>Ngày hết hạn</label>
-                  <input type="month" value={card.expiry} onChange={e => setCard({...card, expiry: e.target.value})} />
-                </div>
-                <div className="pay-fg"><label>CVV</label>
-                  <div className="pay-cvv-wrap">
-                    <input type={showCVV?'text':'password'} placeholder="•••" maxLength={4} value={card.cvv} onChange={e => setCard({...card, cvv: e.target.value.replace(/\D/g,'').slice(0,4)})} />
-                    <button type="button" onClick={() => setShowCVV(!showCVV)}>{showCVV ? <FaEyeSlash /> : <FaEye />}</button>
-                  </div>
+            <div className="pay-card pay-zalopay-info">
+              <div className="zlp-hero">
+                <div className="zlp-icon"><ZaloPayLogo /></div>
+                <div>
+                  <h4>Thanh toán thẻ Visa / Master / JCB</h4>
+                  <p>Bấm "Thanh toán" để chuyển sang trang ZaloPay Gateway — nhập thông tin thẻ an toàn trực tiếp trên trang ZaloPay</p>
                 </div>
               </div>
+              <div className="zlp-methods">
+                {['Visa','Mastercard','JCB','Amex'].map(m => (
+                  <div key={m} className="zlp-method-chip">💳 {m}</div>
+                ))}
+              </div>
+              <div className="zlp-amount-row">
+                <span>Số tiền thanh toán</span>
+                <strong>{fmt(total2)}</strong>
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted, #9ca3af)', marginTop: '8px' }}>
+                🔒 Thông tin thẻ được nhập và mã hoá trực tiếp trên cổng ZaloPay — website không lưu thông tin thẻ
+              </p>
             </div>
           )}
 

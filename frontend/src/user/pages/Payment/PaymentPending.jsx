@@ -30,6 +30,8 @@ export default function PaymentPending() {
     accountName = 'CONG TY SWEETSTAR',
     pointsAwarded = 0,
     pointsBalance = 0,
+    cardSuccess = false,
+    currentUserId = null,
   } = location.state ?? {}
 
   // Tạo lại QR nếu không được pass (fallback)
@@ -56,6 +58,35 @@ export default function PaymentPending() {
     return () => clearTimeout(timer)
   }, [secondsLeft])
 
+  // Demo: sau 15 giây tự động chuyển sang trạng thái thành công + cập nhật DB
+  const [autoConfirmed, setAutoConfirmed] = useState(cardSuccess)
+  useEffect(() => {
+    if (cardSuccess || autoConfirmed) return
+    const timer = setTimeout(async () => {
+      // Gọi API mark order confirmed/paid trong DB
+      const orderId = createdBooking?.booking_id ?? createdBooking?.id
+      const userId  = currentUserId ?? createdBooking?.user_id
+      if (orderId && userId) {
+        try {
+          const token = localStorage.getItem('token')
+          await fetch(`/api/user/${userId}/bookings/${orderId}/confirm-card`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token || ''}`,
+            },
+          })
+        } catch (_) {
+          // non-critical — UI vẫn chuyển thành công
+        }
+      }
+      setAutoConfirmed(true)
+    }, 15000)
+    return () => clearTimeout(timer)
+  }, [cardSuccess, autoConfirmed, createdBooking, currentUserId])
+
+  const isSuccess = cardSuccess || autoConfirmed
+
   const minutes = Math.floor(secondsLeft / 60)
   const seconds = secondsLeft % 60
   const countdownLabel = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
@@ -73,26 +104,30 @@ export default function PaymentPending() {
   return (
     <div className="pp-page">
       {/* ── Header trạng thái ── */}
-      <div className={`pp-status-banner ${expired ? 'expired' : ''}`}>
+      <div className={`pp-status-banner ${isSuccess ? 'success' : expired ? 'expired' : ''}`}>
         <div className="pp-status-icon-ring">
-          {expired ? (
+          {isSuccess ? (
+            <span className="pp-status-icon" style={{ fontSize: '2rem' }}>✅</span>
+          ) : expired ? (
             <FaClock className="pp-status-icon expired-icon" />
           ) : (
             <FaClock className="pp-status-icon" />
           )}
         </div>
         <div className="pp-status-text">
-          <h1>{expired ? 'Đơn hàng đã hết hạn' : 'Đang chờ xử lý'}</h1>
+          <h1>{isSuccess ? 'Thanh toán thành công!' : expired ? 'Đơn hàng đã hết hạn' : 'Đang chờ xử lý'}</h1>
           <p>
-            {expired
+            {isSuccess
+              ? 'Đơn đặt vé của bạn đã được xác nhận. Vé điện tử sẽ gửi vào email của bạn trong vài phút.'
+              : expired
               ? 'Đơn hàng đã bị huỷ do hết thời gian xác nhận thanh toán.'
               : 'Đơn đặt vé của bạn đã được tạo thành công. Vui lòng hoàn tất thanh toán trong thời gian quy định.'}
           </p>
         </div>
       </div>
 
-      {/* ── Countdown ── */}
-      {!expired && (
+      {/* ── Countdown — chỉ hiện khi chờ và chưa hết hạn ── */}
+      {!isSuccess && !expired && (
         <div className="pp-countdown-row">
           <FaClock className="pp-countdown-icon" />
           <span>Ghế được giữ trong</span>
@@ -161,8 +196,8 @@ export default function PaymentPending() {
 
           {/* Trạng thái đơn */}
           <div className="pp-status-badge-row">
-            <span className={`pp-status-badge ${expired ? 'cancelled' : 'pending'}`}>
-              {expired ? '⛔ Đã huỷ' : '🕐 Chờ xác nhận'}
+            <span className={`pp-status-badge ${isSuccess ? 'confirmed' : expired ? 'cancelled' : 'pending'}`}>
+              {isSuccess ? '✅ Đã thanh toán' : expired ? '⛔ Đã huỷ' : '🕐 Chờ xác nhận'}
             </span>
           </div>
         </div>
@@ -170,8 +205,8 @@ export default function PaymentPending() {
         {/* ── Hướng dẫn thanh toán ── */}
         {!expired && (
           <div className="pp-right-col">
-            {/* QR / link thanh toán nếu có */}
-            {(method === 'banking' || vietQRImageUrl) && (
+            {/* QR / link thanh toán — chỉ hiện cho banking khi chưa confirm */}
+            {!isSuccess && (method === 'banking' || vietQRImageUrl) && (
               <div className="pp-qr-card">
                 <h3>Quét mã VietQR để chuyển khoản</h3>
                 <img
@@ -198,7 +233,14 @@ export default function PaymentPending() {
             <div className="pp-guide-card">
               <h3>Hướng dẫn</h3>
               <ol className="pp-guide-list">
-                {method === 'banking' ? (
+                {isSuccess ? (
+                  <>
+                    <li>Thanh toán của bạn đã được xác nhận thành công</li>
+                    <li>Vé điện tử sẽ gửi vào email của bạn trong vài phút</li>
+                    <li>Kiểm tra mục "Vé của tôi" trong trang cá nhân</li>
+                    <li>Mang mã QR đến rạp để check-in</li>
+                  </>
+                ) : method === 'banking' ? (
                   <>
                     <li>Quét mã QR hoặc chuyển khoản theo thông tin bên trên</li>
                     <li>Đảm bảo nhập đúng nội dung chuyển khoản: <strong>{bankTransferNote}</strong></li>
@@ -228,7 +270,9 @@ export default function PaymentPending() {
               <div className="pp-points-banner">
                 <FaStar className="pp-points-icon" />
                 <div>
-                  <div className="pp-points-title">Điểm sẽ được cộng sau khi xác nhận</div>
+                  <div className="pp-points-title">
+                    {isSuccess ? 'Điểm đã được cộng vào tài khoản' : 'Điểm sẽ được cộng sau khi xác nhận'}
+                  </div>
                   <div className="pp-points-value">+{Number(pointsAwarded).toLocaleString('vi-VN')} điểm</div>
                   {Number(pointsBalance || 0) > 0 && (
                     <div className="pp-points-sub">Tổng điểm hiện tại: {Number(pointsBalance).toLocaleString('vi-VN')} điểm</div>
