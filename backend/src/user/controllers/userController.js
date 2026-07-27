@@ -293,6 +293,21 @@ export const userGetMovieById = async (req, res) => {
       [movieId],
     );
 
+    // Kiểm tra DB có cột price_standard/vip/couple riêng không
+    const [showtimeCols] = await db.query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Showtimes'",
+    );
+    const showtimeColSet = new Set(showtimeCols.map((c) => c.COLUMN_NAME));
+    const priceStandardExpr = showtimeColSet.has("price_standard")
+      ? "COALESCE(s.price_standard, s.price)"
+      : "s.price";
+    const priceVipExpr = showtimeColSet.has("price_vip")
+      ? "COALESCE(s.price_vip, s.price)"
+      : priceStandardExpr;
+    const priceCoupleExpr = showtimeColSet.has("price_couple")
+      ? "COALESCE(s.price_couple, s.price)"
+      : priceStandardExpr;
+
     const [showtimeRows] = await db.query(
       `
       SELECT
@@ -300,9 +315,9 @@ export const userGetMovieById = async (req, res) => {
         s.room_id,
         s.start_time,
         s.end_time,
-        s.price AS price_standard,
-        s.price AS price_vip,
-        s.price AS price_couple,
+        ${priceStandardExpr} AS price_standard,
+        ${priceVipExpr} AS price_vip,
+        ${priceCoupleExpr} AS price_couple,
         s.available_seats,
         r.room_name,
         r.room_type,
@@ -374,6 +389,24 @@ export const userGetBookings = async (req, res) => {
   }
 };
 
+export const userGetBookingDetail = async (req, res) => {
+  try {
+    const userId  = Number(req.params.userId);
+    const orderId = Number(req.params.orderId);
+    if (!orderId) return res.status(400).json({ message: "Thiếu orderId." });
+
+    const booking = await BookingModel.findById(orderId);
+    if (!booking) return res.status(404).json({ message: "Không tìm thấy vé." });
+    if (Number(booking.user_id) !== userId) {
+      return res.status(403).json({ message: "Không có quyền xem vé này." });
+    }
+    res.json({ booking });
+  } catch (error) {
+    console.error("Error in userGetBookingDetail:", error);
+    res.status(500).json({ message: "Lỗi khi lấy chi tiết vé" });
+  }
+};
+
 export const userCreateBooking = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -403,6 +436,31 @@ export const userCreateBooking = async (req, res) => {
     res.status(statusCode).json({
       success: false,
       message: error.message || "Lỗi khi đặt vé",
+    });
+  }
+};
+
+export const userConfirmCardPayment = async (req, res) => {
+  try {
+    const userId = Number(req.params.userId || 0);
+    const orderId = Number(req.params.orderId || 0);
+
+    if (!userId) return res.status(400).json({ success: false, message: "Không xác định được người dùng." });
+    if (!orderId) return res.status(400).json({ success: false, message: "Không xác định được đơn hàng." });
+
+    const booking = await BookingModel.confirmCardPayment({ orderId, userId });
+
+    res.json({
+      success: true,
+      booking,
+      message: "Thanh toán thẻ thành công",
+    });
+  } catch (error) {
+    console.error("Error in userConfirmCardPayment:", error);
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      success: false,
+      message: error.message || "Lỗi xác nhận thanh toán thẻ",
     });
   }
 };

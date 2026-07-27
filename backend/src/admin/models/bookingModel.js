@@ -8,6 +8,21 @@ const UNIT_PRICE_BY_TYPE = {
 };
 
 let bookingSchemaPromise = null;
+let showtimePriceColumnsCache = null;
+
+const getShowtimePriceColumns = async () => {
+  if (showtimePriceColumnsCache) return showtimePriceColumnsCache;
+  const [cols] = await db.query(
+    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Showtimes'",
+  );
+  const colSet = new Set(cols.map((c) => c.COLUMN_NAME));
+  showtimePriceColumnsCache = {
+    hasPriceStandard: colSet.has("price_standard"),
+    hasPriceVip: colSet.has("price_vip"),
+    hasPriceCouple: colSet.has("price_couple"),
+  };
+  return showtimePriceColumnsCache;
+};
 
 const buildBookingError = (message, statusCode = 400) => {
   const error = new Error(message);
@@ -587,9 +602,24 @@ export const BookingModel = {
     try {
       await connection.beginTransaction();
 
+      const showtimePriceCols = await getShowtimePriceColumns();
+      const priceStandardExpr = showtimePriceCols.hasPriceStandard
+        ? "COALESCE(price_standard, price)"
+        : "price";
+      const priceVipExpr = showtimePriceCols.hasPriceVip
+        ? "COALESCE(price_vip, price)"
+        : priceStandardExpr;
+      const priceCoupleExpr = showtimePriceCols.hasPriceCouple
+        ? "COALESCE(price_couple, price)"
+        : priceStandardExpr;
+
       const [[showtime]] = await connection.query(
         `
-        SELECT showtime_id, room_id, available_seats, status
+        SELECT showtime_id, room_id, available_seats, status,
+               price,
+               ${priceStandardExpr} AS price_standard,
+               ${priceVipExpr}      AS price_vip,
+               ${priceCoupleExpr}   AS price_couple
         FROM Showtimes
         WHERE showtime_id = ?
         FOR UPDATE
@@ -652,8 +682,15 @@ export const BookingModel = {
         );
       }
 
+      // Lấy giá từ showtime, fallback về hằng số mặc định
+      const priceByType = {
+        regular: Number(showtime.price_standard) > 0 ? Number(showtime.price_standard) : UNIT_PRICE_BY_TYPE.regular,
+        vip:     Number(showtime.price_vip)      > 0 ? Number(showtime.price_vip)      : UNIT_PRICE_BY_TYPE.vip,
+        couple:  Number(showtime.price_couple)   > 0 ? Number(showtime.price_couple)   : UNIT_PRICE_BY_TYPE.couple,
+      };
+
       const seatTotal = normalizedSeatUnits.reduce(
-        (sum, unit) => sum + Number(UNIT_PRICE_BY_TYPE[normalizeSeatUnitType(unit.type)] || 0),
+        (sum, unit) => sum + Number(priceByType[normalizeSeatUnitType(unit.type)] || 0),
         0,
       );
 
@@ -776,10 +813,92 @@ export const BookingModel = {
         [requestedSeatCodes.length, normalizedShowtimeId],
       );
 
-      const pointsResult = await awardBookingPoints(connection, normalizedUserId, orderId, totalAmount, normalizedSeatUnits, normalizedFoodItems);
+      // Chỉ cộng điểm ngay nếu đơn được xác nhận paid tức thì (cash/cashier)
+      let pointsResult = { earnedPoints: 0, newPoints: 0 };
+      if (initialPaymentStatus === 'paid') {
+        pointsResult = await awardBookingPoints(connection, normalizedUserId, orderId, totalAmount, normalizedSeatUnits, normalizedFoodItems);
+      }
 
       await connection.commit();
       const booking = await this.findById(orderId);
+      return {
+        ...booking,
+        pointsAwarded: Number(pointsResult?.earnedPoints || 0),
+        pointsBalance: Number(pointsResult?.newPoints || 0),
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  /**
+   * Xác nhận thanh toán bằng thẻ (Visa/Mastercard/JCB).
+   * Gọi sau khi frontend validate thông tin thẻ thành công.
+   * Mark order → paid/confirmed, sau đó cộng điểm.
+   */
+  async confirmCardPayment({ orderId, userId }) {
+    const normalizedOrderId = Number(orderId || 0);
+    const normalizedUserId = Number(userId || 0);
+
+    if (!normalizedOrderId) throw buildBookingError("Không xác định được đơn hàng.");
+    if (!normalizedUserId) throw buildBookingError("Không xác định được người dùng.");
+
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Lấy thông tin order
+      const [[order]] = await connection.query(
+        `SELECT order_id, user_id, total_amount, payment_status, status
+         FROM Orders WHERE order_id = ? FOR UPDATE`,
+        [normalizedOrderId],
+      );
+
+      if (!order) throw buildBookingError("Đơn hàng không tồn tại.", 404);
+      if (Number(order.user_id) !== normalizedUserId) throw buildBookingError("Không có quyền truy cập đơn hàng này.", 403);
+      if (order.payment_status === 'paid') throw buildBookingError("Đơn hàng đã được thanh toán trước đó.");
+
+      // Mark paid
+      await connection.query(
+        `UPDATE Orders SET payment_status = 'paid', status = 'confirmed' WHERE order_id = ?`,
+        [normalizedOrderId],
+      );
+
+      // Lấy seat units và food items để tính điểm
+      const [ticketRows] = await connection.query(
+        `SELECT s.seat_type FROM Tickets t
+         JOIN Seats s ON s.seat_id = t.seat_id
+         WHERE t.order_id = ?`,
+        [normalizedOrderId],
+      );
+      const [comboRows] = await connection.query(
+        `SELECT c.combo_name, oc.quantity FROM Order_Combos oc
+         JOIN Combos c ON c.combo_id = oc.combo_id
+         WHERE oc.order_id = ?`,
+        [normalizedOrderId],
+      );
+
+      const seatUnitsForPoints = ticketRows.map((row) => ({ type: row.seat_type }));
+      const foodItemsForPoints = comboRows.map((row) => ({
+        comboName: row.combo_name,
+        quantity: Number(row.quantity || 1),
+      }));
+
+      const pointsResult = await awardBookingPoints(
+        connection,
+        normalizedUserId,
+        normalizedOrderId,
+        Number(order.total_amount || 0),
+        seatUnitsForPoints,
+        foodItemsForPoints,
+      );
+
+      await connection.commit();
+
+      const booking = await this.findById(normalizedOrderId);
       return {
         ...booking,
         pointsAwarded: Number(pointsResult?.earnedPoints || 0),

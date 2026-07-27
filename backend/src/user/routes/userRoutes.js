@@ -9,7 +9,9 @@ import {
   userGetCombos,
   userUpdateProfile,
   userGetBookings,
+  userGetBookingDetail,
   userCreateBooking,
+  userConfirmCardPayment,
   userGetNotifications,
   userMarkNotificationRead,
   userMarkAllNotificationsRead,
@@ -49,6 +51,8 @@ router.get('/:userId/promotions', authMiddleware, selfOrAdminOnly, userGetPromot
 
 // Bookings
 router.get('/:userId/bookings', authMiddleware, selfOrAdminOnly, userGetBookings);
+router.get('/:userId/bookings/:orderId', authMiddleware, selfOrAdminOnly, userGetBookingDetail);
 router.post('/:userId/bookings', authMiddleware, selfOrAdminOnly, userCreateBooking);
+router.post('/:userId/bookings/:orderId/confirm-card', authMiddleware, selfOrAdminOnly, userConfirmCardPayment);
 
 export default router;
