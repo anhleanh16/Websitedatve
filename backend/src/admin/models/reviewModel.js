@@ -118,6 +118,25 @@ export class ReviewModel {
     }
   }
 
+  // Update user's own review
+  static async updateReview(reviewId, userId, data) {
+    const { rating, comment } = data
+
+    try {
+      const [results] = await db.query(
+        `UPDATE Reviews
+         SET rating = ?, comment = ?, status = 'approved'
+         WHERE review_id = ? AND user_id = ?`,
+        [rating, comment, reviewId, userId]
+      )
+
+      return { success: results.affectedRows > 0 }
+    } catch (error) {
+      console.error('updateReview error:', error)
+      throw error
+    }
+  }
+
   // Update review status (admin)
   static async updateReviewStatus(reviewId, status) {
     try {
@@ -156,6 +175,24 @@ export class ReviewModel {
       return results?.[0] || null
     } catch (error) {
       console.error('getReviewById error:', error)
+      throw error
+    }
+  }
+
+  // Get a user's review for a movie
+  static async getUserReviewByMovie(movieId, userId) {
+    try {
+      const [results] = await db.query(
+        `SELECT r.*, u.full_name as username, u.avatar
+         FROM Reviews r
+         LEFT JOIN User u ON r.user_id = u.id
+         WHERE r.movie_id = ? AND r.user_id = ?
+         LIMIT 1`,
+        [movieId, userId]
+      )
+      return results?.[0] || null
+    } catch (error) {
+      console.error('getUserReviewByMovie error:', error)
       throw error
     }
   }

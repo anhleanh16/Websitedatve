@@ -115,7 +115,7 @@ export const findUserWithRoleByEmail = async (email) => {
      FROM User u
      LEFT JOIN Roles r ON r.role_id = u.role_id
      LEFT JOIN Employees e ON e.user_id = u.id
-     WHERE LOWER(u.email) = ? AND u.status != 'blocked'
+     WHERE LOWER(u.email) = ?
      LIMIT 1`,
     [normalizedEmail]
   );

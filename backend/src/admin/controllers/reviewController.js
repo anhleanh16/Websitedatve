@@ -109,6 +109,61 @@ export const reviewController = {
     }
   },
 
+  // Update review (user)
+  updateReview: async (req, res) => {
+    try {
+      const { reviewId } = req.params
+      const { rating, comment } = req.body
+      const userId = req.userId
+      const normalizedComment = String(comment || '').trim()
+
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập' })
+      }
+
+      if (!reviewId) {
+        return res.status(400).json({ success: false, message: 'Thiếu ID đánh giá' })
+      }
+
+      const numericRating = parseFloat(rating)
+      if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+        return res.status(400).json({ success: false, message: 'Điểm đánh giá phải từ 1 đến 5' })
+      }
+
+      if (normalizedComment.length > 500) {
+        return res.status(400).json({ success: false, message: 'Bình luận tối đa 500 ký tự' })
+      }
+
+      const moderation = detectSensitiveWords(normalizedComment)
+      if (moderation.blocked) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bình luận chứa từ ngữ nhạy cảm. Vui lòng chỉnh sửa nội dung trước khi gửi.',
+        })
+      }
+
+      const existingReview = await ReviewModel.getReviewById(reviewId)
+      if (!existingReview) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy đánh giá' })
+      }
+
+      if (Number(existingReview.user_id) !== Number(userId)) {
+        return res.status(403).json({ success: false, message: 'Bạn chỉ có thể chỉnh sửa đánh giá của chính mình' })
+      }
+
+      await ReviewModel.updateReview(reviewId, userId, {
+        rating: numericRating,
+        comment: normalizedComment,
+      })
+
+      const updatedReview = await ReviewModel.getReviewById(reviewId)
+      res.json({ success: true, review: updatedReview, message: 'Đánh giá của bạn đã được cập nhật' })
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ success: false, message: 'Lỗi cập nhật đánh giá' })
+    }
+  },
+
   // Approve review (admin)
   approveReview: async (req, res) => {
     try {

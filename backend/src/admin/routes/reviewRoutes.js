@@ -14,5 +14,6 @@ router.delete('/admin/reviews/:reviewId', authMiddleware, adminOnly, reviewContr
 router.get('/movie/:movieId/reviews', reviewController.getMovieReviews)
 router.get('/movie/:movieId/review-stats', reviewController.getMovieStats)
 router.post('/reviews', authMiddleware, reviewController.createReview)
+router.put('/reviews/:reviewId', authMiddleware, reviewController.updateReview)
 
 export default router

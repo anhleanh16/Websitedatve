@@ -23,6 +23,49 @@ import { sendTicketQrEmail } from '../services/ticketEmailService.js';
 
 const router = express.Router();
 
+const getRoleNameByUserId = async (userId) => {
+  const [[row]] = await db.query(
+    `
+    SELECT COALESCE(LOWER(r.role_name), '') AS role_name
+    FROM User u
+    LEFT JOIN Roles r ON r.role_id = u.role_id
+    WHERE u.id = ?
+    LIMIT 1
+  `,
+    [Number(userId || 0)],
+  );
+  return String(row?.role_name || '');
+};
+
+const normalizeRoleName = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+
+const STAFF_ROLE_BLOCKLIST = new Set([
+  'admin',
+  'staff',
+  'manager',
+  'technician',
+  'employee',
+  'quanly',
+  'nhanvien',
+]);
+
+const isCustomerRoleName = (roleName) => {
+  const normalized = normalizeRoleName(roleName);
+  if (!normalized) return true;
+  return !STAFF_ROLE_BLOCKLIST.has(normalized);
+};
+
+const ensureCustomerRoleByUserId = async (userId) => {
+  const roleName = await getRoleNameByUserId(userId);
+  return isCustomerRoleName(roleName);
+};
+
 const sendBookingSuccessNotification = async ({ userId, booking }) => {
   const normalizedUserId = Number(userId || 0);
   if (!normalizedUserId || !booking) return;
@@ -111,6 +154,16 @@ router.post('/:userId/payments/zalopay', authMiddleware, selfOrAdminOnly, async 
     } = req.body;
 
     const userId = Number(req.params.userId || req.user?.id || 0);
+    const requesterId = Number(req.userId || 0);
+
+    if (!requesterId || requesterId !== userId) {
+      return res.status(403).json({ message: 'Bạn chỉ có thể đặt vé bằng chính tài khoản của mình.' });
+    }
+
+    const isCustomer = await ensureCustomerRoleByUserId(userId);
+    if (!isCustomer) {
+      return res.status(403).json({ message: 'Chỉ tài khoản khách hàng mới có quyền đặt vé qua ZaloPay.' });
+    }
 
     const appId        = process.env.ZALOPAY_APP_ID   || '553';
     const key1         = process.env.ZALOPAY_KEY1      || '9phuAOYhan4urywHTh0ndEXiV3pKHr5Q';
@@ -282,6 +335,12 @@ router.post('/payments/zalopay/confirm', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy thông tin đặt vé.' });
     }
 
+    const isCustomer = await ensureCustomerRoleByUserId(Number(pending.user_id));
+    if (!isCustomer) {
+      await db.query(`DELETE FROM Pending_Payments WHERE app_trans_id = ?`, [String(app_trans_id)]).catch(() => {});
+      return res.status(403).json({ success: false, message: 'Tài khoản này không có quyền đặt vé.' });
+    }
+
     // Tạo booking (demo — không verify ZaloPay)
     const seatUnits = JSON.parse(pending.seat_units || '[]');
     const foodItems = JSON.parse(pending.food_items || '[]');
@@ -390,6 +449,13 @@ router.post('/payments/zalopay/callback', async (req, res) => {
       }
       console.warn(`[ZaloPay] No pending payment found for ${app_trans_id}`);
       return res.json({ return_code: 1, return_message: 'Success.' }); // trả 1 để ZaloPay không retry
+    }
+
+    const isCustomer = await ensureCustomerRoleByUserId(Number(pending.user_id));
+    if (!isCustomer) {
+      console.warn(`[ZaloPay] Forbidden booking role for user ${pending.user_id}`);
+      await db.query(`DELETE FROM Pending_Payments WHERE app_trans_id = ?`, [String(app_trans_id)]).catch(() => {});
+      return res.json({ return_code: 1, return_message: 'Success.' });
     }
 
     // Tạo booking thật

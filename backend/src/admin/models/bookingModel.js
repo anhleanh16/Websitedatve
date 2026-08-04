@@ -30,6 +30,44 @@ const buildBookingError = (message, statusCode = 400) => {
   return error;
 };
 
+const getRoleNameByUserId = async (connection, userId) => {
+  const [[row]] = await connection.query(
+    `
+    SELECT COALESCE(LOWER(r.role_name), '') AS role_name
+    FROM User u
+    LEFT JOIN Roles r ON r.role_id = u.role_id
+    WHERE u.id = ?
+    LIMIT 1
+  `,
+    [Number(userId || 0)],
+  );
+  return String(row?.role_name || '');
+};
+
+const normalizeRoleName = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+
+const STAFF_ROLE_BLOCKLIST = new Set([
+  'admin',
+  'staff',
+  'manager',
+  'technician',
+  'employee',
+  'quanly',
+  'nhanvien',
+]);
+
+const isCustomerRoleName = (roleName) => {
+  const normalized = normalizeRoleName(roleName);
+  if (!normalized) return true;
+  return !STAFF_ROLE_BLOCKLIST.has(normalized);
+};
+
 const normalizeSeatUnitType = (value) => {
   const type = String(value || "regular").trim().toLowerCase();
   if (type === "vip") return "vip";
@@ -602,6 +640,11 @@ export const BookingModel = {
     try {
       await connection.beginTransaction();
 
+      const roleName = await getRoleNameByUserId(connection, normalizedUserId);
+      if (!isCustomerRoleName(roleName)) {
+        throw buildBookingError('Chỉ tài khoản khách hàng mới có quyền đặt vé.', 403);
+      }
+
       const showtimePriceCols = await getShowtimePriceColumns();
       const priceStandardExpr = showtimePriceCols.hasPriceStandard
         ? "COALESCE(price_standard, price)"
@@ -849,6 +892,11 @@ export const BookingModel = {
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
+
+      const roleName = await getRoleNameByUserId(connection, normalizedUserId);
+      if (!isCustomerRoleName(roleName)) {
+        throw buildBookingError('Chỉ tài khoản khách hàng mới có quyền thanh toán và tích điểm.', 403);
+      }
 
       // Lấy thông tin order
       const [[order]] = await connection.query(

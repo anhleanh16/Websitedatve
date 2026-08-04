@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { reviewService } from '../../services/reviewService'
-import { FaStar } from 'react-icons/fa'
+import { FaStar, FaPen } from 'react-icons/fa'
 import './ReviewSection.css'
 
 export default function ReviewSection({ movieId }) {
@@ -10,6 +10,7 @@ export default function ReviewSection({ movieId }) {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [editReviewId, setEditReviewId] = useState(null)
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -42,6 +43,15 @@ export default function ReviewSection({ movieId }) {
     }
   }
 
+  const currentUserReview = reviews.find(review => Number(review.user_id) === Number(user?.id)) || null
+
+  useEffect(() => {
+    if (currentUserReview && !editReviewId && !showForm) {
+      setRating(Number(currentUserReview.rating || 5))
+      setComment(currentUserReview.comment || '')
+    }
+  }, [currentUserReview, editReviewId, showForm])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!user) {
@@ -54,11 +64,17 @@ export default function ReviewSection({ movieId }) {
     setSuccess('')
 
     try {
-      await reviewService.createReview(movieId, rating, comment)
-      setSuccess('Đánh giá của bạn đã được đăng thành công')
+      if (editReviewId) {
+        await reviewService.updateReview(editReviewId, rating, comment)
+        setSuccess('Đánh giá của bạn đã được cập nhật thành công')
+      } else {
+        await reviewService.createReview(movieId, rating, comment)
+        setSuccess('Đánh giá của bạn đã được đăng thành công')
+      }
       setRating(5)
       setComment('')
       setShowForm(false)
+      setEditReviewId(null)
       setTimeout(() => loadReviews(), 1000)
     } catch (err) {
       setError(err.message)
@@ -179,6 +195,26 @@ export default function ReviewSection({ movieId }) {
                 </span>
               </div>
               {review.comment && <p className="rs-review-comment">{review.comment}</p>}
+              {user && Number(review.user_id) === Number(user.id) && (
+                <div className="rs-review-actions">
+                  <button
+                    type="button"
+                    className="rs-review-edit-btn"
+                    aria-label="Chỉnh sửa đánh giá"
+                    title="Chỉnh sửa đánh giá"
+                    onClick={() => {
+                      setError('')
+                      setSuccess('')
+                      setEditReviewId(review.review_id)
+                      setRating(Number(review.rating || 5))
+                      setComment(review.comment || '')
+                      setShowForm(true)
+                    }}
+                  >
+                    <FaPen />
+                  </button>
+                </div>
+              )}
             </article>
           ))
         )}
@@ -186,8 +222,11 @@ export default function ReviewSection({ movieId }) {
 
       {/* Review Action */}
       <div className="rs-action-area">
-        <h3 className="rs-action-title">Chia sẻ cảm nhận của bạn</h3>
+        <h3 className="rs-action-title">{editReviewId ? 'Chỉnh sửa đánh giá của bạn' : 'Chia sẻ cảm nhận của bạn'}</h3>
         {!user && <p className="rs-auth-hint">Đăng nhập để gửi đánh giá cho bộ phim này.</p>}
+        {user && currentUserReview && !showForm && (
+          <p className="rs-auth-hint">Bạn đã có một đánh giá cho bộ phim này. Có thể bấm biểu tượng cây bút để cập nhật.</p>
+        )}
 
         {error && <div className="rs-error">{error}</div>}
         {success && <div className="rs-success">{success}</div>}
@@ -230,7 +269,7 @@ export default function ReviewSection({ movieId }) {
 
             <div className="rs-form-actions">
               <button type="submit" className="rs-btn-submit" disabled={submitting}>
-                {submitting ? 'Đang gửi...' : 'Gửi đánh giá'}
+                {submitting ? 'Đang gửi...' : editReviewId ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}
               </button>
               <button type="button" className="rs-btn-cancel" onClick={() => setShowForm(false)}>
                 Hủy

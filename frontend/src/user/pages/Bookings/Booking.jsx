@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./Booking.css";
 import { userComboService, userCinemaService } from "../../services/userApi";
+import { getValidStoredToken } from "../../../utils/auth";
 
 const parseSeatCode = (seatCode) => {
   const match = String(seatCode || "")
@@ -764,7 +765,40 @@ export default function Booking() {
     [selectedComboDetails, selectedSnackDetails],
   );
   const hasSelectedFood = selectedFoodItems.length > 0;
-  const handleCheckout = () =>
+  const handleCheckout = () => {
+    const token = getValidStoredToken();
+    if (!token) {
+      navigate("/login", {
+        state: {
+          from: "/payment",
+          paymentState: {
+            movieId,
+            showtimeId,
+            movieTitle,
+            cinema,
+            roomName: selectedRoomDisplayName,
+            roomType: selectedRoomDisplayType,
+            day,
+            time,
+            selectedSeats,
+            selectedSeatLabels,
+            selectedSeatUnits,
+            seatTotal,
+            comboTotal,
+            snackTotal,
+            total,
+            totalWithSnacks,
+            comboCounts,
+            snackCounts,
+            selectedComboDetails,
+            selectedSnackDetails,
+            foodItems: selectedFoodItems,
+          },
+        },
+      });
+      return;
+    }
+
     navigate("/payment", {
       state: {
         movieId,
@@ -790,6 +824,7 @@ export default function Booking() {
         foodItems: selectedFoodItems,
       },
     });
+  };
   const handleBreadcrumbSectionClick = () => {
     if (hasMovieSelection) {
       navigate("/Films/Film", { state: movieSelectionState });

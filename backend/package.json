@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "seed:content": "node scripts/seed-20-blogs-and-10-news.js"
+    "seed:content": "node scripts/seed-20-blogs-and-10-news.js",
+    "seed:bookings-demo": "node scripts/seed-demo-bookings-10days.js",
+    "seed:showtimes-dense": "node scripts/seed-dense-showtimes.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

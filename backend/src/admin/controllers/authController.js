@@ -103,6 +103,13 @@ export const login = async (req, res) => {
     if (!user)
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng.' });
 
+    if (String(user.status || '').toLowerCase() === 'blocked') {
+      return res.status(403).json({
+        message:
+          'Tài khoản của bạn đã bị khóa, vui lòng liên hệ CSKH Sweet Star hoặc đến rạp chiếu phim Sweet Star gần nhất để được hỗ trợ.',
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng.' });

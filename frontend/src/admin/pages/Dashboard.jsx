@@ -61,17 +61,44 @@ export default function AdminDashboard() {
   const [statisticsData, setStatisticsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [warning, setWarning] = useState("");
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const [dashboard, statistics] = await Promise.all([
+      setWarning("");
+
+      const [dashboardResult, statisticsResult] = await Promise.allSettled([
         adminDashboardService.getDashboardStats(),
         adminStatisticsService.getStatistics(),
       ]);
-      setDashboardStats(dashboard);
-      setStatisticsData(statistics);
+
+      let nextDashboard = null;
+      let nextStatistics = null;
+      let warningMessage = "";
+
+      if (dashboardResult.status === "fulfilled") {
+        nextDashboard = dashboardResult.value;
+      } else {
+        warningMessage = "Không thể tải dữ liệu tổng quan chính.";
+      }
+
+      if (statisticsResult.status === "fulfilled") {
+        nextStatistics = statisticsResult.value;
+      } else {
+        warningMessage = warningMessage
+          ? `${warningMessage} Biểu đồ thống kê đang tạm thời không khả dụng.`
+          : "Biểu đồ thống kê đang tạm thời không khả dụng.";
+      }
+
+      if (!nextDashboard && !nextStatistics) {
+        throw new Error("Không thể tải dữ liệu trang tổng quan.");
+      }
+
+      setDashboardStats(nextDashboard);
+      setStatisticsData(nextStatistics);
+      setWarning(warningMessage);
     } catch (err) {
       console.error("Failed to load dashboard data:", err);
       setError(err.message);
@@ -136,6 +163,15 @@ export default function AdminDashboard() {
 
   return (
     <div className="admin-dashboard">
+      {warning && (
+        <div className="admin-statistics" style={{ marginBottom: 16 }}>
+          <div className="error-message">
+            <h3>Cảnh báo</h3>
+            <p>{warning}</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Stat cards ── */}
       <div className="stats-grid">
         {[

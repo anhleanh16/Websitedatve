@@ -34,6 +34,8 @@ export default function Login() {
   const dispatch  = useDispatch()
   const navigate  = useNavigate()
   const location  = useLocation()
+  const returnTo = location.state?.from || '/'
+  const returnState = location.state?.paymentState ?? null
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -131,8 +133,8 @@ export default function Login() {
       // Dispatch vào Redux
       dispatch(setUser({ token: data.token, user: normalizedUser }))
 
-      // Điều hướng về trang chủ
-      navigate('/')
+      // Điều hướng theo ngữ cảnh trước đó nếu có
+      navigate(returnTo, { replace: true, state: returnState })
     } catch {
       setMessage('Không thể kết nối máy chủ, vui lòng thử lại.')
     } finally {

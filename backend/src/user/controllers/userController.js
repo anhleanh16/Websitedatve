@@ -126,6 +126,69 @@ const sendBookingSuccessNotification = async ({ userId, booking }) => {
   });
 };
 
+const normalizeRoleName = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+
+const STAFF_ROLE_BLOCKLIST = new Set([
+  'admin',
+  'staff',
+  'manager',
+  'technician',
+  'employee',
+  'quanly',
+  'nhanvien',
+]);
+
+const isCustomerRoleName = (roleName) => {
+  const normalized = normalizeRoleName(roleName);
+  if (!normalized) return true;
+  return !STAFF_ROLE_BLOCKLIST.has(normalized);
+};
+
+const getRoleNameByUserId = async (userId) => {
+  const [[row]] = await db.query(
+    `
+    SELECT COALESCE(r.role_name, '') AS role_name
+    FROM User u
+    LEFT JOIN Roles r ON r.role_id = u.role_id
+    WHERE u.id = ?
+    LIMIT 1
+  `,
+    [Number(userId || 0)],
+  );
+
+  return String(row?.role_name || '');
+};
+
+const ensureCustomerBookingAccess = async (req, userId) => {
+  const requesterId = Number(req.userId || 0);
+  const targetUserId = Number(userId || 0);
+
+  if (!requesterId || requesterId !== targetUserId) {
+    return {
+      allowed: false,
+      statusCode: 403,
+      message: 'Bạn chỉ có thể thao tác đặt vé trên chính tài khoản của mình.',
+    };
+  }
+
+  const roleName = await getRoleNameByUserId(targetUserId);
+  if (!isCustomerRoleName(roleName)) {
+    return {
+      allowed: false,
+      statusCode: 403,
+      message: 'Chỉ tài khoản khách hàng mới có quyền đặt vé và tích điểm.',
+    };
+  }
+
+  return { allowed: true };
+};
+
 const normalizeCinemaImagePath = (cinema) => {
   if (!cinema) return cinema;
   const image = cinema.image;
@@ -1054,6 +1117,11 @@ export const userCreateBooking = async (req, res) => {
       return res.status(400).json({ message: "Không xác định được người dùng." });
     }
 
+    const access = await ensureCustomerBookingAccess(req, normalizedUserId);
+    if (!access.allowed) {
+      return res.status(access.statusCode).json({ success: false, message: access.message });
+    }
+
     const booking = await BookingModel.createUserBooking({
       userId: normalizedUserId,
       showtimeId,
@@ -1092,6 +1160,11 @@ export const userConfirmCardPayment = async (req, res) => {
 
     if (!userId) return res.status(400).json({ success: false, message: "Không xác định được người dùng." });
     if (!orderId) return res.status(400).json({ success: false, message: "Không xác định được đơn hàng." });
+
+    const access = await ensureCustomerBookingAccess(req, userId);
+    if (!access.allowed) {
+      return res.status(access.statusCode).json({ success: false, message: access.message });
+    }
 
     const booking = await BookingModel.confirmCardPayment({ orderId, userId });
     let emailSent = false;

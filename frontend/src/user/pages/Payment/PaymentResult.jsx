@@ -13,11 +13,13 @@ import './PaymentResult.css'
 export default function PaymentResult() {
   const location = useLocation()
   const navigate = useNavigate()
+  const DEMO_AUTO_CONFIRM_SECONDS = 15
 
-  const [status, setStatus]           = useState('verifying') // verifying | success | fail
+  const [status, setStatus]           = useState('waiting') // waiting | verifying | success | fail
   const [pending, setPending]         = useState(null)
   const [booking, setBooking]         = useState(null)
   const [pointsAwarded, setPointsAwarded] = useState(0)
+  const [secondsLeft, setSecondsLeft] = useState(DEMO_AUTO_CONFIRM_SECONDS)
 
   useEffect(() => {
     // Đọc pending data từ sessionStorage
@@ -36,21 +38,41 @@ export default function PaymentResult() {
       return
     }
 
-    // Demo: tự động confirm luôn khi vào trang
+    // Demo: tự động confirm sau 15 giây khi vào trang
     if (savedPending?.appTransId) {
-      setStatus('verifying')
-      userBookingService.confirmZaloPayOrder(savedPending.appTransId)
-        .then((result) => {
-          if (result?.success) {
-            setBooking(result.booking || null)
-            setPointsAwarded(result.booking?.pointsAwarded || 0)
-            sessionStorage.removeItem('zlp_pending')
-            setStatus('success')
-          } else {
-            setStatus('fail')
+      setStatus('waiting')
+      setSecondsLeft(DEMO_AUTO_CONFIRM_SECONDS)
+
+      const countdownTimer = setInterval(() => {
+        setSecondsLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownTimer)
+            return 0
           }
+          return prev - 1
         })
-        .catch(() => setStatus('fail'))
+      }, 1000)
+
+      const autoConfirmTimer = setTimeout(() => {
+        setStatus('verifying')
+        userBookingService.confirmZaloPayOrder(savedPending.appTransId)
+          .then((result) => {
+            if (result?.success) {
+              setBooking(result.booking || null)
+              setPointsAwarded(result.booking?.pointsAwarded || 0)
+              sessionStorage.removeItem('zlp_pending')
+              setStatus('success')
+            } else {
+              setStatus('fail')
+            }
+          })
+          .catch(() => setStatus('fail'))
+      }, DEMO_AUTO_CONFIRM_SECONDS * 1000)
+
+      return () => {
+        clearInterval(countdownTimer)
+        clearTimeout(autoConfirmTimer)
+      }
     }
   }, [navigate])
 
@@ -58,8 +80,19 @@ export default function PaymentResult() {
   const amountRaw = params.get('amount')
   const finalTotal = pending?.finalTotal || Number(amountRaw || 0)
 
-  // --- Loading / Verifying ---
-  if (status === 'waiting' || status === 'verifying') {
+  // --- Waiting / Verifying ---
+  if (status === 'waiting') {
+    return (
+      <div className="pr-page">
+        <div className="pr-loading">
+          <FaSpinner className="pr-spinner" />
+          <p>Đây là bản demo. Hệ thống sẽ tự động xác nhận thanh toán sau <b>{secondsLeft}s</b>.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'verifying') {
     return (
       <div className="pr-page">
         <div className="pr-loading">

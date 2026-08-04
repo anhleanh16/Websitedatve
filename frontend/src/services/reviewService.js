@@ -39,6 +39,24 @@ export const reviewService = {
     return res.json()
   },
 
+  // Update own review
+  updateReview: async (reviewId, rating, comment) => {
+    const res = await fetch(`${API_BASE_URL}/reviews/${reviewId}`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      credentials: 'include',
+      body: JSON.stringify({ rating, comment })
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.message || 'Lỗi cập nhật đánh giá')
+    }
+    return res.json()
+  },
+
   // Get all reviews (admin)
   getAllReviews: async (page = 1, limit = 20, status = null, movieId = null) => {
     let url = `${API_BASE_URL}/admin/reviews?page=${page}&limit=${limit}`

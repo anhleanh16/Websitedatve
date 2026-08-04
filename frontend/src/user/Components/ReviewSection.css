@@ -185,6 +185,38 @@
   line-height: 1.55;
 }
 
+.rs-review-actions {
+  margin-top: 0.62rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rs-review-edit-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(30, 41, 59, 0.75);
+  color: #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+
+.rs-review-edit-btn:hover {
+  transform: translateY(-1px);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.7);
+  background: rgba(51, 65, 85, 0.85);
+}
+
+.rs-review-edit-btn svg {
+  width: 0.82rem;
+  height: 0.82rem;
+}
+
 .rs-action-area {
   margin-top: 1.8rem;
   border-radius: 14px;

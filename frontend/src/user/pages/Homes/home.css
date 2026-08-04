@@ -1668,8 +1668,60 @@
     left: 0.6rem;
     bottom: 72px;
     width: auto;
-    max-height: 68vh;
+    max-height: 62vh;
     border-radius: 18px;
+  }
+
+  .ai-mini-header {
+    padding: 0.66rem 0.72rem;
+  }
+
+  .ai-mini-mode-switch {
+    gap: 0.34rem;
+    padding: 0.54rem 0.72rem 0.18rem;
+  }
+
+  .ai-mini-mode-btn {
+    font-size: 0.7rem;
+    padding: 0.32rem 0.62rem;
+  }
+
+  .ai-mini-body {
+    padding: 0.7rem;
+    gap: 0.5rem;
+  }
+
+  .ai-mini-bubble {
+    max-width: 90%;
+    padding: 0.52rem 0.66rem;
+    font-size: 0.79rem;
+    line-height: 1.4;
+  }
+
+  .ai-mini-input-wrap {
+    gap: 0.42rem;
+    padding: 0.58rem 0.68rem;
+  }
+
+  .ai-mini-input-wrap input {
+    border-radius: 10px;
+    padding: 0.48rem 0.62rem;
+    font-size: 0.82rem;
+  }
+
+  .ai-mini-input-wrap button {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+  }
+
+  .ai-mini-footer {
+    padding: 0 0.7rem 0.58rem;
+  }
+
+  .ai-mini-full-link {
+    font-size: 0.72rem;
   }
 
   .ai-voice-btn {
@@ -1700,6 +1752,28 @@
 
   .qb-step { padding: 0.55rem 0.7rem; font-size: 0.78rem; }
   .deals-more-btn { width: 100%; }
+
+  .ai-mini-chat {
+    left: 0.48rem;
+    right: 0.48rem;
+    bottom: 68px;
+    max-height: 58vh;
+    border-radius: 16px;
+  }
+
+  .ai-mini-input-wrap {
+    padding: 0.52rem 0.6rem;
+  }
+
+  .ai-mini-input-wrap input {
+    font-size: 0.8rem;
+    padding: 0.44rem 0.58rem;
+  }
+
+  .ai-mini-input-wrap button {
+    width: 30px;
+    height: 30px;
+  }
 }
 
 

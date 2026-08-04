@@ -1,11 +1,28 @@
 import { db } from "../../../config/db.js";
 
+let movieColumnsCache = null;
+
+const getMovieColumns = async () => {
+  if (movieColumnsCache) return movieColumnsCache;
+  const [rows] = await db.query(
+    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Movies'",
+  );
+  const set = new Set(rows.map((row) => row.COLUMN_NAME));
+  movieColumnsCache = {
+    hasIsDeleted: set.has("is_deleted"),
+  };
+  return movieColumnsCache;
+};
+
 export const DashboardModel = {
   /**
    * Lấy các số liệu thống kê chính cho trang dashboard.
    * @returns {Promise<Object>} Một đối tượng chứa các số liệu thống kê.
    */
   async getStats() {
+    const movieColumns = await getMovieColumns();
+    const movieFilter = movieColumns.hasIsDeleted ? " WHERE is_deleted = 0" : "";
+
     // Thống kê người dùng
     const [userStats] = await db.query(`
       SELECT
@@ -19,25 +36,27 @@ export const DashboardModel = {
           SELECT COUNT(*)
           FROM User u
           JOIN Roles r ON r.role_id = u.role_id
-          WHERE r.role_name IN ('admin', 'staff')
+          WHERE r.role_name IN ('admin', 'staff', 'manager', 'technician')
         ) AS total_staff
     `);
 
     // Thống kê phim
     const [movieStats] = await db.query(`
       SELECT
-        (SELECT COUNT(*) FROM Movies WHERE is_deleted = 0) AS total_movies,
-        (SELECT COUNT(*) FROM Movies WHERE status = 'now_showing' AND is_deleted = 0) AS now_showing,
-        (SELECT COUNT(*) FROM Movies WHERE status = 'coming_soon' AND is_deleted = 0) AS coming_soon
+        (SELECT COUNT(*) FROM Movies${movieFilter}) AS total_movies,
+        (SELECT COUNT(*) FROM Movies${movieFilter}${movieFilter ? " AND" : " WHERE"} status = 'now_showing') AS now_showing,
+        (SELECT COUNT(*) FROM Movies${movieFilter}${movieFilter ? " AND" : " WHERE"} status = 'coming_soon') AS coming_soon
     `);
 
-    // Thống kê doanh thu (ví dụ: trong 30 ngày qua)
+    // Thống kê doanh thu trong 30 ngày qua, dựa trên đơn đã thanh toán
     const [revenueStats] = await db.query(`
       SELECT
-        SUM(total_amount) AS total_revenue,
+        COALESCE(SUM(total_amount), 0) AS total_revenue,
         COUNT(*) AS total_bookings
       FROM Orders
-      WHERE status = 'completed' AND created_at >= NOW() - INTERVAL 30 DAY
+      WHERE payment_status = 'paid'
+        AND status IN ('confirmed', 'completed')
+        AND created_at >= NOW() - INTERVAL 30 DAY
     `);
 
     // Lấy các booking gần đây

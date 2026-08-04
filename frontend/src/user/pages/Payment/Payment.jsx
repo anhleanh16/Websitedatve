@@ -5,6 +5,7 @@ import { FaCreditCard, FaUniversity, FaMobileAlt, FaLock, FaTag, FaShieldAlt, Fa
 import './Payment.css'
 import { userBookingService, userPromotionService } from '../../services/userApi'
 import { buildVietQROnlyImageUrl } from '../../utils/vietqr'
+import { getValidStoredToken } from '../../../utils/auth'
 
 const CARD_TYPES = [
   { name: 'Visa',       pattern: /^4/,      color: 'linear-gradient(135deg,#1a1f71,#2563eb)', icon: 'VISA' },
@@ -72,6 +73,7 @@ export default function Payment() {
   const location = useLocation()
   const navigate = useNavigate()
   const currentUser = useSelector((s) => s.user?.profile)
+  const storedToken = typeof window !== 'undefined' ? getValidStoredToken() : null
   const { movieId=null, showtimeId=null, movieTitle='', cinema='', roomName='', roomType='', day='', time='',
     selectedSeats=[], selectedSeatLabels=[], selectedSeatUnits=[], seatTotal=0, comboTotal=0,
     snackTotal=0, totalWithSnacks, foodItems=[], total=0 } = location.state ?? {}
@@ -141,7 +143,7 @@ export default function Payment() {
 
   const pay = async () => {
     if (!agreed || busy) return
-    if (!currentUser?.id) { setErr('Vui lòng đăng nhập trước khi thanh toán.'); navigate('/login'); return }
+    if (!currentUser?.id) { setErr('Vui lòng đăng nhập trước khi thanh toán.'); navigate('/login', { state: { from: '/payment', paymentState: location.state ?? null } }); return }
     if (!showtimeId) { setErr('Không xác định được suất chiếu.'); return }
     if (!selectedSeatUnits?.length) { setErr('Bạn chưa chọn ghế hợp lệ.'); return }
     setBusy(true); setErr('')
@@ -163,15 +165,15 @@ export default function Payment() {
         // Lưu context vào sessionStorage để hiển thị khi redirect về
         sessionStorage.setItem('zlp_pending', JSON.stringify({
           appTransId: zlp.appTransId,
+          orderUrl: zlp.orderUrl || '',
           movieTitle, cinema, day, time,
           displaySeats: seats,
           foods,
           finalTotal: Math.round(total2),
           method,
+          demoAutoPay: true,
         }))
-        // Mở ZaloPay trong tab mới — tab app vẫn còn để detect khi user quay lại
-        window.open(zlp.orderUrl, '_blank', 'noopener')
-        // Chuyển sang trang chờ xác nhận
+        // Demo mode: không cần mở cổng thanh toán thật, tự động xác nhận sau 15 giây.
         navigate('/payment/result', { replace: true })
         return
       }
@@ -186,6 +188,12 @@ export default function Payment() {
   }
 
   useEffect(() => { if (err && errRef.current) errRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, [err])
+
+  useEffect(() => {
+    if (!currentUser?.id && !storedToken) {
+      navigate('/login', { replace: true, state: { from: '/payment', paymentState: location.state ?? null } })
+    }
+  }, [currentUser?.id, location.state, navigate, storedToken])
 
   return (
     <div className="pay-page">
