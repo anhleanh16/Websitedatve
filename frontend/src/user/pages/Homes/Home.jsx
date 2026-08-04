@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import QuickBookWidget from '../../Components/QuickBookWidget/QuickBookWidget'
 import {
   FaPlay, FaTicketAlt, FaStar, FaMapMarkerAlt, FaClock,
@@ -299,6 +299,7 @@ const buildMiniAiReply = (message) => {
 
 export default function Home() {
   const selectedCinema = useSelector((s) => s.cinema.selectedCinema)
+  const location = useLocation()
   const navigate = useNavigate()
 
   const handleBookingClick = (e, movieId) => {
@@ -346,6 +347,13 @@ export default function Home() {
   const aiReplyTimer = useRef(null)
   const aiMessagesEndRef = useRef(null)
   const speechRecognitionRef = useRef(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('chatbox') === '1') {
+      setIsAiOpen(true)
+    }
+  }, [location.search])
 
   useEffect(() => {
     const loadHomeData = async () => {
@@ -830,7 +838,7 @@ export default function Home() {
           )}
 
           <div className='ai-mini-footer'>
-            <Link to='/ai-assistant' className='ai-mini-full-link'>Mở trang AI đầy đủ</Link>
+            <Link to='/?chatbox=1' className='ai-mini-full-link'>Mở chatbox ở trang chủ</Link>
           </div>
         </section>
       )}

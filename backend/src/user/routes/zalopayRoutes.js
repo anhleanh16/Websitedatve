@@ -17,9 +17,39 @@ import express from 'express';
 import { createHmac } from 'node:crypto';
 import { db } from '../../../config/db.js';
 import { BookingModel } from '../../admin/models/bookingModel.js';
+import { NotificationModel } from '../../admin/models/notificationModel.js';
 import { authMiddleware, selfOrAdminOnly } from '../../admin/middleware/authMiddleware.js';
+import { sendTicketQrEmail } from '../services/ticketEmailService.js';
 
 const router = express.Router();
+
+const sendBookingSuccessNotification = async ({ userId, booking }) => {
+  const normalizedUserId = Number(userId || 0);
+  if (!normalizedUserId || !booking) return;
+
+  const movieTitle = String(booking.movie_title || 'phim đã chọn');
+  const bookingCode = String(booking.booking_code || '').trim();
+  const showDate = booking.start_time
+    ? new Date(booking.start_time).toLocaleString('vi-VN')
+    : '';
+  const seatCodes = String(booking.seats?.join?.(', ') || booking.seat_codes || '').trim();
+  const dedupeCode = String(bookingCode || booking.booking_id || '').trim();
+
+  const contentParts = [
+    `Bạn đã đặt vé thành công cho \"${movieTitle}\".`,
+    bookingCode ? `Mã vé: ${bookingCode}.` : '',
+    showDate ? `Suất chiếu: ${showDate}.` : '',
+    seatCodes ? `Ghế: ${seatCodes}.` : '',
+  ].filter(Boolean);
+
+  await NotificationModel.createForUser({
+    userId: normalizedUserId,
+    title: 'Đặt vé thành công',
+    content: contentParts.join(' '),
+    type: 'booking',
+    dedupeKey: dedupeCode ? `booking_success:${dedupeCode}` : null,
+  });
+};
 
 // ── Đảm bảo bảng Pending_Payments tồn tại ────────────────────────────────────
 let pendingPaymentsReady = false;
@@ -290,7 +320,30 @@ router.post('/payments/zalopay/confirm', async (req, res) => {
       [String(booking.booking_code || '')],
     );
 
-    return res.json({ success: true, booking: finalBooking || booking });
+    try {
+      const fullBooking = await BookingModel.findById(Number(finalBooking?.booking_id || booking.booking_id || 0));
+      if (fullBooking) {
+        await sendBookingSuccessNotification({
+          userId: Number(pending.user_id),
+          booking: fullBooking,
+        });
+      }
+    } catch (notifyError) {
+      console.warn('[ZaloPay] Booking notification send failed (confirm):', notifyError.message);
+    }
+
+    let emailSent = false;
+    try {
+      const fullBooking = await BookingModel.findById(Number(finalBooking?.booking_id || booking.booking_id || 0));
+      if (fullBooking) {
+        const emailResult = await sendTicketQrEmail(fullBooking);
+        emailSent = Boolean(emailResult?.sent);
+      }
+    } catch (mailError) {
+      console.warn('[ZaloPay] Ticket email send failed (confirm):', mailError.message);
+    }
+
+    return res.json({ success: true, booking: finalBooking || booking, emailSent });
   } catch (err) {
     console.error('[ZaloPay] Confirm error:', err);
     return res.status(500).json({ success: false, message: err.message });
@@ -372,6 +425,24 @@ router.post('/payments/zalopay/callback', async (req, res) => {
 
     // Xóa pending data
     await db.query(`DELETE FROM Pending_Payments WHERE app_trans_id = ?`, [String(app_trans_id)]).catch(() => {});
+
+    try {
+      const fullBooking = await BookingModel.findById(Number(booking.booking_id || 0));
+      if (fullBooking) {
+        try {
+          await sendBookingSuccessNotification({
+            userId: Number(pending.user_id),
+            booking: fullBooking,
+          });
+        } catch (notifyError) {
+          console.warn('[ZaloPay] Booking notification send failed (callback):', notifyError.message);
+        }
+
+        await sendTicketQrEmail(fullBooking);
+      }
+    } catch (mailError) {
+      console.warn('[ZaloPay] Ticket email send failed (callback):', mailError.message);
+    }
 
     return res.json({ return_code: 1, return_message: 'Success.' });
   } catch (err) {

@@ -2,9 +2,129 @@ import * as CinemaModel from "../../admin/models/cinemaModel.js";
 import { MovieModel } from "../../admin/models/movieModel.js";
 import { BookingModel } from "../../admin/models/bookingModel.js";
 import { db } from "../../../config/db.js";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { NotificationModel } from "../../admin/models/notificationModel.js";
 import { PromotionModel } from "../../admin/models/promotionModel.js";
 import { NewsModel } from "../../admin/models/newsModel.js";
+import { sendTicketQrEmail } from '../services/ticketEmailService.js';
+import {
+  isEmailVerificationConfigured,
+  sendEmailChangeOtpEmail,
+} from '../../admin/services/emailVerificationService.js';
+
+const EMAIL_CHANGE_OTP_TTL_MINUTES = 5;
+const PROFILE_AUDIT_MAX_LIMIT = 50;
+let profileSchemaReadyPromise = null;
+
+const ensureColumn = async (tableName, columnName, definitionSql) => {
+  const [rows] = await db.query(`SHOW COLUMNS FROM ${tableName} LIKE ?`, [columnName]);
+  if (rows.length === 0) {
+    await db.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definitionSql}`);
+  }
+};
+
+const ensureUserProfileSchema = async () => {
+  if (profileSchemaReadyPromise) {
+    await profileSchemaReadyPromise;
+    return;
+  }
+
+  profileSchemaReadyPromise = (async () => {
+    await ensureColumn('User', 'pending_email', 'VARCHAR(100) NULL AFTER email');
+    await ensureColumn('User', 'email_change_otp', 'VARCHAR(10) NULL AFTER pending_email');
+    await ensureColumn('User', 'email_change_expires', 'DATETIME NULL AFTER email_change_otp');
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS User_Profile_Audits (
+        audit_id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        changed_by INT NULL,
+        action VARCHAR(50) NOT NULL,
+        field_changes TEXT NULL,
+        ip_address VARCHAR(64) NULL,
+        user_agent VARCHAR(255) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_profile_audits_user_time (user_id, created_at),
+        FOREIGN KEY (user_id) REFERENCES User(id) ON DELETE CASCADE
+      )
+    `);
+  })();
+
+  try {
+    await profileSchemaReadyPromise;
+  } catch (error) {
+    profileSchemaReadyPromise = null;
+    throw error;
+  }
+};
+
+const buildChanges = (before, after) => {
+  const changes = {};
+  for (const key of Object.keys(after)) {
+    const prev = before[key] ?? null;
+    const next = after[key] ?? null;
+    if (String(prev) !== String(next)) {
+      changes[key] = { before: prev, after: next };
+    }
+  }
+  return changes;
+};
+
+const logProfileAudit = async (req, {
+  userId,
+  action,
+  changedBy = null,
+  changes = null,
+}) => {
+  await ensureUserProfileSchema();
+  const ipAddress = String(req.headers['x-forwarded-for'] || req.ip || '').slice(0, 64);
+  const userAgent = String(req.headers['user-agent'] || '').slice(0, 255);
+  const fieldChanges = changes && Object.keys(changes).length > 0 ? JSON.stringify(changes) : null;
+
+  await db.query(
+    `
+      INSERT INTO User_Profile_Audits (user_id, changed_by, action, field_changes, ip_address, user_agent)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `,
+    [
+      Number(userId),
+      changedBy ? Number(changedBy) : null,
+      String(action || 'profile_update'),
+      fieldChanges,
+      ipAddress || null,
+      userAgent || null,
+    ],
+  );
+};
+
+const sendBookingSuccessNotification = async ({ userId, booking }) => {
+  const normalizedUserId = Number(userId || 0);
+  if (!normalizedUserId || !booking) return;
+
+  const movieTitle = String(booking.movie_title || 'phim đã chọn');
+  const bookingCode = String(booking.booking_code || '').trim();
+  const showDate = booking.start_time
+    ? new Date(booking.start_time).toLocaleString('vi-VN')
+    : '';
+  const seatCodes = String(booking.seats?.join?.(', ') || booking.seat_codes || '').trim();
+  const dedupeCode = String(bookingCode || booking.booking_id || '').trim();
+
+  const contentParts = [
+    `Bạn đã đặt vé thành công cho \"${movieTitle}\".`,
+    bookingCode ? `Mã vé: ${bookingCode}.` : '',
+    showDate ? `Suất chiếu: ${showDate}.` : '',
+    seatCodes ? `Ghế: ${seatCodes}.` : '',
+  ].filter(Boolean);
+
+  await NotificationModel.createForUser({
+    userId: normalizedUserId,
+    title: 'Đặt vé thành công',
+    content: contentParts.join(' '),
+    type: 'booking',
+    dedupeKey: dedupeCode ? `booking_success:${dedupeCode}` : null,
+  });
+};
 
 const normalizeCinemaImagePath = (cinema) => {
   if (!cinema) return cinema;
@@ -109,10 +229,59 @@ export const getPublicCinemaById = async (req, res) => {
 
 export const userGetProfile = async (req, res) => {
   try {
-    const { userId } = req.params;
-    res.json({ user: { id: userId, name: "", email: "" } });
+    await ensureUserProfileSchema();
+    const userId = Number(req.params.userId || 0);
+    if (!userId) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ." });
+    }
+
+    const [[user]] = await db.query(
+      `
+      SELECT
+        id,
+        full_name,
+        email,
+        pending_email,
+        email_change_expires,
+        phone,
+        birthday,
+        sex,
+        avatar,
+        point,
+        status,
+        updated_at,
+        created_at
+      FROM User
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [userId],
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy hồ sơ người dùng." });
+    }
+
+    return res.json({
+      user: {
+        id: user.id,
+        name: user.full_name,
+        email: user.email,
+        pending_email: user.pending_email || "",
+        email_change_expires: user.email_change_expires,
+        phone: user.phone || "",
+        birthday: user.birthday,
+        sex: user.sex,
+        avatar: user.avatar || "",
+        point: Number(user.point || 0),
+        status: user.status,
+        updated_at: user.updated_at,
+        created_at: user.created_at,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error in userGetProfile:", error);
+    res.status(500).json({ message: "Không thể tải hồ sơ người dùng." });
   }
 };
 
@@ -381,11 +550,465 @@ export const userGetMovieById = async (req, res) => {
 
 export const userUpdateProfile = async (req, res) => {
   try {
-    const { userId } = req.params;
-    const { name, phone, address } = req.body;
-    res.json({ message: "Profile updated" });
+    await ensureUserProfileSchema();
+    const userId = Number(req.params.userId || 0);
+    if (!userId) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ." });
+    }
+
+    const { name, email, phone, birthday, sex } = req.body || {};
+
+    const trimmedName = String(name || "").trim();
+    const trimmedEmail = String(email || "").trim().toLowerCase();
+    const trimmedPhone = String(phone || "").trim();
+    const normalizedBirthday = birthday ? String(birthday).slice(0, 10) : null;
+    const normalizedSex = ["Nam", "Nu", "Khac"].includes(String(sex || ""))
+      ? String(sex)
+      : null;
+
+    if (!trimmedName || !trimmedEmail) {
+      return res.status(400).json({ message: "Họ tên và email là bắt buộc." });
+    }
+
+    const [[currentUser]] = await db.query(
+      "SELECT id, full_name, email, phone, birthday, sex FROM User WHERE id = ? LIMIT 1",
+      [userId],
+    );
+
+    if (!currentUser) {
+      return res.status(404).json({ message: "Không tìm thấy tài khoản." });
+    }
+
+    if (trimmedEmail !== String(currentUser.email || '').trim().toLowerCase()) {
+      return res.status(400).json({
+        message: "Để đổi email, vui lòng dùng chức năng xác minh OTP email mới.",
+        requiresEmailVerification: true,
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE User
+      SET full_name = ?,
+          email = ?,
+          phone = ?,
+          birthday = ?,
+          sex = ?,
+          updated_at = NOW()
+      WHERE id = ?
+    `,
+      [
+        trimmedName,
+        trimmedEmail,
+        trimmedPhone || null,
+        normalizedBirthday,
+        normalizedSex,
+        userId,
+      ],
+    );
+
+    const [[updatedUser]] = await db.query(
+      `
+      SELECT id, full_name, email, phone, birthday, sex, avatar, point, status, updated_at
+      FROM User
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [userId],
+    );
+
+    const changes = buildChanges(
+      {
+        full_name: currentUser.full_name,
+        email: currentUser.email,
+        phone: currentUser.phone,
+        birthday: currentUser.birthday,
+        sex: currentUser.sex,
+      },
+      {
+        full_name: updatedUser.full_name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        birthday: updatedUser.birthday,
+        sex: updatedUser.sex,
+      },
+    );
+
+    if (Object.keys(changes).length > 0) {
+      await logProfileAudit(req, {
+        userId,
+        changedBy: req.userId,
+        action: 'profile_updated',
+        changes,
+      });
+    }
+
+    return res.json({
+      message: "Cập nhật hồ sơ thành công.",
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.full_name,
+        email: updatedUser.email,
+        phone: updatedUser.phone || "",
+        birthday: updatedUser.birthday,
+        sex: updatedUser.sex,
+        avatar: updatedUser.avatar || "",
+        point: Number(updatedUser.point || 0),
+        status: updatedUser.status,
+        updated_at: updatedUser.updated_at,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error in userUpdateProfile:", error);
+    res.status(500).json({ message: "Không thể cập nhật hồ sơ." });
+  }
+};
+
+export const userChangePassword = async (req, res) => {
+  try {
+    await ensureUserProfileSchema();
+    const userId = Number(req.params.userId || 0);
+    if (!userId) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ." });
+    }
+
+    const { currentPassword, newPassword } = req.body || {};
+    const current = String(currentPassword || "");
+    const next = String(newPassword || "");
+
+    if (!current || !next) {
+      return res.status(400).json({ message: "Vui lòng nhập mật khẩu hiện tại và mật khẩu mới." });
+    }
+
+    if (next.length < 6) {
+      return res.status(400).json({ message: "Mật khẩu mới phải ít nhất 6 ký tự." });
+    }
+
+    const [[user]] = await db.query(
+      "SELECT id, password FROM User WHERE id = ? LIMIT 1",
+      [userId],
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy tài khoản." });
+    }
+
+    const matched = await bcrypt.compare(current, String(user.password || ""));
+    if (!matched) {
+      return res.status(400).json({ message: "Mật khẩu hiện tại không đúng." });
+    }
+
+    const hashed = await bcrypt.hash(next, 10);
+    await db.query(
+      "UPDATE User SET password = ?, updated_at = NOW() WHERE id = ?",
+      [hashed, userId],
+    );
+
+    await logProfileAudit(req, {
+      userId,
+      changedBy: req.userId,
+      action: 'password_changed',
+      changes: { password: { before: '***', after: '***' } },
+    });
+
+    return res.json({ message: "Đổi mật khẩu thành công." });
+  } catch (error) {
+    console.error("Error in userChangePassword:", error);
+    return res.status(500).json({ message: "Không thể đổi mật khẩu lúc này." });
+  }
+};
+
+export const userUpdateAvatar = async (req, res) => {
+  try {
+    await ensureUserProfileSchema();
+    const userId = Number(req.params.userId || 0);
+    if (!userId) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "Vui lòng chọn ảnh đại diện." });
+    }
+
+    const avatarPath = `/uploads/staff/${req.file.filename}`;
+
+    const [[currentUser]] = await db.query(
+      "SELECT avatar FROM User WHERE id = ? LIMIT 1",
+      [userId],
+    );
+
+    await db.query(
+      "UPDATE User SET avatar = ?, updated_at = NOW() WHERE id = ?",
+      [avatarPath, userId],
+    );
+
+    await logProfileAudit(req, {
+      userId,
+      changedBy: req.userId,
+      action: 'avatar_updated',
+      changes: buildChanges(
+        { avatar: currentUser?.avatar || null },
+        { avatar: avatarPath },
+      ),
+    });
+
+    return res.json({
+      message: "Cập nhật ảnh đại diện thành công.",
+      avatar: avatarPath,
+    });
+  } catch (error) {
+    console.error("Error in userUpdateAvatar:", error);
+    return res.status(500).json({ message: "Không thể cập nhật ảnh đại diện." });
+  }
+};
+
+export const userRemoveAvatar = async (req, res) => {
+  try {
+    await ensureUserProfileSchema();
+    const userId = Number(req.params.userId || 0);
+    if (!userId) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ." });
+    }
+
+    const [[currentUser]] = await db.query(
+      "SELECT avatar FROM User WHERE id = ? LIMIT 1",
+      [userId],
+    );
+
+    await db.query(
+      "UPDATE User SET avatar = NULL, updated_at = NOW() WHERE id = ?",
+      [userId],
+    );
+
+    await logProfileAudit(req, {
+      userId,
+      changedBy: req.userId,
+      action: 'avatar_removed',
+      changes: buildChanges(
+        { avatar: currentUser?.avatar || null },
+        { avatar: null },
+      ),
+    });
+
+    return res.json({ message: "Đã xoá ảnh đại diện.", avatar: "" });
+  } catch (error) {
+    console.error("Error in userRemoveAvatar:", error);
+    return res.status(500).json({ message: "Không thể xoá ảnh đại diện." });
+  }
+};
+
+export const userRequestEmailChangeOtp = async (req, res) => {
+  try {
+    await ensureUserProfileSchema();
+    const userId = Number(req.params.userId || 0);
+    if (!userId) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ." });
+    }
+
+    const newEmail = String(req.body?.newEmail || '').trim().toLowerCase();
+    if (!newEmail) {
+      return res.status(400).json({ message: "Vui lòng nhập email mới." });
+    }
+
+    if (!isEmailVerificationConfigured()) {
+      return res.status(500).json({
+        message: "Thiếu cấu hình SMTP để gửi OTP đổi email.",
+      });
+    }
+
+    const [[currentUser]] = await db.query(
+      "SELECT id, full_name, email FROM User WHERE id = ? LIMIT 1",
+      [userId],
+    );
+
+    if (!currentUser) {
+      return res.status(404).json({ message: "Không tìm thấy tài khoản." });
+    }
+
+    if (newEmail === String(currentUser.email || '').trim().toLowerCase()) {
+      return res.status(400).json({ message: "Email mới trùng với email hiện tại." });
+    }
+
+    const [[emailOwner]] = await db.query(
+      "SELECT id FROM User WHERE LOWER(email) = ? LIMIT 1",
+      [newEmail],
+    );
+
+    if (emailOwner) {
+      return res.status(409).json({ message: "Email này đã được sử dụng." });
+    }
+
+    const otpCode = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+    const expiresAt = new Date(Date.now() + EMAIL_CHANGE_OTP_TTL_MINUTES * 60 * 1000);
+
+    await db.query(
+      `
+      UPDATE User
+      SET pending_email = ?,
+          email_change_otp = ?,
+          email_change_expires = ?,
+          updated_at = NOW()
+      WHERE id = ?
+    `,
+      [newEmail, otpCode, expiresAt, userId],
+    );
+
+    await sendEmailChangeOtpEmail({
+      toEmail: newEmail,
+      fullName: currentUser.full_name,
+      otpCode,
+      ttlMinutes: EMAIL_CHANGE_OTP_TTL_MINUTES,
+    });
+
+    await logProfileAudit(req, {
+      userId,
+      changedBy: req.userId,
+      action: 'email_change_otp_requested',
+      changes: {
+        email: {
+          before: currentUser.email,
+          after: newEmail,
+        },
+      },
+    });
+
+    return res.json({
+      message: "Đã gửi OTP xác minh đến email mới.",
+      pendingEmail: newEmail,
+      expiresInSeconds: EMAIL_CHANGE_OTP_TTL_MINUTES * 60,
+    });
+  } catch (error) {
+    console.error("Error in userRequestEmailChangeOtp:", error);
+    return res.status(500).json({ message: "Không thể gửi OTP đổi email lúc này." });
+  }
+};
+
+export const userConfirmEmailChangeOtp = async (req, res) => {
+  try {
+    await ensureUserProfileSchema();
+    const userId = Number(req.params.userId || 0);
+    if (!userId) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ." });
+    }
+
+    const otpCode = String(req.body?.otpCode || '').trim();
+    if (!otpCode || !/^\d{6}$/.test(otpCode)) {
+      return res.status(400).json({ message: "OTP không hợp lệ. Vui lòng nhập 6 chữ số." });
+    }
+
+    const [[user]] = await db.query(
+      `
+      SELECT id, full_name, email, pending_email, email_change_otp, email_change_expires, phone, birthday, sex, avatar, point, status
+      FROM User
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [userId],
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy tài khoản." });
+    }
+
+    if (!user.pending_email || !user.email_change_otp || !user.email_change_expires) {
+      return res.status(400).json({ message: "Không có yêu cầu đổi email đang chờ xác minh." });
+    }
+
+    if (new Date(user.email_change_expires).getTime() < Date.now()) {
+      return res.status(400).json({ message: "Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại OTP." });
+    }
+
+    if (String(user.email_change_otp) !== otpCode) {
+      return res.status(400).json({ message: "Mã OTP không đúng." });
+    }
+
+    const pendingEmail = String(user.pending_email || '').trim().toLowerCase();
+    const [[emailOwner]] = await db.query(
+      "SELECT id FROM User WHERE LOWER(email) = ? AND id <> ? LIMIT 1",
+      [pendingEmail, userId],
+    );
+    if (emailOwner) {
+      return res.status(409).json({ message: "Email này đã được sử dụng." });
+    }
+
+    await db.query(
+      `
+      UPDATE User
+      SET email = ?,
+          pending_email = NULL,
+          email_change_otp = NULL,
+          email_change_expires = NULL,
+          email_verified = 1,
+          email_verified_at = NOW(),
+          updated_at = NOW()
+      WHERE id = ?
+    `,
+      [pendingEmail, userId],
+    );
+
+    await logProfileAudit(req, {
+      userId,
+      changedBy: req.userId,
+      action: 'email_changed_verified',
+      changes: {
+        email: {
+          before: user.email,
+          after: pendingEmail,
+        },
+      },
+    });
+
+    return res.json({
+      message: "Đổi email thành công.",
+      user: {
+        id: user.id,
+        name: user.full_name,
+        email: pendingEmail,
+        phone: user.phone || "",
+        birthday: user.birthday,
+        sex: user.sex,
+        avatar: user.avatar || "",
+        point: Number(user.point || 0),
+        status: user.status,
+      },
+    });
+  } catch (error) {
+    console.error("Error in userConfirmEmailChangeOtp:", error);
+    return res.status(500).json({ message: "Không thể xác minh OTP đổi email." });
+  }
+};
+
+export const userGetProfileAuditLogs = async (req, res) => {
+  try {
+    await ensureUserProfileSchema();
+    const userId = Number(req.params.userId || 0);
+    if (!userId) {
+      return res.status(400).json({ message: "ID người dùng không hợp lệ." });
+    }
+
+    const limitRaw = Number(req.query.limit || 20);
+    const limit = Math.min(Math.max(limitRaw || 20, 1), PROFILE_AUDIT_MAX_LIMIT);
+
+    const [rows] = await db.query(
+      `
+      SELECT audit_id, user_id, changed_by, action, field_changes, ip_address, user_agent, created_at
+      FROM User_Profile_Audits
+      WHERE user_id = ?
+      ORDER BY created_at DESC, audit_id DESC
+      LIMIT ?
+    `,
+      [userId, limit],
+    );
+
+    const audits = rows.map((row) => ({
+      ...row,
+      field_changes: row.field_changes ? JSON.parse(row.field_changes) : null,
+    }));
+
+    return res.json({ audits });
+  } catch (error) {
+    console.error("Error in userGetProfileAuditLogs:", error);
+    return res.status(500).json({ message: "Không thể tải lịch sử chỉnh sửa." });
   }
 };
 
@@ -439,6 +1062,14 @@ export const userCreateBooking = async (req, res) => {
       paymentMethod,
     });
 
+    if (String(booking?.payment_status || '').toLowerCase() === 'paid') {
+      try {
+        await sendBookingSuccessNotification({ userId: normalizedUserId, booking });
+      } catch (notifyError) {
+        console.warn('Booking notification send failed (create booking):', notifyError.message);
+      }
+    }
+
     res.status(201).json({
       success: true,
       booking,
@@ -463,10 +1094,28 @@ export const userConfirmCardPayment = async (req, res) => {
     if (!orderId) return res.status(400).json({ success: false, message: "Không xác định được đơn hàng." });
 
     const booking = await BookingModel.confirmCardPayment({ orderId, userId });
+    let emailSent = false;
+    let notificationSent = false;
+
+    try {
+      await sendBookingSuccessNotification({ userId, booking });
+      notificationSent = true;
+    } catch (notifyError) {
+      console.warn('Booking notification send failed (card payment):', notifyError.message);
+    }
+
+    try {
+      const emailResult = await sendTicketQrEmail(booking);
+      emailSent = Boolean(emailResult?.sent);
+    } catch (mailError) {
+      console.warn('Ticket email send failed (card payment):', mailError.message);
+    }
 
     res.json({
       success: true,
       booking,
+      emailSent,
+      notificationSent,
       message: "Thanh toán thẻ thành công",
     });
   } catch (error) {

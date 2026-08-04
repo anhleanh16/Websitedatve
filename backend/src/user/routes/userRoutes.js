@@ -22,8 +22,15 @@ import {
   validatePromoCode,
   userGetNews,
   userGetNewsBySlug,
+  userChangePassword,
+  userUpdateAvatar,
+  userRemoveAvatar,
+  userRequestEmailChangeOtp,
+  userConfirmEmailChangeOtp,
+  userGetProfileAuditLogs,
 } from '../controllers/userController.js';
 import { authMiddleware, selfOrAdminOnly } from '../../admin/middleware/authMiddleware.js';
+import { uploadStaffAvatar } from '../../../config/upload.js';
 
 const router = express.Router();
 
@@ -40,8 +47,14 @@ router.get('/news', userGetNews);
 router.get('/news/:slug', userGetNewsBySlug);
 
 // Profile
-router.get('/:userId/profile', userGetProfile);
-router.put('/:userId/profile', userUpdateProfile);
+router.get('/:userId/profile', authMiddleware, selfOrAdminOnly, userGetProfile);
+router.put('/:userId/profile', authMiddleware, selfOrAdminOnly, userUpdateProfile);
+router.post('/:userId/profile/email-change/request-otp', authMiddleware, selfOrAdminOnly, userRequestEmailChangeOtp);
+router.post('/:userId/profile/email-change/confirm-otp', authMiddleware, selfOrAdminOnly, userConfirmEmailChangeOtp);
+router.get('/:userId/profile/audit-logs', authMiddleware, selfOrAdminOnly, userGetProfileAuditLogs);
+router.put('/:userId/change-password', authMiddleware, selfOrAdminOnly, userChangePassword);
+router.post('/:userId/avatar', authMiddleware, selfOrAdminOnly, uploadStaffAvatar.single('avatar'), userUpdateAvatar);
+router.delete('/:userId/avatar', authMiddleware, selfOrAdminOnly, userRemoveAvatar);
 router.get('/:userId/notifications', authMiddleware, selfOrAdminOnly, userGetNotifications);
 router.put('/:userId/notifications/read-all', authMiddleware, selfOrAdminOnly, userMarkAllNotificationsRead);
 router.put('/:userId/notifications/:notificationId/read', authMiddleware, selfOrAdminOnly, userMarkNotificationRead);

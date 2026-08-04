@@ -14,6 +14,24 @@ const ensureColumn = async (tableName, columnName, definitionSql) => {
   }
 };
 
+const ensureIndex = async (tableName, indexName, createSql) => {
+  const [rows] = await db.query(
+    `
+    SELECT 1
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = ?
+      AND INDEX_NAME = ?
+    LIMIT 1
+  `,
+    [tableName, indexName],
+  );
+
+  if (rows.length === 0) {
+    await db.query(createSql);
+  }
+};
+
 const getRecipientUsers = async (connection = db) => {
   const [users] = await connection.query(
     `
@@ -64,6 +82,12 @@ export const ensureNotificationSchema = async () => {
         "VARCHAR(20) DEFAULT 'all'",
       );
       await ensureColumn("Notifications", "created_by", "INT NULL");
+      await ensureColumn("Notifications", "reference_key", "VARCHAR(150) NULL");
+      await ensureIndex(
+        "Notifications",
+        "uniq_notifications_reference_key",
+        "CREATE UNIQUE INDEX uniq_notifications_reference_key ON Notifications (reference_key)",
+      );
     })();
   }
 
@@ -71,6 +95,77 @@ export const ensureNotificationSchema = async () => {
 };
 
 export const NotificationModel = {
+  async createForUser({
+    userId,
+    title,
+    content,
+    type = "booking",
+    createdBy = null,
+    dedupeKey = null,
+  }) {
+    await ensureNotificationSchema();
+
+    const normalizedUserId = Number(userId || 0);
+    const normalizedDedupeKey = String(dedupeKey || "").trim().slice(0, 150);
+    if (!normalizedUserId) {
+      throw new Error("Invalid userId for notification.");
+    }
+
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      if (normalizedDedupeKey) {
+        const [[existing]] = await connection.query(
+          `
+          SELECT n.notification_id
+          FROM Notifications n
+          JOIN User_Notifications un ON un.notification_id = n.notification_id
+          WHERE un.user_id = ? AND n.reference_key = ?
+          LIMIT 1
+        `,
+          [normalizedUserId, normalizedDedupeKey],
+        );
+
+        if (existing?.notification_id) {
+          await connection.commit();
+          return {
+            notificationId: existing.notification_id,
+            userId: normalizedUserId,
+            duplicated: true,
+          };
+        }
+      }
+
+      const [result] = await connection.query(
+        `
+        INSERT INTO Notifications (title, content, type, audience_scope, created_by, reference_key)
+        VALUES (?, ?, ?, 'single', ?, ?)
+      `,
+        [title, content, type, createdBy, normalizedDedupeKey || null],
+      );
+
+      await connection.query(
+        `
+        INSERT INTO User_Notifications (user_id, notification_id, is_read)
+        VALUES (?, ?, 0)
+      `,
+        [normalizedUserId, result.insertId],
+      );
+
+      await connection.commit();
+      return {
+        notificationId: result.insertId,
+        userId: normalizedUserId,
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
   async getRecipientUsers() {
     await ensureNotificationSchema();
     return getRecipientUsers();

@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Navigate, Routes, Route } from "react-router-dom";
 import Home from "../pages/Homes/Home";
 import MovieDetail from "../pages/MovieDetails/MovieDetail";
 import Film from "../pages/Films/Film";
@@ -11,7 +11,6 @@ import NewsDetail from "../pages/News/NewsDetail";
 import Blog from "../pages/Blog/Blog";
 import BlogDetail from "../pages/Blog/BlogDetail";
 import Cinemas from "../pages/Cinemas";
-import AIAssistant from "../pages/AIAssistant";
 import Notifications from "../pages/Notifications/Notifications";
 import Profile from "../pages/Profiles/Profile";
 import Login from "../pages/Logins/Login";
@@ -39,7 +38,7 @@ export function UserRoutes() {
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
         <Route path="/cinemas" element={<Cinemas />} />
-        <Route path="/ai-assistant" element={<AIAssistant />} />
+        <Route path="/ai-assistant" element={<Navigate to='/?chatbox=1' replace />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/login" element={<Login />} />

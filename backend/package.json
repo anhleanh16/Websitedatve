@@ -17,7 +17,8 @@
     "multer": "^2.2.0",
     "mysql2": "^3.5.2",
     "naughty-words": "^1.2.0",
-    "nodemailer": "^9.0.4"
+    "nodemailer": "^9.0.4",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"

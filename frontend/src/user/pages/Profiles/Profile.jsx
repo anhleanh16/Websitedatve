@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import {
   FaUser, FaEdit, FaLock, FaCamera, FaTicketAlt,
   FaHistory, FaBell, FaCrown, FaHeadset, FaRobot,
@@ -9,6 +9,12 @@ import {
   FaDownload
 } from 'react-icons/fa'
 import './profile.css'
+import { setUser } from '../../../redux/slices/userSlice'
+import {
+  userBookingService,
+  userNotificationService,
+  userProfileService,
+} from '../../services/userApi'
 
 /* ── Helpers ── */
 const formatDate = (dateStr) => {
@@ -28,6 +34,21 @@ const formatMoney = (amount) => {
   return Number(amount).toLocaleString('vi-VN') + 'đ'
 }
 
+const formatRelativeTime = (dateStr) => {
+  if (!dateStr) return 'Vừa xong'
+  const d = new Date(dateStr)
+  if (isNaN(d)) return 'Vừa xong'
+  const diffMs = Date.now() - d.getTime()
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return 'Vừa xong'
+  if (mins < 60) return `${mins} phút trước`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} giờ trước`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} ngày trước`
+  return formatDate(dateStr)
+}
+
 /* Trạng thái đơn → label + class */
 const STATUS_MAP = {
   confirmed:  { label: 'Sắp chiếu',  cls: 'upcoming'   },
@@ -38,12 +59,16 @@ const STATUS_MAP = {
 }
 const getStatus = (status) => STATUS_MAP[status] || { label: status, cls: '' }
 
-const MOCK_NOTIFS = [
-  { id: 1, title: 'Vé xem phim đã xác nhận', desc: 'Vé đã được xác nhận.', time: '2 giờ trước', read: false },
-  { id: 2, title: 'Ưu đãi thành viên Gold',  desc: 'Bạn đủ điều kiện nhận voucher sinh nhật 100K.', time: '1 ngày trước', read: false },
-  { id: 3, title: 'Phim mới ra mắt',          desc: 'Mở bán vé từ hôm nay.', time: '3 ngày trước', read: true },
-  { id: 4, title: 'Điểm tích lũy cập nhật',  desc: '+50 điểm từ giao dịch gần nhất.', time: '5 ngày trước', read: true },
-]
+const AUDIT_ACTION_LABEL = {
+  profile_updated: 'Cập nhật thông tin hồ sơ',
+  password_changed: 'Đổi mật khẩu',
+  avatar_updated: 'Cập nhật ảnh đại diện',
+  avatar_removed: 'Xóa ảnh đại diện',
+  email_change_otp_requested: 'Yêu cầu OTP đổi email',
+  email_changed_verified: 'Xác minh đổi email thành công',
+}
+
+const getAuditLabel = (action) => AUDIT_ACTION_LABEL[action] || action
 
 const SIDEBAR_ITEMS = [
   { key: 'profile',   label: 'Hồ sơ cá nhân',    icon: <FaUser /> },
@@ -55,18 +80,42 @@ const SIDEBAR_ITEMS = [
   { key: 'notifs',    label: 'Thông báo',           icon: <FaBell /> },
   { key: 'member',    label: 'Thành viên',          icon: <FaCrown />, link: '/Membership' },
   { key: 'support',   label: 'Hỗ trợ',             icon: <FaHeadset /> },
-  { key: 'ai',        label: 'Chatbox AI',          icon: <FaRobot />, link: '/ai-assistant' },
+  { key: 'ai',        label: 'Chatbox AI',          icon: <FaRobot />, link: '/?chatbox=1' },
 ]
 
 export default function Profile() {
   const profile  = useSelector((s) => s.user.profile)
+  const tokenFromStore = useSelector((s) => s.user.token)
+  const dispatch = useDispatch()
   const navigate = useNavigate()
 
   const [tab,        setTab]        = useState('profile')
-  const [avatarSrc,  setAvatarSrc]  = useState(null)
-  const [notifs,     setNotifs]     = useState(MOCK_NOTIFS)
+  const [avatarSrc,  setAvatarSrc]  = useState('')
+  const [notifs,     setNotifs]     = useState([])
+  const [notifsLoading, setNotifsLoading] = useState(false)
+  const [notifsError, setNotifsError] = useState('')
   const [saved,      setSaved]      = useState(false)
+  const [saveError,  setSaveError]  = useState('')
+  const [saveMessage, setSaveMessage] = useState('')
   const [pointsSummary, setPointsSummary] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [profileError, setProfileError] = useState('')
+  const [avatarMsg, setAvatarMsg] = useState('')
+  const [avatarLoading, setAvatarLoading] = useState(false)
+  const [currentEmail, setCurrentEmail] = useState(profile?.email || '')
+  const [emailChange, setEmailChange] = useState({
+    pendingEmail: '',
+    otpCode: '',
+    expiresAt: null,
+    loading: false,
+    verifyLoading: false,
+    message: '',
+    error: '',
+  })
+  const [auditLogs, setAuditLogs] = useState([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditError, setAuditError] = useState('')
+  const [nowTs, setNowTs] = useState(Date.now())
 
   /* bookings */
   const [bookings,      setBookings]      = useState([])
@@ -76,20 +125,73 @@ export default function Profile() {
 
   /* edit form */
   const [editForm, setEditForm] = useState({
-    name:    profile?.name  || 'Nguyễn Văn A',
-    email:   profile?.email || 'user@example.com',
-    phone:   '0901 234 567',
-    dob:     '1999-05-15',
+    name:    profile?.name  || '',
+    email:   profile?.email || '',
+    phone:   '',
+    dob:     '',
     gender:  'male',
-    address: 'Đà Nẵng',
   })
 
   /* password form */
   const [pwdForm, setPwdForm] = useState({ current: '', next: '', confirm: '' })
   const [showPwd, setShowPwd] = useState({ current: false, next: false, confirm: false })
   const [pwdMsg,  setPwdMsg]  = useState('')
+  const [pwdLoading, setPwdLoading] = useState(false)
 
   const fileRef = useRef(null)
+
+  useEffect(() => {
+    const mapSexToGender = (sex) => {
+      if (sex === 'Nam') return 'male'
+      if (sex === 'Nu') return 'female'
+      if (sex === 'Khac') return 'other'
+      return 'male'
+    }
+
+    const loadProfile = async () => {
+      if (!profile?.id) return
+      setProfileLoading(true)
+      setProfileError('')
+      try {
+        const data = await userProfileService.getById(profile.id)
+        const user = data?.user
+        if (!user) throw new Error('Không thể đọc dữ liệu hồ sơ.')
+
+        setEditForm({
+          name: user.name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          dob: user.birthday ? String(user.birthday).slice(0, 10) : '',
+          gender: mapSexToGender(user.sex),
+        })
+        setCurrentEmail(user.email || '')
+        setEmailChange((prev) => ({
+          ...prev,
+          pendingEmail: user.pending_email || '',
+          expiresAt: user.email_change_expires ? new Date(user.email_change_expires).getTime() : null,
+        }))
+        setAvatarSrc(user.avatar || '')
+
+        const nextUser = {
+          ...(profile || {}),
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          avatar: user.avatar,
+          point: user.point,
+        }
+        dispatch(setUser({ token: tokenFromStore || localStorage.getItem('token'), user: nextUser }))
+        localStorage.setItem('user', JSON.stringify(nextUser))
+      } catch (error) {
+        setProfileError(error.message || 'Không thể tải hồ sơ người dùng.')
+      } finally {
+        setProfileLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [dispatch, profile?.id, tokenFromStore])
 
   useEffect(() => {
     const loadPoints = async () => {
@@ -110,6 +212,30 @@ export default function Profile() {
     loadPoints()
   }, [profile?.id])
 
+  const loadAuditLogs = async () => {
+    if (!profile?.id) return
+    setAuditLoading(true)
+    setAuditError('')
+    try {
+      const data = await userProfileService.getAuditLogs(profile.id, 15)
+      setAuditLogs(Array.isArray(data?.audits) ? data.audits : [])
+    } catch (error) {
+      setAuditError(error.message || 'Không thể tải lịch sử chỉnh sửa hồ sơ.')
+    } finally {
+      setAuditLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadAuditLogs()
+  }, [profile?.id])
+
+  useEffect(() => {
+    if (!emailChange.expiresAt) return undefined
+    const timer = window.setInterval(() => setNowTs(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [emailChange.expiresAt])
+
   /* Load danh sách vé từ CSDL */
   useEffect(() => {
     const loadBookings = async () => {
@@ -117,12 +243,7 @@ export default function Profile() {
       setBookingsLoading(true)
       setBookingsError(null)
       try {
-        const token = localStorage.getItem('token')
-        const res = await fetch(`/api/user/${profile.id}/bookings`, {
-          headers: { Authorization: `Bearer ${token || ''}` },
-        })
-        if (!res.ok) throw new Error('Không thể tải danh sách vé')
-        const data = await res.json()
+        const data = await userBookingService.getAll(profile.id)
         setBookings(data.bookings || [])
       } catch (err) {
         console.error('Failed to load bookings', err)
@@ -134,33 +255,240 @@ export default function Profile() {
     loadBookings()
   }, [profile?.id])
 
+  useEffect(() => {
+    const loadNotifs = async () => {
+      if (!profile?.id) return
+      setNotifsLoading(true)
+      setNotifsError('')
+      try {
+        const data = await userNotificationService.getAll(profile.id)
+        const mapped = Array.isArray(data?.notifications)
+          ? data.notifications.map((n) => ({
+              id: n.notification_id,
+              title: n.title || 'Thông báo',
+              desc: n.content || '',
+              time: formatRelativeTime(n.created_at),
+              read: Boolean(n.is_read),
+            }))
+          : []
+        setNotifs(mapped)
+      } catch (error) {
+        setNotifsError(error.message || 'Không thể tải thông báo.')
+      } finally {
+        setNotifsLoading(false)
+      }
+    }
+    loadNotifs()
+  }, [profile?.id])
+
   const handleEditChange = (e) => setEditForm(p => ({ ...p, [e.target.name]: e.target.value }))
 
-  const handleSaveEdit = (e) => {
+  const handleSaveEdit = async (e) => {
     e.preventDefault()
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    if (!profile?.id) return
+    setSaveError('')
+    setSaveMessage('')
+    try {
+      const sex = editForm.gender === 'male' ? 'Nam' : editForm.gender === 'female' ? 'Nu' : 'Khac'
+      const normalizedCurrentEmail = String(currentEmail || '').trim().toLowerCase()
+      const normalizedNewEmail = String(editForm.email || '').trim().toLowerCase()
+      const isEmailChanged = Boolean(normalizedNewEmail && normalizedCurrentEmail !== normalizedNewEmail)
+
+      const response = await userProfileService.update(profile.id, {
+        name: editForm.name,
+        email: normalizedCurrentEmail,
+        phone: editForm.phone,
+        birthday: editForm.dob || null,
+        sex,
+      })
+
+      const updated = response?.user
+      if (updated) {
+        const nextUser = {
+          ...(profile || {}),
+          id: updated.id,
+          name: updated.name,
+          email: updated.email,
+          phone: updated.phone,
+          avatar: updated.avatar,
+          point: updated.point,
+        }
+        dispatch(setUser({ token: tokenFromStore || localStorage.getItem('token'), user: nextUser }))
+        localStorage.setItem('user', JSON.stringify(nextUser))
+      }
+
+      if (isEmailChanged) {
+        setEmailChange((prev) => ({ ...prev, loading: true, error: '', message: '' }))
+        const otpResponse = await userProfileService.requestEmailChangeOtp(profile.id, {
+          newEmail: normalizedNewEmail,
+        })
+        const ttlSeconds = Number(otpResponse?.expiresInSeconds || 0)
+        setEmailChange((prev) => ({
+          ...prev,
+          pendingEmail: otpResponse?.pendingEmail || normalizedNewEmail,
+          expiresAt: ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : null,
+          loading: false,
+          verifyLoading: false,
+          otpCode: '',
+          message: otpResponse?.message || 'Đã gửi OTP đến email mới.',
+          error: '',
+        }))
+        setSaveMessage('Đã lưu thông tin hồ sơ. Email mới cần OTP để xác minh trước khi cập nhật.')
+      } else {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2500)
+        setSaveMessage('Cập nhật hồ sơ thành công.')
+      }
+
+      await loadAuditLogs()
+    } catch (error) {
+      setEmailChange((prev) => ({ ...prev, loading: false, verifyLoading: false }))
+      setSaveError(error.message || 'Không thể cập nhật hồ sơ.')
+    }
+  }
+
+  const handleConfirmEmailOtp = async (e) => {
+    e.preventDefault()
+    if (!profile?.id) return
+    const code = String(emailChange.otpCode || '').trim()
+    if (!/^\d{6}$/.test(code)) {
+      setEmailChange((prev) => ({ ...prev, error: 'Vui lòng nhập OTP gồm 6 chữ số.', message: '' }))
+      return
+    }
+
+    try {
+      setEmailChange((prev) => ({ ...prev, verifyLoading: true, error: '', message: '' }))
+      const response = await userProfileService.confirmEmailChangeOtp(profile.id, { otpCode: code })
+      const updated = response?.user
+      if (updated) {
+        setCurrentEmail(updated.email || '')
+        setEditForm((prev) => ({ ...prev, email: updated.email || prev.email }))
+        const nextUser = {
+          ...(profile || {}),
+          id: updated.id,
+          name: updated.name,
+          email: updated.email,
+          phone: updated.phone,
+          avatar: updated.avatar,
+          point: updated.point,
+        }
+        dispatch(setUser({ token: tokenFromStore || localStorage.getItem('token'), user: nextUser }))
+        localStorage.setItem('user', JSON.stringify(nextUser))
+      }
+
+      setEmailChange((prev) => ({
+        ...prev,
+        pendingEmail: '',
+        expiresAt: null,
+        otpCode: '',
+        verifyLoading: false,
+        message: response?.message || 'Đổi email thành công.',
+        error: '',
+      }))
+      await loadAuditLogs()
+    } catch (error) {
+      setEmailChange((prev) => ({
+        ...prev,
+        verifyLoading: false,
+        error: error.message || 'Không thể xác minh OTP.',
+        message: '',
+      }))
+    }
   }
 
   const handlePwdChange = (e) => setPwdForm(p => ({ ...p, [e.target.name]: e.target.value }))
 
-  const handleSavePwd = (e) => {
+  const handleSavePwd = async (e) => {
     e.preventDefault()
     if (pwdForm.next !== pwdForm.confirm) { setPwdMsg('Mật khẩu xác nhận không khớp.'); return }
     if (pwdForm.next.length < 6)          { setPwdMsg('Mật khẩu mới phải ít nhất 6 ký tự.'); return }
-    setPwdMsg('success')
-    setPwdForm({ current: '', next: '', confirm: '' })
-    setTimeout(() => setPwdMsg(''), 3000)
+    if (!profile?.id) return
+
+    try {
+      setPwdLoading(true)
+      await userProfileService.changePassword(profile.id, {
+        currentPassword: pwdForm.current,
+        newPassword: pwdForm.next,
+      })
+      setPwdMsg('success')
+      setPwdForm({ current: '', next: '', confirm: '' })
+      setTimeout(() => setPwdMsg(''), 3000)
+    } catch (error) {
+      setPwdMsg(error.message || 'Không thể đổi mật khẩu lúc này.')
+    } finally {
+      setPwdLoading(false)
+    }
   }
 
-  const handleAvatarFile = (e) => {
+  const handleAvatarFile = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const url = URL.createObjectURL(file)
-    setAvatarSrc(url)
+    if (!profile?.id) return
+
+    setAvatarMsg('')
+    setAvatarLoading(true)
+    try {
+      const response = await userProfileService.updateAvatar(profile.id, file)
+      const avatar = response?.avatar || ''
+      setAvatarSrc(avatar)
+      setAvatarMsg('Cập nhật ảnh đại diện thành công.')
+
+      const nextUser = {
+        ...(profile || {}),
+        avatar,
+      }
+      dispatch(setUser({ token: tokenFromStore || localStorage.getItem('token'), user: nextUser }))
+      localStorage.setItem('user', JSON.stringify(nextUser))
+    } catch (error) {
+      setAvatarMsg(error.message || 'Không thể cập nhật ảnh đại diện.')
+    } finally {
+      setAvatarLoading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
   }
 
-  const markAllRead = () => setNotifs(n => n.map(x => ({ ...x, read: true })))
+  const handleRemoveAvatar = async () => {
+    if (!profile?.id) return
+    setAvatarMsg('')
+    setAvatarLoading(true)
+    try {
+      await userProfileService.removeAvatar(profile.id)
+      setAvatarSrc('')
+      setAvatarMsg('Đã xoá ảnh đại diện.')
+
+      const nextUser = {
+        ...(profile || {}),
+        avatar: '',
+      }
+      dispatch(setUser({ token: tokenFromStore || localStorage.getItem('token'), user: nextUser }))
+      localStorage.setItem('user', JSON.stringify(nextUser))
+    } catch (error) {
+      setAvatarMsg(error.message || 'Không thể xoá ảnh đại diện.')
+    } finally {
+      setAvatarLoading(false)
+    }
+  }
+
+  const markAllRead = async () => {
+    if (!profile?.id) return
+    try {
+      await userNotificationService.markAllAsRead(profile.id)
+      setNotifs((n) => n.map((x) => ({ ...x, read: true })))
+    } catch (error) {
+      setNotifsError(error.message || 'Không thể cập nhật thông báo.')
+    }
+  }
+
+  const markOneRead = async (notificationId) => {
+    if (!profile?.id) return
+    try {
+      await userNotificationService.markAsRead(profile.id, notificationId)
+      setNotifs((prev) => prev.map((x) => (x.id === notificationId ? { ...x, read: true } : x)))
+    } catch (error) {
+      setNotifsError(error.message || 'Không thể cập nhật trạng thái thông báo.')
+    }
+  }
+
   const unreadCount = notifs.filter(n => !n.read).length
 
   const handleTabClick = (item) => {
@@ -168,11 +496,14 @@ export default function Profile() {
     setTab(item.key)
   }
 
-  const userName  = profile?.name  || editForm.name
-  const userEmail = profile?.email || editForm.email
+  const userName  = editForm.name || profile?.name || 'Người dùng'
+  const userEmail = editForm.email || profile?.email || ''
   const userInitial = userName?.[0]?.toUpperCase() || 'U'
   const totalPoints = pointsSummary?.user?.points ?? 0
   const tierName = pointsSummary?.user?.tier?.name || 'Silver'
+  const emailOtpRemainingSeconds = emailChange.expiresAt
+    ? Math.max(0, Math.floor((emailChange.expiresAt - nowTs) / 1000))
+    : 0
 
   /* Thống kê từ bookings thực */
   const totalBookings   = bookings.length
@@ -228,6 +559,13 @@ export default function Profile() {
       {/* ══ CONTENT ══ */}
       <main className='profile-content'>
 
+        {profileLoading && (
+          <div className='booking-loading'><FaSpinner className='spin' /> Đang tải hồ sơ...</div>
+        )}
+        {profileError && (
+          <div className='booking-error'>⚠️ {profileError}</div>
+        )}
+
         {/* ── HỒ SƠ CÁ NHÂN ── */}
         {tab === 'profile' && (
           <div className='pc-section'>
@@ -251,9 +589,8 @@ export default function Profile() {
                   { label: 'Họ và tên',     value: editForm.name },
                   { label: 'Email',          value: editForm.email },
                   { label: 'Số điện thoại', value: editForm.phone },
-                  { label: 'Ngày sinh',      value: new Date(editForm.dob).toLocaleDateString('vi-VN') },
+                  { label: 'Ngày sinh',      value: formatDate(editForm.dob) },
                   { label: 'Giới tính',      value: editForm.gender === 'male' ? 'Nam' : editForm.gender === 'female' ? 'Nữ' : 'Khác' },
-                  { label: 'Địa chỉ',        value: editForm.address },
                 ].map(row => (
                   <div key={row.label} className='pi-row'>
                     <span className='pi-label'>{row.label}</span>
@@ -278,6 +615,35 @@ export default function Profile() {
                 </div>
               ))}
             </div>
+
+            <div className='pc-header' style={{ marginTop: 22 }}>
+              <FaHistory />
+              <h2>Lần chỉnh sửa gần nhất</h2>
+            </div>
+            <div className='notifs-list'>
+              {auditLoading && <div className='booking-loading'><FaSpinner className='spin' /> Đang tải lịch sử chỉnh sửa...</div>}
+              {auditError && <div className='booking-error'>⚠️ {auditError}</div>}
+              {!auditLoading && !auditError && auditLogs.length === 0 && (
+                <div className='booking-empty'>Chưa có lịch sử chỉnh sửa hồ sơ.</div>
+              )}
+              {auditLogs.map((item) => {
+                const changes = item?.field_changes && typeof item.field_changes === 'object'
+                  ? Object.keys(item.field_changes)
+                  : []
+                return (
+                  <div key={item.audit_id} className='notif-item'>
+                    <div className='notif-dot active' />
+                    <div className='notif-body'>
+                      <div className='notif-title'>{getAuditLabel(item.action)}</div>
+                      <div className='notif-desc'>
+                        {changes.length > 0 ? `Trường thay đổi: ${changes.join(', ')}` : 'Không có chi tiết trường thay đổi.'}
+                      </div>
+                    </div>
+                    <div className='notif-time'>{formatRelativeTime(item.created_at)}</div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 
@@ -297,6 +663,11 @@ export default function Profile() {
                 <div className='ef-field'>
                   <label>Email</label>
                   <input name='email' type='email' value={editForm.email} onChange={handleEditChange} placeholder='Email' />
+                  {emailChange.pendingEmail && (
+                    <small style={{ color: '#b45309', marginTop: 6, display: 'block' }}>
+                      Đang chờ xác minh OTP cho email mới: {emailChange.pendingEmail}
+                    </small>
+                  )}
                 </div>
                 <div className='ef-field'>
                   <label>Số điện thoại</label>
@@ -314,14 +685,38 @@ export default function Profile() {
                     <option value='other'>Khác</option>
                   </select>
                 </div>
-                <div className='ef-field'>
-                  <label>Địa chỉ</label>
-                  <input name='address' value={editForm.address} onChange={handleEditChange} placeholder='Địa chỉ' />
-                </div>
               </div>
+              {saveError && <div className='pwd-msg error'>⚠️ {saveError}</div>}
+              {saveMessage && <div className='pwd-msg success'>✅ {saveMessage}</div>}
               <button type='submit' className={`save-btn${saved ? ' saved' : ''}`}>
                 {saved ? <><FaCheck /> Đã lưu!</> : <><FaSave /> Lưu thay đổi</>}
               </button>
+
+              {emailChange.pendingEmail && (
+                <div style={{ marginTop: 18, border: '1px solid #fcd34d', borderRadius: 12, padding: 16, background: '#fff7ed' }}>
+                  <h4 style={{ marginTop: 0, marginBottom: 8 }}>Xác minh đổi email bằng OTP</h4>
+                  <p style={{ marginTop: 0, marginBottom: 10, color: '#92400e' }}>
+                    Chúng tôi đã gửi OTP đến email mới. Nhập mã để hoàn tất đổi email.
+                    {emailOtpRemainingSeconds > 0 ? ` Còn ${emailOtpRemainingSeconds}s.` : ' OTP có thể đã hết hạn, bạn hãy lưu lại để gửi OTP mới.'}
+                  </p>
+
+                  <form onSubmit={handleConfirmEmailOtp} style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <input
+                      type='text'
+                      value={emailChange.otpCode}
+                      onChange={(e) => setEmailChange((prev) => ({ ...prev, otpCode: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                      placeholder='Nhập OTP 6 số'
+                      style={{ minWidth: 180, padding: '10px 12px', borderRadius: 8, border: '1px solid #f59e0b' }}
+                    />
+                    <button type='submit' className='save-btn' disabled={emailChange.verifyLoading}>
+                      <FaCheck /> {emailChange.verifyLoading ? 'Đang xác minh...' : 'Xác minh OTP'}
+                    </button>
+                  </form>
+
+                  {emailChange.error && <div className='pwd-msg error' style={{ marginTop: 10 }}>⚠️ {emailChange.error}</div>}
+                  {emailChange.message && <div className='pwd-msg success' style={{ marginTop: 10 }}>✅ {emailChange.message}</div>}
+                </div>
+              )}
             </form>
           </div>
         )}
@@ -372,8 +767,8 @@ export default function Profile() {
                 </ul>
               </div>
 
-              <button type='submit' className='save-btn'>
-                <FaLock /> Cập nhật mật khẩu
+              <button type='submit' className='save-btn' disabled={pwdLoading}>
+                <FaLock /> {pwdLoading ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
               </button>
             </form>
           </div>
@@ -395,13 +790,18 @@ export default function Profile() {
               <div className='avatar-actions'>
                 <p>Ảnh đại diện nên có kích thước tối thiểu 200×200px, định dạng JPG hoặc PNG, tối đa 2MB.</p>
                 <input ref={fileRef} type='file' accept='image/*' style={{ display: 'none' }} onChange={handleAvatarFile} />
-                <button className='save-btn' onClick={() => fileRef.current?.click()}>
-                  <FaCamera /> Chọn ảnh từ thiết bị
+                <button className='save-btn' onClick={() => fileRef.current?.click()} disabled={avatarLoading}>
+                  <FaCamera /> {avatarLoading ? 'Đang tải ảnh...' : 'Chọn ảnh từ thiết bị'}
                 </button>
                 {avatarSrc && (
-                  <button className='remove-btn' onClick={() => setAvatarSrc(null)}>
+                  <button className='remove-btn' onClick={handleRemoveAvatar} disabled={avatarLoading}>
                     <FaTimes /> Xoá ảnh
                   </button>
+                )}
+                {avatarMsg && (
+                  <div className={`pwd-msg ${avatarMsg.includes('thành công') ? 'success' : 'error'}`}>
+                    {avatarMsg.includes('thành công') ? '✅ ' : '⚠️ '}{avatarMsg}
+                  </div>
                 )}
               </div>
             </div>
@@ -545,8 +945,13 @@ export default function Profile() {
               )}
             </div>
             <div className='notifs-list'>
+              {notifsLoading && <div className='booking-loading'><FaSpinner className='spin' /> Đang tải thông báo...</div>}
+              {notifsError && <div className='booking-error'>⚠️ {notifsError}</div>}
+              {!notifsLoading && !notifsError && notifs.length === 0 && (
+                <div className='booking-empty'>Bạn chưa có thông báo nào.</div>
+              )}
               {notifs.map(n => (
-                <div key={n.id} className={`notif-item${n.read ? '' : ' unread'}`} onClick={() => setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))}>
+                <div key={n.id} className={`notif-item${n.read ? '' : ' unread'}`} onClick={() => markOneRead(n.id)}>
                   <div className={`notif-dot${n.read ? '' : ' active'}`} />
                   <div className='notif-body'>
                     <div className='notif-title'>{n.title}</div>

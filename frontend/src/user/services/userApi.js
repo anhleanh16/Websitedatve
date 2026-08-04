@@ -6,6 +6,23 @@ function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+async function uploadFetch(path, options = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { ...getAuthHeaders(), ...options.headers },
+    ...options,
+  });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearStoredSession();
+      window.location.assign("/login");
+    }
+    throw new Error(data?.message || `API error ${res.status}`);
+  }
+  return data;
+}
+
 async function apiFetch(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...getAuthHeaders(), ...options.headers },
@@ -41,6 +58,44 @@ export const userNotificationService = {
     ),
   clearAll: (userId) =>
     apiFetch(`/user/${encodeURIComponent(userId)}/notifications`, {
+      method: "DELETE",
+    }),
+};
+
+export const userProfileService = {
+  getById: (userId) => apiFetch(`/user/${encodeURIComponent(userId)}/profile`),
+  update: (userId, payload) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/profile`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  requestEmailChangeOtp: (userId, payload) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/profile/email-change/request-otp`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  confirmEmailChangeOtp: (userId, payload) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/profile/email-change/confirm-otp`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getAuditLogs: (userId, limit = 20) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/profile/audit-logs?limit=${encodeURIComponent(limit)}`),
+  changePassword: (userId, payload) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/change-password`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  updateAvatar: (userId, file) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    return uploadFetch(`/user/${encodeURIComponent(userId)}/avatar`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+  removeAvatar: (userId) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/avatar`, {
       method: "DELETE",
     }),
 };
