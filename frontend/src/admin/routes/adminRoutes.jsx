@@ -23,38 +23,67 @@ import { getValidStoredToken } from "../../utils/auth";
 export function AdminRoutes() {
   const profile = useSelector((state) => state.user.profile);
   const token = getValidStoredToken();
-  const isAdmin = token && profile?.role === "admin";
+  const storedUser = profile || JSON.parse(localStorage.getItem('user') || '{}');
+  const userRole = String(storedUser?.role || '').toLowerCase();
+  const canAccessAdmin = token && ['admin', 'staff', 'manager', 'technician'].includes(userRole);
+
+  const isStaff = userRole === 'staff';
+  const isTechnician = userRole === 'technician';
+
+  const staffRoutes = [
+    <Route key="users" path="users" element={<AdminLayout><Users /></AdminLayout>} />,
+    <Route key="bookings" path="bookings" element={<AdminLayout><Bookings /></AdminLayout>} />,
+    <Route key="statistics" path="statistics" element={<AdminLayout><Statistics /></AdminLayout>} />,
+    <Route key="index" path="" element={<AdminLayout><Bookings /></AdminLayout>} />,
+  ];
+  const technicianRoutes = [
+    <Route key="staff" path="staff" element={<AdminLayout><Staff /></AdminLayout>} />,
+    <Route key="movies" path="movies" element={<AdminLayout><Movies /></AdminLayout>} />,
+    <Route key="showtimes" path="showtimes" element={<AdminLayout><Showtimes /></AdminLayout>} />,
+    <Route key="cinemas" path="cinemas" element={<AdminLayout><Cinemas /></AdminLayout>} />,
+    <Route key="combos" path="combos" element={<AdminLayout><Combos /></AdminLayout>} />,
+    <Route key="promotions" path="promotions" element={<AdminLayout><Promotions /></AdminLayout>} />,
+    <Route key="points" path="points" element={<AdminLayout><PointsManagement /></AdminLayout>} />,
+    <Route key="news" path="news" element={<AdminLayout><NewsManagement /></AdminLayout>} />,
+    <Route key="blog" path="blog" element={<AdminLayout><BlogManagement /></AdminLayout>} />,
+    <Route key="notifications" path="notifications" element={<AdminLayout><Notifications /></AdminLayout>} />,
+    <Route key="comments" path="comments" element={<AdminLayout><Comments /></AdminLayout>} />,
+    <Route key="settings" path="settings" element={<AdminLayout><Settings /></AdminLayout>} />,
+    <Route key="index" path="" element={<AdminLayout><Staff /></AdminLayout>} />,
+  ];
+  const adminRoutes = [
+    <Route key="dashboard" path="dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />,
+    <Route key="staff" path="staff" element={<AdminLayout><Staff /></AdminLayout>} />,
+    <Route key="users" path="users" element={<AdminLayout><Users /></AdminLayout>} />,
+    <Route key="movies" path="movies" element={<AdminLayout><Movies /></AdminLayout>} />,
+    <Route key="showtimes" path="showtimes" element={<AdminLayout><Showtimes /></AdminLayout>} />,
+    <Route key="cinemas" path="cinemas" element={<AdminLayout><Cinemas /></AdminLayout>} />,
+    <Route key="bookings" path="bookings" element={<AdminLayout><Bookings /></AdminLayout>} />,
+    <Route key="combos" path="combos" element={<AdminLayout><Combos /></AdminLayout>} />,
+    <Route key="promotions" path="promotions" element={<AdminLayout><Promotions /></AdminLayout>} />,
+    <Route key="points" path="points" element={<AdminLayout><PointsManagement /></AdminLayout>} />,
+    <Route key="news" path="news" element={<AdminLayout><NewsManagement /></AdminLayout>} />,
+    <Route key="blog" path="blog" element={<AdminLayout><BlogManagement /></AdminLayout>} />,
+    <Route key="notifications" path="notifications" element={<AdminLayout><Notifications /></AdminLayout>} />,
+    <Route key="comments" path="comments" element={<AdminLayout><Comments /></AdminLayout>} />,
+    <Route key="statistics" path="statistics" element={<AdminLayout><Statistics /></AdminLayout>} />,
+    <Route key="settings" path="settings" element={<AdminLayout><Settings /></AdminLayout>} />,
+    <Route key="index" path="" element={<AdminLayout><Dashboard /></AdminLayout>} />,
+  ];
 
   return (
     <Routes>
-      {/* Route login không cần authentication */}
       <Route path="login" element={<AdminLogin />} />
-
-      {/* Các route khác cần authentication */}
-      {isAdmin && (
+      {canAccessAdmin && (
         <>
-          <Route path="dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />
-          <Route path="staff" element={<AdminLayout><Staff /></AdminLayout>} />
-          <Route path="users" element={<AdminLayout><Users /></AdminLayout>} />
-          <Route path="movies" element={<AdminLayout><Movies /></AdminLayout>} />
-          <Route path="showtimes" element={<AdminLayout><Showtimes /></AdminLayout>} />
-          <Route path="cinemas" element={<AdminLayout><Cinemas /></AdminLayout>} />
-          <Route path="bookings" element={<AdminLayout><Bookings /></AdminLayout>} />
-          <Route path="combos" element={<AdminLayout><Combos /></AdminLayout>} />
-          <Route path="promotions" element={<AdminLayout><Promotions /></AdminLayout>} />
-          <Route path="points" element={<AdminLayout><PointsManagement /></AdminLayout>} />
-          <Route path="news" element={<AdminLayout><NewsManagement /></AdminLayout>} />
-          <Route path="blog" element={<AdminLayout><BlogManagement /></AdminLayout>} />
-          <Route path="notifications" element={<AdminLayout><Notifications /></AdminLayout>} />
-          <Route path="comments" element={<AdminLayout><Comments /></AdminLayout>} />
-          <Route path="statistics" element={<AdminLayout><Statistics /></AdminLayout>} />
-          <Route path="settings" element={<AdminLayout><Settings /></AdminLayout>} />
-          <Route index element={<AdminLayout><Dashboard /></AdminLayout>} />
+          {isStaff ? staffRoutes : isTechnician ? technicianRoutes : adminRoutes}
+          <Route
+            path="*"
+            element={<Navigate to={isStaff ? "/admin/bookings" : isTechnician ? "/admin/staff" : "/admin/dashboard"} replace />}
+          />
         </>
       )}
-
-      {/* Redirect về login nếu không phải admin */}
-      {!isAdmin && (
+      {!canAccessAdmin && (
         <Route path="*" element={<Navigate to="/admin/login" replace />} />
       )}
     </Routes>

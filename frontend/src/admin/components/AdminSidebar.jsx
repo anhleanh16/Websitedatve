@@ -1,25 +1,29 @@
 import { NavLink } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 const NAV_ITEMS = [
-  { to: "/admin/dashboard",     label: "Tổng quan",        icon: "⊞" },
-  { to: "/admin/users",         label: "Tài khoản",        icon: "👥" },
-  { to: "/admin/staff",         label: "Nhân viên",        icon: "🧑‍💼" },
-  { to: "/admin/movies",        label: "Phim",             icon: "🎬" },
-  { to: "/admin/showtimes",     label: "Lịch chiếu",       icon: "🕐" },
-  { to: "/admin/cinemas",       label: "Rạp chiếu",        icon: "🎭" },
-  { to: "/admin/bookings",      label: "Đặt vé",           icon: "🎟" },
-  { to: "/admin/combos",        label: "Combo",            icon: "🍿" },
-  { to: "/admin/promotions",    label: "Khuyến mãi",       icon: "🏷" },
-  { to: "/admin/points",        label: "Điểm thưởng",       icon: "⭐" },
-  { to: "/admin/news",          label: "Tin tức",          icon: "📰" },
-  { to: "/admin/blog",          label: "Blog",             icon: "📑" },
-  { to: "/admin/notifications", label: "Thông báo",        icon: "🔔" },
-  { to: "/admin/comments",      label: "Bình luận",        icon: "💬" },
-  { to: "/admin/statistics",       label: "Thống kê",          icon: "📊" },
-  { to: "/admin/settings",      label: "Cài đặt",          icon: "⚙" },
+  { to: "/admin/dashboard",     label: "Tổng quan",        icon: "⊞", roles: ["admin","manager"] },
+  { to: "/admin/users",         label: "Tài khoản",        icon: "👥", roles: ["admin","manager"] },
+  { to: "/admin/staff",         label: "Nhân viên",        icon: "🧑‍💼", roles: ["admin","manager","technician"] },
+  { to: "/admin/movies",        label: "Phim",             icon: "🎬", roles: ["admin","manager","technician"] },
+  { to: "/admin/showtimes",     label: "Lịch chiếu",       icon: "🕐", roles: ["admin","manager","technician"] },
+  { to: "/admin/cinemas",       label: "Rạp chiếu",        icon: "🎭", roles: ["admin","manager","technician"] },
+  { to: "/admin/bookings",      label: "Đặt vé",           icon: "🎟", roles: ["admin","manager","staff"] },
+  { to: "/admin/statistics",     label: "Thống kê",          icon: "📊", roles: ["admin","manager","staff"] },
+  { to: "/admin/combos",        label: "Combo",            icon: "🍿", roles: ["admin","manager","technician"] },
+  { to: "/admin/promotions",    label: "Khuyến mãi",       icon: "🏷", roles: ["admin","manager","technician"] },
+  { to: "/admin/points",        label: "Điểm thưởng",       icon: "⭐", roles: ["admin","manager","technician"] },
+  { to: "/admin/news",          label: "Tin tức",          icon: "📰", roles: ["admin","manager","technician"] },
+  { to: "/admin/blog",          label: "Blog",             icon: "📑", roles: ["admin","manager","technician"] },
+  { to: "/admin/notifications", label: "Thông báo",        icon: "🔔", roles: ["admin","manager","technician"] },
+  { to: "/admin/comments",      label: "Bình luận",        icon: "💬", roles: ["admin","manager","technician"] },
+  { to: "/admin/settings",      label: "Cài đặt",          icon: "⚙", roles: ["admin","manager","technician"] },
 ];
 
 export default function AdminSidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
+  const profile = useSelector((state) => state.user.profile);
+  const role = String(profile?.role || "").toLowerCase();
+
   return (
     <aside className={`admin-sidebar${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`}>
       {/* Header */}
@@ -37,7 +41,7 @@ export default function AdminSidebar({ collapsed, onToggle, mobileOpen, onMobile
       {/* Nav */}
       <nav className="sidebar-nav">
         <ul>
-          {NAV_ITEMS.map(({ to, label, icon }) => (
+          {NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(role)).map(({ to, label, icon }) => (
             <li key={to}>
               <NavLink
                 to={to}

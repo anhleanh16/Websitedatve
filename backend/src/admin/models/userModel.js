@@ -12,7 +12,17 @@ export const UserModel = {
         u.full_name,
         u.email,
         u.phone as phone_number,
-        COALESCE(r.role_name, 'user') as role,
+        CASE
+          WHEN u.id = 1 THEN 'admin'
+          WHEN e.position IS NOT NULL AND e.position != '' THEN
+            CASE
+              WHEN LOWER(e.position) LIKE '%quản lý%' OR LOWER(e.position) LIKE '%manager%' THEN 'manager'
+              WHEN LOWER(e.position) LIKE '%kỹ thuật%' OR LOWER(e.position) LIKE '%technician%' OR LOWER(e.position) LIKE '%technical%' THEN 'technician'
+              ELSE 'staff'
+            END
+          ELSE 'user'
+        END as role,
+        e.position as employee_position,
         u.status,
         u.birthday,
         u.sex,
@@ -22,6 +32,8 @@ export const UserModel = {
         User u
       LEFT JOIN
         Roles r ON u.role_id = r.role_id
+      LEFT JOIN
+        Employees e ON e.user_id = u.id
       ORDER BY
         u.created_at DESC, u.id DESC`,
     );

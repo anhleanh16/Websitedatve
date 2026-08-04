@@ -14,7 +14,7 @@ if (token) {
       id:    payload.userId,
       name:  payload.name  || '',
       email: payload.email || '',
-      role:  payload.role  || 'user',
+      role:  String(payload.role || 'user').toLowerCase(),
     }
     store.dispatch(setUser({ token, user }))
   }

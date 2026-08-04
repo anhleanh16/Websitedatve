@@ -109,7 +109,7 @@ export const deactivateAdminUser = async (req, res) => {
 
     const success = await UserModel.updateUserStatus(
       idToDeactivate,
-      "inactive",
+      "blocked",
     );
 
     if (success) {
@@ -122,6 +122,52 @@ export const deactivateAdminUser = async (req, res) => {
   } catch (err) {
     console.error("Error deactivating user:", err);
     res.status(500).json({ message: "Failed to deactivate user" });
+  }
+};
+
+export const lockAdminUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const idToLock = parseInt(userId, 10);
+
+    if (idToLock === 1) {
+      return res
+        .status(403)
+        .json({ message: "Không thể khóa tài khoản quản trị viên gốc." });
+    }
+
+    const success = await UserModel.updateUserStatus(idToLock, "blocked");
+    if (success) {
+      res.json({ message: "User locked successfully" });
+    } else {
+      res.status(404).json({ message: "User not found or could not be locked" });
+    }
+  } catch (err) {
+    console.error("Error locking user:", err);
+    res.status(500).json({ message: "Failed to lock user" });
+  }
+};
+
+export const unlockAdminUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const idToUnlock = parseInt(userId, 10);
+
+    if (idToUnlock === 1) {
+      return res
+        .status(403)
+        .json({ message: "Không thể mở khóa tài khoản quản trị viên gốc." });
+    }
+
+    const success = await UserModel.updateUserStatus(idToUnlock, "active");
+    if (success) {
+      res.json({ message: "User unlocked successfully" });
+    } else {
+      res.status(404).json({ message: "User not found or could not be unlocked" });
+    }
+  } catch (err) {
+    console.error("Error unlocking user:", err);
+    res.status(500).json({ message: "Failed to unlock user" });
   }
 };
 
@@ -153,7 +199,17 @@ export const searchAdminUsers = async (req, res) => {
         u.full_name,
         u.email,
         u.phone as phone_number,
-        COALESCE(r.role_name, 'user') as role,
+        CASE
+          WHEN u.id = 1 THEN 'admin'
+          WHEN e.position IS NOT NULL AND e.position != '' THEN
+            CASE
+              WHEN LOWER(e.position) LIKE '%quản lý%' OR LOWER(e.position) LIKE '%manager%' THEN 'manager'
+              WHEN LOWER(e.position) LIKE '%kỹ thuật%' OR LOWER(e.position) LIKE '%technician%' OR LOWER(e.position) LIKE '%technical%' THEN 'technician'
+              ELSE 'staff'
+            END
+          ELSE 'user'
+        END as role,
+        e.position as employee_position,
         u.status,
         u.birthday,
         u.sex,
@@ -161,6 +217,7 @@ export const searchAdminUsers = async (req, res) => {
         u.created_at
       FROM User u
       LEFT JOIN Roles r ON u.role_id = r.role_id
+      LEFT JOIN Employees e ON e.user_id = u.id
       WHERE u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
       ORDER BY u.created_at DESC
       LIMIT 20`,

@@ -15,7 +15,7 @@ async function apiFetch(path, options = {}) {
   if (!res.ok) {
     if (res.status === 401) {
       clearStoredSession();
-      window.location.assign("/login");
+      window.location.assign("/admin/login");
     }
     throw new Error(data?.message || `API error ${res.status}`);
   }

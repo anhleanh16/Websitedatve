@@ -35,7 +35,7 @@ export const login = async (req, res) => {
 
     await updateLastLogin(user.id);
 
-    const role = user.role_name || 'user';
+    const role = (user.role_name || user.role || 'user').toLowerCase();
     const token = makeToken({
       userId: user.id,
       email: user.email,

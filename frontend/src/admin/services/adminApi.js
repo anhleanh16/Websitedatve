@@ -16,7 +16,7 @@ async function apiFetch(path, options = {}) {
   if (!res.ok) {
     if (res.status === 401) {
       clearStoredSession();
-      window.location.assign("/login");
+      window.location.assign("/admin/login");
     }
     throw new Error(data?.message || `API error ${res.status}`);
   }
@@ -33,7 +33,7 @@ async function uploadFetch(path, options = {}) {
   if (!res.ok) {
     if (res.status === 401) {
       clearStoredSession();
-      window.location.assign("/login");
+      window.location.assign("/admin/login");
     }
     throw new Error(data?.message || `API error ${res.status}`);
   }
@@ -43,26 +43,16 @@ async function uploadFetch(path, options = {}) {
 // ─── Movies ───────────────────────────────────────────────────────────────────
 export const adminMovieService = {
   getAllMovies: (trash = false) => apiFetch(`/admin/movies?trash=${trash}`),
-  createMovie: (formData) => {
-    return fetch(`${BASE}/admin/movies`, {
+  createMovie: (formData) =>
+    uploadFetch(`/admin/movies`, {
       method: "POST",
-      headers: getAuthHeaders(),
       body: formData,
-    }).then((res) => {
-      if (!res.ok) throw new Error("API error");
-      return res.json();
-    });
-  },
-  updateMovie: (id, formData) => {
-    return fetch(`${BASE}/admin/movies/${id}`, {
+    }),
+  updateMovie: (id, formData) =>
+    uploadFetch(`/admin/movies/${id}`, {
       method: "PUT",
-      headers: getAuthHeaders(),
       body: formData,
-    }).then((res) => {
-      if (!res.ok) throw new Error("API error");
-      return res.json();
-    });
-  },
+    }),
   deleteMovie: (id) => apiFetch(`/admin/movies/${id}`, { method: "DELETE" }),
   restoreMovie: (id) =>
     apiFetch(`/admin/movies/${id}/restore`, { method: "PUT" }),
@@ -363,4 +353,23 @@ export const adminSeatService = {
       method: "PUT",
       body: JSON.stringify({ roomId, seatIds, changes }),
     }),
+};
+
+// ─── Employees ────────────────────────────────────────────────────────────────
+export const adminEmployeeService = {
+  getAll: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== "" && v !== null),
+      ),
+    ).toString();
+    return apiFetch(`/admin/employees${q ? `?${q}` : ""}`);
+  },
+  getById: (id) => apiFetch(`/admin/employees/${id}`),
+  create: (data) =>
+    apiFetch("/admin/employees", { method: "POST", body: JSON.stringify(data) }),
+  update: (id, data) =>
+    apiFetch(`/admin/employees/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id) =>
+    apiFetch(`/admin/employees/${id}`, { method: "DELETE" }),
 };

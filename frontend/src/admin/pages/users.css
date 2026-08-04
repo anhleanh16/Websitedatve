@@ -33,9 +33,12 @@
 .us-avatar { width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
 .us-avatar.sm { width: 30px; height: 30px; font-size: 11px; border-radius: 8px; }
 .us-avatar.lg { width: 56px; height: 56px; font-size: 20px; border-radius: 16px; }
-.us-role-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.us-role-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; white-space: nowrap; }
 .role-user  { background: rgba(96,165,250,0.15); color: #93c5fd; }
 .role-admin { background: rgba(167,139,250,0.18); color: #c4b5fd; }
+.role-staff { background: rgba(34,197,94,0.18); color: #86efac; }
+.role-manager { background: rgba(249,115,22,0.18); color: #fdba74; }
+.role-technician { background: rgba(59,130,246,0.18); color: #93c5fd; }
 .us-member-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
 .us-member-badge.sm { font-size: 11px; padding: 2px 8px; }
 .us-points { color: #fbbf24; font-weight: 600; font-size: 13px; }

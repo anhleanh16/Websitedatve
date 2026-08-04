@@ -10,6 +10,7 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('')
   const [showPwd,  setShowPwd]  = useState(false)
   const [message,  setMessage]  = useState('')
+  const [messageType, setMessageType] = useState('')
   const [loading,  setLoading]  = useState(false)
 
   const dispatch  = useDispatch()
@@ -20,35 +21,54 @@ export default function AdminLogin() {
     setLoading(true)
     setMessage('')
 
+    const trimmedEmail = email.trim()
+    const trimmedPassword = password.trim()
+
+    if (!trimmedEmail || !trimmedPassword) {
+      setMessageType('info')
+      setMessage('Vui lòng nhập email và mật khẩu hợp lệ.')
+      setLoading(false)
+      return
+    }
+
     try {
       const res  = await fetch('/api/auth/login', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email, password }),
+        body:    JSON.stringify({ email: trimmedEmail, password: trimmedPassword }),
       })
       const data = await res.json()
 
       if (!res.ok) {
+        setMessageType('error')
         setMessage(data.message || 'Đăng nhập thất bại')
         return
       }
 
-      // Kiểm tra xem người dùng có phải admin không
-      if (data.user?.role !== 'admin') {
-        setMessage('Bạn không có quyền truy cập trang quản trị. Vui lòng sử dụng tài khoản admin.')
+      // Chỉ cho phép các role admin/staff/manager/technician truy cập khu vực quản trị
+      const userRole = String(data.user?.role || '').toLowerCase()
+      if (!['admin', 'staff', 'manager', 'technician'].includes(userRole)) {
+        setMessageType('info')
+        setMessage('Bạn không có quyền truy cập trang quản trị. Vui lòng sử dụng tài khoản admin, staff, manager hoặc technician.')
         return
+      }
+
+      const normalizedUser = {
+        ...data.user,
+        role: userRole,
       }
 
       // Lưu token và user vào localStorage
       localStorage.setItem('token', data.token)
-      localStorage.setItem('user',  JSON.stringify(data.user))
+      localStorage.setItem('user',  JSON.stringify(normalizedUser))
 
       // Dispatch vào Redux
-      dispatch(setUser({ token: data.token, user: data.user }))
+      dispatch(setUser({ token: data.token, user: normalizedUser }))
 
       // Điều hướng đến admin dashboard
       navigate('/admin/dashboard')
     } catch {
+      setMessageType('error')
       setMessage('Không thể kết nối máy chủ, vui lòng thử lại.')
     } finally {
       setLoading(false)
@@ -137,7 +157,7 @@ export default function AdminLogin() {
             </div>
 
             {message && (
-              <div className={`error-message ${message.includes('thành công') ? 'success' : 'error'}`}>
+              <div className={`error-message ${messageType || 'error'}`}>
                 {message}
               </div>
             )}

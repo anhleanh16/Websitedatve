@@ -45,6 +45,9 @@ const STATUS_MAP = {
 };
 const ROLE_MAP = {
   user: { label: "Khách hàng", cls: "role-user" },
+  staff: { label: "Nhân viên", cls: "role-staff" },
+  manager: { label: "Quản lý", cls: "role-manager" },
+  technician: { label: "Kỹ thuật viên", cls: "role-technician" },
   admin: { label: "Quản trị viên", cls: "role-admin" },
 };
 
@@ -72,7 +75,6 @@ function getInitials(name) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
-  const [activeTab, setActiveTab] = useState("list");
   const [selectedUser, setSelectedUser] = useState(null);
   const [adjustPointsUser, setAdjustPointsUser] = useState(null);
   const [resetPwUser, setResetPwUser] = useState(null);
@@ -87,7 +89,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const data = await adminUserService.getAllUsers(); // Correct function name
+      const data = await adminUserService.getAllUsers();
       const processedUsers = data.users.map((u) => ({
         ...u,
         id: u.user_id,
@@ -98,6 +100,7 @@ export default function UsersPage() {
         birthday: u.birthday || "N/A",
         sex: u.sex || "N/A",
         transactions: u.transactions || [],
+        employee_position: u.employee_position || null,
       }));
       setUsers(processedUsers);
       setError(null);
@@ -111,13 +114,12 @@ export default function UsersPage() {
 
   const handleToggleStatus = async (user) => {
     if (!user.can_be_locked) return;
-    const newStatus = user.status === "blocked" ? "active" : "blocked";
     try {
-      if (newStatus === "blocked") {
-        await adminUserService.deactivateUser(user.id);
+      if (user.status === "blocked") {
+        await adminUserService.unlockUser(user.id);
+      } else {
+        await adminUserService.lockUser(user.id);
       }
-      // Note: You might need an 'activateUser' function in your service
-      // For now, we just refresh the list to see the change
       fetchUsers();
     } catch (error) {
       console.error("Failed to toggle user status", error);
@@ -158,24 +160,13 @@ export default function UsersPage() {
           + Thêm người dùng
         </button>
       </div>
-      <div className="us-tabs">
-        <button
-          className={activeTab === "list" ? "active" : ""}
-          onClick={() => setActiveTab("list")}
-        >
-          Danh sách
-        </button>
-        {/* Other tabs can be added here */}
-      </div>
 
-      {activeTab === "list" && (
-        <UserList
-          users={users}
-          onView={setSelectedUser}
-          onToggleStatus={handleToggleStatus}
-          onResetPassword={handleResetPassword}
-        />
-      )}
+      <UserList
+        users={users}
+        onView={setSelectedUser}
+        onToggleStatus={handleToggleStatus}
+        onResetPassword={handleResetPassword}
+      />
 
       <UserDetail
         user={selectedUser}
@@ -262,6 +253,9 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
         >
           <option value="all">Tất cả vai trò</option>
           <option value="user">Khách hàng</option>
+          <option value="staff">Nhân viên</option>
+          <option value="manager">Quản lý</option>
+          <option value="technician">Kỹ thuật viên</option>
           <option value="admin">Quản trị viên</option>
         </select>
       </div>
@@ -294,6 +288,8 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
               filtered.map((u) => {
                 const st = STATUS_MAP[u.status] || STATUS_MAP.inactive;
                 const rl = ROLE_MAP[u.role] || ROLE_MAP.user;
+                const roleLabel = rl.label;
+                const roleCls = rl.cls;
                 const lvl = getMemberLevel(u.points);
                 return (
                   <tr key={u.id}>
@@ -320,8 +316,8 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
                       </span>
                     </td>
                     <td>
-                      <span className={`us-role-badge ${rl.cls}`}>
-                        {rl.label}
+                      <span className={`us-role-badge ${roleCls}`}>
+                        {roleLabel}
                       </span>
                     </td>
                     <td>
@@ -394,6 +390,8 @@ function UserDetail({ user, onClose, onToggleStatus, onAdjustPoints, onResetPass
   if (!user) return null;
   const st = STATUS_MAP[user.status] || STATUS_MAP.inactive;
   const rl = ROLE_MAP[user.role] || ROLE_MAP.user;
+  const roleLabel = rl.label;
+  const roleCls = rl.cls;
   const lvl = getMemberLevel(user.points);
   const nextLvl = MEMBERSHIP_LEVELS.find((l) => l.minPoints > user.points);
   const pctToNext = nextLvl
@@ -422,7 +420,7 @@ function UserDetail({ user, onClose, onToggleStatus, onAdjustPoints, onResetPass
             </div>
             <div className="us-profile-info">
               <h3>{user.name}</h3>
-              <span className={`us-role-badge ${rl.cls}`}>{rl.label}</span>
+              <span className={`us-role-badge ${roleCls}`}>{roleLabel}</span>
               <span
                 className={`status-pill ${st.cls}`}
                 style={{ marginLeft: 8 }}

@@ -39,12 +39,17 @@ export default function Login() {
         return
       }
 
+      const normalizedUser = {
+        ...data.user,
+        role: String(data.user?.role || '').toLowerCase(),
+      }
+
       // Lưu token và user vào localStorage
       localStorage.setItem('token', data.token)
-      localStorage.setItem('user',  JSON.stringify(data.user))
+      localStorage.setItem('user',  JSON.stringify(normalizedUser))
 
       // Dispatch vào Redux
-      dispatch(setUser({ token: data.token, user: data.user }))
+      dispatch(setUser({ token: data.token, user: normalizedUser }))
 
       // Điều hướng về trang chủ
       navigate('/')

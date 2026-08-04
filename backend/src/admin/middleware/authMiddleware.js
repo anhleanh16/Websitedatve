@@ -12,7 +12,7 @@ export const authMiddleware = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.userId    = decoded.userId;
-    req.userRole  = decoded.role;
+    req.userRole  = String(decoded.role || '').toLowerCase();
     req.userEmail = decoded.email;
     req.userName  = decoded.name;
     next();
@@ -21,9 +21,22 @@ export const authMiddleware = (req, res, next) => {
   }
 };
 
-/* Yêu cầu role admin */
+const hasRole = (req, roles) => roles.includes(req.userRole);
+
 export const adminOnly = (req, res, next) => {
-  if (req.userRole !== 'admin')
+  if (!hasRole(req, ['admin', 'manager', 'technician']))
+    return res.status(403).json({ message: 'Không có quyền truy cập.' });
+  next();
+};
+
+export const adminManagerOnly = (req, res, next) => {
+  if (!hasRole(req, ['admin', 'manager']))
+    return res.status(403).json({ message: 'Không có quyền truy cập.' });
+  next();
+};
+
+export const staffBasicOnly = (req, res, next) => {
+  if (!hasRole(req, ['admin', 'manager', 'staff']))
     return res.status(403).json({ message: 'Không có quyền truy cập.' });
   next();
 };

@@ -46,11 +46,20 @@ import {
   getShowtimeRooms,
 } from "../controllers/showtimeController.js";
 import {
+  getEmployees,
+  getEmployeeById,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+} from "../controllers/employeeController.js";
+import {
   getAdminUsers,
   searchAdminUsers,
   createAdminUser,
   deactivateAdminUser,
   resetAdminUserPassword,
+  lockAdminUser,
+  unlockAdminUser,
 } from "../controllers/userController.js";
 import {
   getAdminNotifications,
@@ -85,21 +94,23 @@ import {
   deleteAdminCombo,
 } from "../controllers/comboController.js";
 import { uploadMovieFilesMiddleware, uploadCinemaImage, uploadNewsImage, uploadCkeditorNewsImage } from "../../../config/upload.js";
-import { authMiddleware, adminOnly } from "../middleware/authMiddleware.js";
+import { authMiddleware, adminOnly, adminManagerOnly, staffBasicOnly } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-router.get("/dashboard", getDashboardStats);
+router.get("/dashboard", authMiddleware, adminManagerOnly, getDashboardStats);
 
 // ─── Statistics ───────────────────────────────────────────────────────────────
-router.get("/statistics", getStatistics);
+router.get("/statistics", authMiddleware, staffBasicOnly, getStatistics);
 
 // ─── User Management ─────────────────────────────────────────────────────────
-router.get("/users", getAdminUsers);
-router.get("/users/search", searchAdminUsers);
+router.get("/users", authMiddleware, staffBasicOnly, getAdminUsers);
+router.get("/users/search", authMiddleware, staffBasicOnly, searchAdminUsers);
 router.post("/users", authMiddleware, adminOnly, createAdminUser);
-router.put("/users/:userId/deactivate", deactivateAdminUser);
+router.put("/users/:userId/deactivate", authMiddleware, adminOnly, deactivateAdminUser);
+router.put("/users/:userId/lock", authMiddleware, adminOnly, lockAdminUser);
+router.put("/users/:userId/unlock", authMiddleware, adminOnly, unlockAdminUser);
 router.put("/users/:userId/reset-password", authMiddleware, adminOnly, resetAdminUserPassword);
 
 // ─── Notifications Management ────────────────────────────────────────────────
@@ -160,15 +171,15 @@ router.put("/combos/:id", authMiddleware, adminOnly, updateAdminCombo);
 router.delete("/combos/:id", authMiddleware, adminOnly, deleteAdminCombo);
 
 // ─── Booking Management ──────────────────────────────────────────────────────
-router.get("/bookings", getAdminBookings);
-router.get("/bookings/verify/:code", verifyBookingCode);
-router.post("/bookings/staff-create", authMiddleware, adminOnly, staffCreateBooking);
-router.get("/bookings/:orderId", getAdminBookingDetail);
-router.put("/bookings/:orderId/refund", refundBooking);
-router.put("/bookings/:orderId/check-in", checkInBooking);
+router.get("/bookings", authMiddleware, staffBasicOnly, getAdminBookings);
+router.get("/bookings/verify/:code", authMiddleware, staffBasicOnly, verifyBookingCode);
+router.post("/bookings/staff-create", authMiddleware, staffBasicOnly, staffCreateBooking);
+router.get("/bookings/:orderId", authMiddleware, staffBasicOnly, getAdminBookingDetail);
+router.put("/bookings/:orderId/refund", authMiddleware, adminOnly, refundBooking);
+router.put("/bookings/:orderId/check-in", authMiddleware, staffBasicOnly, checkInBooking);
 
 // ─── Movie Management ─────────────────────────────────────────────────────────
-router.get("/movies", getAdminMovies);
+router.get("/movies", authMiddleware, adminOnly, getAdminMovies);
 
 // Middleware to log form data before processing
 const logFormData = (req, res, next) => {
@@ -182,6 +193,8 @@ const logFormData = (req, res, next) => {
 
 router.post(
   "/movies",
+  authMiddleware,
+  adminOnly,
   logFormData,
   uploadMovieFilesMiddleware,
   // Middleware để tổ chức lại files cho đúng định dạng cũ
@@ -199,6 +212,8 @@ router.post(
 );
 router.put(
   "/movies/:id",
+  authMiddleware,
+  adminOnly,
   logFormData,
   uploadMovieFilesMiddleware,
   // Middleware để tổ chức lại files cho đúng định dạng cũ
@@ -214,23 +229,23 @@ router.put(
   },
   updateMovie,
 );
-router.delete("/movies/:id", deleteMovie);
-router.put("/movies/:id/restore", restoreMovie);
-router.put("/movies/:id/toggle-hide", toggleHideMovie);
+router.delete("/movies/:id", authMiddleware, adminOnly, deleteMovie);
+router.put("/movies/:id/restore", authMiddleware, adminOnly, restoreMovie);
+router.put("/movies/:id/toggle-hide", authMiddleware, adminOnly, toggleHideMovie);
 
 // ─── Movie Category Management ─────────────────────────────────────────────────
-router.get("/categories", getAllCategories);
-router.post("/categories", createCategory);
-router.get("/categories/:id", getCategoryById);
-router.put("/categories/:id", updateCategory);
-router.delete("/categories/:id", deleteCategory);
+router.get("/categories", authMiddleware, adminOnly, getAllCategories);
+router.post("/categories", authMiddleware, adminOnly, createCategory);
+router.get("/categories/:id", authMiddleware, adminOnly, getCategoryById);
+router.put("/categories/:id", authMiddleware, adminOnly, updateCategory);
+router.delete("/categories/:id", authMiddleware, adminOnly, deleteCategory);
 
 // ─── Showtime Management ──────────────────────────────────────────────────────
-router.get("/showtimes/cinemas", getShowtimeCinemas);
-router.get("/showtimes/rooms", getShowtimeRooms);
-router.get("/showtimes", getShowtimes);
-router.get("/showtimes/:id", getShowtimeById);
-router.get("/showtimes/:id/sold-seats", async (req, res) => {
+router.get("/showtimes/cinemas", authMiddleware, adminOnly, getShowtimeCinemas);
+router.get("/showtimes/rooms", authMiddleware, adminOnly, getShowtimeRooms);
+router.get("/showtimes", authMiddleware, adminOnly, getShowtimes);
+router.get("/showtimes/:id", authMiddleware, adminOnly, getShowtimeById);
+router.get("/showtimes/:id/sold-seats", authMiddleware, adminOnly, async (req, res) => {
   try {
     const { db } = await import("../../../config/db.js");
     const showtimeId = Number(req.params.id);
@@ -251,22 +266,29 @@ router.get("/showtimes/:id/sold-seats", async (req, res) => {
     res.status(500).json({ soldSeats: [] });
   }
 });
-router.post("/showtimes/recurring", createRecurringShowtime);
-router.post("/showtimes", createShowtime);
-router.put("/showtimes/:id", updateShowtime);
-router.delete("/showtimes/:id", deleteShowtime);
-router.put("/showtimes/:id/cancel", cancelShowtime);
+router.post("/showtimes/recurring", authMiddleware, adminOnly, createRecurringShowtime);
+router.post("/showtimes", authMiddleware, adminOnly, createShowtime);
+router.put("/showtimes/:id", authMiddleware, adminOnly, updateShowtime);
+router.delete("/showtimes/:id", authMiddleware, adminOnly, deleteShowtime);
+router.put("/showtimes/:id/cancel", authMiddleware, adminOnly, cancelShowtime);
 
 // ─── Cinema Management ────────────────────────────────────────────────────────
-router.get("/cinemas", getAllCinemas);
-router.get("/cinemas/:id", getCinemaById);
-router.post("/cinemas", uploadCinemaImage.single("image"), createCinema);
-router.put("/cinemas/:id", uploadCinemaImage.single("image"), updateCinema);
-router.delete("/cinemas/:id", deleteCinema);
+router.get("/cinemas", authMiddleware, adminOnly, getAllCinemas);
+router.get("/cinemas/:id", authMiddleware, adminOnly, getCinemaById);
+router.post("/cinemas", authMiddleware, adminOnly, uploadCinemaImage.single("image"), createCinema);
+router.put("/cinemas/:id", authMiddleware, adminOnly, uploadCinemaImage.single("image"), updateCinema);
+router.delete("/cinemas/:id", authMiddleware, adminOnly, deleteCinema);
 
 // ─── Rooms / Seats Management ─────────────────────────────────────────────────
-router.get("/rooms", getRoomsByCinema);
-router.get("/seats", getSeatsByRoom);
-router.put("/seats/bulk", bulkUpdateSeats);
+router.get("/rooms", authMiddleware, adminOnly, getRoomsByCinema);
+router.get("/seats", authMiddleware, adminOnly, getSeatsByRoom);
+router.put("/seats/bulk", authMiddleware, adminOnly, bulkUpdateSeats);
+
+// ─── Employee Management ─────────────────────────────────────────────────────
+router.get("/employees",     authMiddleware, adminOnly, getEmployees);
+router.get("/employees/:id", authMiddleware, adminOnly, getEmployeeById);
+router.post("/employees",    authMiddleware, adminOnly, createEmployee);
+router.put("/employees/:id", authMiddleware, adminOnly, updateEmployee);
+router.delete("/employees/:id", authMiddleware, adminOnly, deleteEmployee);
 
 export default router;

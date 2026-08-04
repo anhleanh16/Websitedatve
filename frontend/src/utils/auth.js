@@ -1,6 +1,21 @@
-export function parseJwt(token) {
+function base64UrlDecode(str) {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
   try {
-    return JSON.parse(atob(token.split(".")[1]));
+    return atob(padded);
+  } catch {
+    return null;
+  }
+}
+
+export function parseJwt(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3) return null;
+  const decoded = base64UrlDecode(parts[1]);
+  if (!decoded) return null;
+
+  try {
+    return JSON.parse(decoded);
   } catch {
     return null;
   }

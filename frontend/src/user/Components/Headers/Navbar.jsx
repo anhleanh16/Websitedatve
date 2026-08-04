@@ -32,7 +32,9 @@ export default function Navbar() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
 
-  const isAdmin = profile?.role === 'admin'
+  const role = String(profile?.role || '').toLowerCase()
+  const isAdmin = role === 'admin'
+  const isAdminPanelUser = ['admin', 'staff', 'manager', 'technician'].includes(role)
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [searchOpen,   setSearchOpen]   = useState(false)
@@ -244,8 +246,8 @@ export default function Navbar() {
       {/* Right side */}
       <div className='nav-right'>
 
-        {/* Nút Quản trị — chỉ hiện khi là admin */}
-        {isAdmin && (
+        {/* Nút Quản trị — hiện khi là admin hoặc nhân viên admin panel */}
+        {isAdminPanelUser && (
           <Link to='/admin' className='nav-admin-btn'>
             <span>⚙</span>
             <span className='nav-admin-label'>Quản trị</span>
@@ -487,7 +489,7 @@ export default function Navbar() {
                   <li role='menuitem'>
                     <Link to='/Membership' className='submenu-link'><span>👑</span> Thành viên</Link>
                   </li>
-                  {isAdmin && (
+                  {isAdminPanelUser && (
                     <li role='menuitem'>
                       <Link to='/admin' className='submenu-link'><span>⚙️</span> Quản trị</Link>
                     </li>
@@ -538,7 +540,7 @@ export default function Navbar() {
               </Link>
             </li>
           ))}
-          {isAdmin && (
+          {isAdminPanelUser && (
             <li>
               <Link to='/admin' className='mobile-link'>
                 <span className='mobile-link-icon'>⚙</span> Quản trị

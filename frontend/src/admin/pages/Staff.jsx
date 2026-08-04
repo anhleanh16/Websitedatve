@@ -9,6 +9,7 @@ import {
   adminRoomService,
   adminSeatService,
   adminComboService,
+  adminEmployeeService,
 } from "../services/adminApi.js";
 
 const API_ORIGIN = (() => {
@@ -196,6 +197,35 @@ const EMPTY_STAFF = {
   avatar: "",
   shifts: [], tasks: [], attendance: [],
 };
+
+const mapDepartmentId = (departmentName) => {
+  const match = DEPARTMENTS.find((item) => item.name === departmentName);
+  return match ? match.id : "";
+};
+
+const mapEmployeeToStaff = (employee, localFallback = null) => ({
+  id: employee.id,
+  name: employee.name || "",
+  code: employee.code || "",
+  email: employee.email || "",
+  phone: employee.phone || "",
+  dob: employee.dob || "",
+  sex: employee.sex || "Nam",
+  address: employee.address || "",
+  avatar: employee.avatarUrl || employee.avatar || "",
+  cinemaId: employee.cinemaId ?? "",
+  departmentId: mapDepartmentId(employee.department) || "",
+  role: employee.position?.toLowerCase().includes("quản lý") ? "manager" : employee.position?.toLowerCase().includes("kỹ thuật") ? "technician" : "staff",
+  type: employee.type || "full_time",
+  salary: employee.salary ?? "",
+  baseSalary: employee.salary ?? "",
+  status: employee.status || "active",
+  hireDate: employee.hireDate || "",
+  shifts: Array.isArray(employee.shifts) ? employee.shifts : [],
+  tasks: localFallback?.tasks || [],
+  attendance: localFallback?.attendance || [],
+  position: employee.position || "",
+});
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 function Toast({ message, onClose }) {
@@ -991,7 +1021,11 @@ function TaskOverview({ staff }) {
 export default function AdminStaff() {
   const [staffList, setStaffList] = useState(() => {
     const saved = localStorage.getItem('adminStaffList');
-    return saved ? JSON.parse(saved) : SAMPLE_STAFF;
+    try {
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
   const [activeTab,  setActiveTab]  = useState("list");
 
@@ -1004,34 +1038,69 @@ export default function AdminStaff() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3200); };
 
+  const loadEmployees = async () => {
+    try {
+      const response = await adminEmployeeService.getAll();
+      const serverEmployees = (response?.employees || []).map((employee) => {
+        const persisted = JSON.parse(localStorage.getItem('adminStaffList') || '[]');
+        const localFallback = persisted.find((item) => String(item.id) === String(employee.id));
+        return mapEmployeeToStaff(employee, localFallback);
+      });
+      setStaffList(serverEmployees);
+      localStorage.setItem('adminStaffList', JSON.stringify(serverEmployees));
+    } catch (err) {
+      showToast(`Không thể tải dữ liệu nhân viên: ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    loadEmployees();
+  }, []);
+
   const handleSave = async (data) => {
     try {
-      let finalData = { ...data };
-      
-      // If there's an avatar file, convert to base64
+      const { id, ...rest } = data;
+      let payload = { ...rest };
+
       if (data.avatarFile) {
-        finalData.avatar = await new Promise((resolve, reject) => {
+        payload.avatarUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
           reader.onerror = reject;
           reader.readAsDataURL(data.avatarFile);
         });
-        delete finalData.avatarFile;
+      } else if (data.avatar) {
+        payload.avatarUrl = data.avatar;
       }
-      
-      // Update staff list
-      let updatedList;
-      if (staffList.find(s => s.id === finalData.id)) {
-        updatedList = staffList.map(s => s.id === finalData.id ? finalData : s);
-        showToast(`Đã cập nhật nhân viên "${finalData.name}".`);
+
+      payload.code = (payload.code || "").trim();
+      payload.name = (payload.name || "").trim();
+      payload.email = (payload.email || "").trim();
+      payload.phone = (payload.phone || "").trim();
+      payload.position = payload.position || (payload.role === "manager" ? "Quản lý" : payload.role === "technician" ? "Kỹ thuật viên" : "Nhân viên");
+      payload.department = DEPARTMENTS.find((item) => item.id === Number(payload.departmentId))?.name || "";
+      payload.cinemaId = payload.cinemaId ? Number(payload.cinemaId) : null;
+      payload.type = payload.type || "full_time";
+      payload.status = payload.status || "active";
+      payload.salary = Number(payload.salary || 0);
+      payload.shifts = Array.isArray(payload.shifts) ? payload.shifts : [];
+      payload.hireDate = payload.hireDate || null;
+      payload.dob = payload.dob || null;
+      payload.sex = payload.sex || "Nam";
+      payload.address = payload.address || "";
+
+      if (id && String(id).length < 12) {
+        await adminEmployeeService.update(id, payload);
+        showToast(`Đã cập nhật nhân viên "${payload.name}".`);
       } else {
-        updatedList = [finalData, ...staffList];
-        showToast(`Đã thêm nhân viên "${finalData.name}".`);
+        const created = await adminEmployeeService.create(payload);
+        if (created?.employee?.id) {
+          payload.id = created.employee.id;
+        }
+        showToast(`Đã thêm nhân viên "${payload.name}".`);
       }
-      
-      // Save to localStorage
-      localStorage.setItem('adminStaffList', JSON.stringify(updatedList));
-      setStaffList(updatedList);
+
+      await loadEmployees();
       setEditStaff(undefined);
       setViewStaff(null);
     } catch (err) {
@@ -1055,12 +1124,15 @@ export default function AdminStaff() {
     setAttendStaff(null); setViewStaff(null);
   };
 
-  const handleConfirmDelete = () => {
-    const updatedList = staffList.filter(s => s.id !== deleteTarget.id);
-    localStorage.setItem('adminStaffList', JSON.stringify(updatedList));
-    setStaffList(updatedList);
-    showToast(`Đã xóa nhân viên "${deleteTarget.name}".`);
-    setDeleteTarget(null);
+  const handleConfirmDelete = async () => {
+    try {
+      await adminEmployeeService.delete(deleteTarget.id);
+      await loadEmployees();
+      showToast(`Đã xóa nhân viên "${deleteTarget.name}".`);
+      setDeleteTarget(null);
+    } catch (err) {
+      showToast(`Lỗi: ${err.message}`);
+    }
   };
 
   const openEdit = (s) => { setViewStaff(null); setEditStaff(s); };
