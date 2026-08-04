@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "seed:content": "node scripts/seed-20-blogs-and-10-news.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
