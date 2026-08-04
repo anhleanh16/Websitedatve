@@ -13,13 +13,40 @@ import './PaymentResult.css'
 export default function PaymentResult() {
   const location = useLocation()
   const navigate = useNavigate()
-  const DEMO_AUTO_CONFIRM_SECONDS = 15
 
-  const [status, setStatus]           = useState('waiting') // waiting | verifying | success | fail
+  const [status, setStatus]           = useState('verifying') // verifying | success | fail
   const [pending, setPending]         = useState(null)
   const [booking, setBooking]         = useState(null)
   const [pointsAwarded, setPointsAwarded] = useState(0)
-  const [secondsLeft, setSecondsLeft] = useState(DEMO_AUTO_CONFIRM_SECONDS)
+  const [checking, setChecking] = useState(false)
+  const [checkMessage, setCheckMessage] = useState('')
+
+  const verifyPayment = async (appTransId, { showLoading = false } = {}) => {
+    if (!appTransId) return
+
+    if (showLoading) setStatus('verifying')
+    setChecking(true)
+    setCheckMessage('')
+
+    try {
+      const result = await userBookingService.confirmZaloPayOrder(appTransId)
+      if (result?.success) {
+        setBooking(result.booking || null)
+        setPointsAwarded(result.booking?.pointsAwarded || 0)
+        sessionStorage.removeItem('zlp_pending')
+        setStatus('success')
+        return
+      }
+
+      setStatus('fail')
+      setCheckMessage('Giao dịch chưa hoàn tất. Vui lòng thanh toán trên ZaloPay rồi bấm kiểm tra lại.')
+    } catch {
+      setStatus('fail')
+      setCheckMessage('Chưa xác nhận được giao dịch. Bạn có thể bấm kiểm tra lại sau vài giây.')
+    } finally {
+      setChecking(false)
+    }
+  }
 
   useEffect(() => {
     // Đọc pending data từ sessionStorage
@@ -38,41 +65,9 @@ export default function PaymentResult() {
       return
     }
 
-    // Demo: tự động confirm sau 15 giây khi vào trang
+    // Demo: tự động confirm luôn khi vào trang
     if (savedPending?.appTransId) {
-      setStatus('waiting')
-      setSecondsLeft(DEMO_AUTO_CONFIRM_SECONDS)
-
-      const countdownTimer = setInterval(() => {
-        setSecondsLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(countdownTimer)
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-
-      const autoConfirmTimer = setTimeout(() => {
-        setStatus('verifying')
-        userBookingService.confirmZaloPayOrder(savedPending.appTransId)
-          .then((result) => {
-            if (result?.success) {
-              setBooking(result.booking || null)
-              setPointsAwarded(result.booking?.pointsAwarded || 0)
-              sessionStorage.removeItem('zlp_pending')
-              setStatus('success')
-            } else {
-              setStatus('fail')
-            }
-          })
-          .catch(() => setStatus('fail'))
-      }, DEMO_AUTO_CONFIRM_SECONDS * 1000)
-
-      return () => {
-        clearInterval(countdownTimer)
-        clearTimeout(autoConfirmTimer)
-      }
+      verifyPayment(savedPending.appTransId, { showLoading: true })
     }
   }, [navigate])
 
@@ -80,19 +75,8 @@ export default function PaymentResult() {
   const amountRaw = params.get('amount')
   const finalTotal = pending?.finalTotal || Number(amountRaw || 0)
 
-  // --- Waiting / Verifying ---
-  if (status === 'waiting') {
-    return (
-      <div className="pr-page">
-        <div className="pr-loading">
-          <FaSpinner className="pr-spinner" />
-          <p>Đây là bản demo. Hệ thống sẽ tự động xác nhận thanh toán sau <b>{secondsLeft}s</b>.</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (status === 'verifying') {
+  // --- Loading / Verifying ---
+  if (status === 'waiting' || status === 'verifying') {
     return (
       <div className="pr-page">
         <div className="pr-loading">
@@ -121,6 +105,10 @@ export default function PaymentResult() {
             ? 'Đơn đặt vé của bạn đã được xác nhận. Vé điện tử sẽ gửi qua email.'
             : 'Giao dịch bị huỷ hoặc thất bại. Bạn có thể thử lại.'}
         </p>
+
+        {status === 'fail' && checkMessage && (
+          <div className="pr-error-msg">{checkMessage}</div>
+        )}
 
         {booking && (
           <div className="pr-ticket">
@@ -152,6 +140,13 @@ export default function PaymentResult() {
             </>
           ) : (
             <>
+              <button
+                className={`pr-btn primary${checking ? ' disabled' : ''}`}
+                onClick={() => verifyPayment(pending?.appTransId, { showLoading: true })}
+                disabled={checking || !pending?.appTransId}
+              >
+                {checking ? <><FaSpinner className="pr-spin-sm" /> Đang kiểm tra...</> : 'Kiểm tra thanh toán'}
+              </button>
               <button className="pr-btn primary" onClick={() => navigate(-2)}>Thử lại</button>
               <Link to="/" className="pr-btn ghost"><FaHome /> Trang chủ</Link>
             </>

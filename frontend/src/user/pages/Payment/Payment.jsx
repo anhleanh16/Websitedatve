@@ -165,15 +165,15 @@ export default function Payment() {
         // Lưu context vào sessionStorage để hiển thị khi redirect về
         sessionStorage.setItem('zlp_pending', JSON.stringify({
           appTransId: zlp.appTransId,
-          orderUrl: zlp.orderUrl || '',
           movieTitle, cinema, day, time,
           displaySeats: seats,
           foods,
           finalTotal: Math.round(total2),
           method,
-          demoAutoPay: true,
         }))
-        // Demo mode: không cần mở cổng thanh toán thật, tự động xác nhận sau 15 giây.
+        // Mở ZaloPay trong tab mới — tab app vẫn còn để detect khi user quay lại
+        window.open(zlp.orderUrl, '_blank', 'noopener')
+        // Chuyển sang trang chờ xác nhận
         navigate('/payment/result', { replace: true })
         return
       }
