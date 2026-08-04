@@ -375,6 +375,20 @@ export default function MovieDetail() {
   const ratingBreakdown = Array.isArray(movie?.rating_breakdown)
     ? movie.rating_breakdown
     : [5, 4, 3, 2, 1].map((stars) => ({ stars, percent: 0, count: 0 }));
+
+  const getBarPercent = (item) => {
+    const providedPercent = Number(item?.percent);
+    if (Number.isFinite(providedPercent)) {
+      return Math.max(0, Math.min(100, providedPercent));
+    }
+
+    const countValue = Number(item?.count || 0);
+    if (reviewCount > 0 && countValue > 0) {
+      return Math.max(0, Math.min(100, (countValue / reviewCount) * 100));
+    }
+
+    return 0;
+  };
   // gallery display logic: show up to 6 tiles
   // if there are more than 6 images, show first 5 and a 6th tile with +N
   const VISIBLE_LIMIT = 6;
@@ -793,17 +807,26 @@ export default function MovieDetail() {
                 <div className="rating-legend">{recommendedPercent}% yêu thích</div>
               </div>
               <div className="rating-breakdown">
-                {ratingBreakdown.map((item) => (
-                  <div className="rating-row" key={item.stars}>
-                    <div className="rating-row-left">
-                      <span className="rating-stars">{item.stars}★</span>
-                      <div className="rating-bar">
-                        <div className="rating-bar-fill" style={{ '--final-width': `${item.percent}%` }} />
+                {ratingBreakdown.map((item) => {
+                  const barPercent = getBarPercent(item);
+                  return (
+                    <div className="rating-row" key={item.stars}>
+                      <div className="rating-row-left">
+                        <span className="rating-stars">{item.stars}★</span>
+                        <div className="rating-bar">
+                          <div
+                            className="rating-bar-fill"
+                            style={{ width: `${barPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="rating-row-meta">
+                        <span className="rating-percent">{Math.round(barPercent)}%</span>
+                        <span className="rating-count">{formatReviewCount(item.count)}</span>
                       </div>
                     </div>
-                    <span className="rating-count">{formatReviewCount(item.count)}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

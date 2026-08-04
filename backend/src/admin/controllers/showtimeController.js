@@ -28,10 +28,16 @@ const normalizeShowtimePayload = (body = {}) => ({
   price_standard: body.price_standard ?? body.priceStandard ?? body.price,
   price_vip: body.price_vip ?? body.priceVip ?? body.price,
   price_couple: body.price_couple ?? body.priceCouple ?? body.price,
-  price: body.price,
+  price: body.price ?? body.priceStandard ?? body.price_standard,
   available_seats: body.available_seats ?? body.availableSeats,
   status: body.status,
 });
+
+const buildShowtimePayloadError = (message) => {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+};
 
 export const getShowtimes = async (req, res) => {
   try {
@@ -110,6 +116,22 @@ export const createRecurringShowtime = async (req, res) => {
       available_seats: available_seats ?? availableSeats,
     });
 
+    if (result.created.length === 0) {
+      const reasons = (result.skipped || [])
+        .slice(0, 3)
+        .map((item) => item.reason)
+        .filter(Boolean);
+      const reasonText = reasons.length
+        ? ` Lý do thường gặp: ${reasons.join(" | ")}`
+        : "";
+
+      return res.status(400).json({
+        message: `Không tạo được suất chiếu nào trong khoảng đã chọn.${reasonText}`,
+        created: result.created,
+        skipped: result.skipped,
+      });
+    }
+
     res.status(201).json({
       message: `Đã tạo ${result.created.length} suất chiếu. Bỏ qua ${result.skipped.length} suất bị xung đột.`,
       created: result.created,
@@ -126,9 +148,14 @@ export const createRecurringShowtime = async (req, res) => {
 
 export const createShowtime = async (req, res) => {
   try {
-    const showtimeId = await ShowtimeModel.create(
-      normalizeShowtimePayload(req.body),
-    );
+    const payload = normalizeShowtimePayload(req.body);
+    if (!payload.movie_id || !payload.room_id || !payload.start_time) {
+      throw buildShowtimePayloadError(
+        "Thiếu thông tin phim, phòng hoặc giờ bắt đầu.",
+      );
+    }
+
+    const showtimeId = await ShowtimeModel.create(payload);
     res
       .status(201)
       .json({ message: "Showtime created successfully", showtimeId });
@@ -144,10 +171,13 @@ export const createShowtime = async (req, res) => {
 export const updateShowtime = async (req, res) => {
   try {
     const { id } = req.params;
-    const success = await ShowtimeModel.update(
-      id,
-      normalizeShowtimePayload(req.body),
-    );
+    const payload = normalizeShowtimePayload(req.body);
+    if (!payload.movie_id || !payload.room_id || !payload.start_time) {
+      throw buildShowtimePayloadError(
+        "Thiếu thông tin phim, phòng hoặc giờ bắt đầu.",
+      );
+    }
+    const success = await ShowtimeModel.update(id, payload);
     if (success) {
       res.json({ message: "Showtime updated successfully" });
     } else {

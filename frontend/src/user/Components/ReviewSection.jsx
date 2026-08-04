@@ -68,19 +68,19 @@ export default function ReviewSection({ movieId }) {
   }
 
   const StarRating = ({ value, onChange, interactive = false }) => (
-    <div className="star-rating-input">
+    <div className="rs-star-input">
       {[1, 2, 3, 4, 5].map(star => (
         <button
           key={star}
           type="button"
-          className={`star-btn ${star <= value ? 'filled' : ''}`}
+          className={`rs-star-btn ${star <= value ? 'filled' : ''}`}
           onClick={() => interactive && onChange?.(star)}
           onMouseEnter={() => interactive && onChange?.(star)}
         >
           <FaStar />
         </button>
       ))}
-      {interactive && <span className="rating-text">{value}/5</span>}
+      {interactive && <span className="rs-rating-text">{value}/5</span>}
     </div>
   )
 
@@ -107,99 +107,64 @@ export default function ReviewSection({ movieId }) {
     : 0
 
   const ratingData = getRatingBreakdown()
+  const getPercent = (count) => {
+    const total = Number(ratingData?.totalReviews || 0)
+    if (!total) return 0
+    return Math.round((Number(count || 0) / total) * 100)
+  }
 
   return (
-    <section className="review-section">
-      <h2 className="review-title">Đánh giá & Bình luận</h2>
+    <section className="rs-section">
+      <h2 className="rs-title">Đánh giá & Bình luận</h2>
 
       {/* Rating Summary */}
       {ratingData && ratingData.totalReviews > 0 && (
-        <div className="rating-summary">
-          <div className="rating-avg">
-            <div className="avg-number">{avgRating}</div>
-            <div className="avg-stars">
+        <div className="rs-summary">
+          <div className="rs-summary-left">
+            <div className="rs-avg-number">{avgRating}</div>
+            <div className="rs-avg-stars">
               {[...Array(5)].map((_, i) => (
                 <FaStar key={i} style={{ color: i < Math.floor(avgRating) ? '#fbbf24' : '#d1d5db' }} />
               ))}
             </div>
-            <div className="avg-count">{ratingData.totalReviews} đánh giá</div>
+            <div className="rs-avg-count">{ratingData.totalReviews} đánh giá</div>
           </div>
 
-          <div className="rating-breakdown">
+          <div className="rs-breakdown">
             {[5, 4, 3, 2, 1].map(rating => (
-              <div key={rating} className="breakdown-row">
-                <span className="breakdown-label">{rating} ⭐</span>
-                <div className="breakdown-bar">
+              <div key={rating} className="rs-breakdown-row">
+                <span className="rs-breakdown-label">{rating}★</span>
+                <div className="rs-breakdown-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={getPercent(ratingData.breakdown[rating])}>
                   <div
-                    className="breakdown-fill"
+                    className="rs-breakdown-fill"
                     style={{
-                      width: `${ratingData.totalReviews > 0 ? (ratingData.breakdown[rating] / ratingData.totalReviews) * 100 : 0}%`
+                      width: `${getPercent(ratingData.breakdown[rating])}%`
                     }}
                   />
                 </div>
-                <span className="breakdown-count">{ratingData.breakdown[rating]}</span>
+                <span className="rs-breakdown-percent">{getPercent(ratingData.breakdown[rating])}%</span>
+                <span className="rs-breakdown-count">{ratingData.breakdown[rating]}</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Review Form */}
-      {!showForm ? (
-        <button className="btn-write-review" onClick={() => setShowForm(true)}>
-          ⭐ Viết đánh giá của bạn
-        </button>
-      ) : (
-        <form className="review-form" onSubmit={handleSubmit}>
-          <h3>Viết đánh giá</h3>
-
-          <div className="form-group">
-            <label>Đánh giá của bạn</label>
-            <StarRating value={rating} onChange={setRating} interactive={true} />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="comment">Bình luận (tùy chọn)</label>
-            <textarea
-              id="comment"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Chia sẻ cảm nhận của bạn về bộ phim này..."
-              maxLength={500}
-              rows={4}
-            />
-            <small>{comment.length}/500</small>
-          </div>
-
-          {error && <div className="error-box">{error}</div>}
-          {success && <div className="success-box">{success}</div>}
-
-          <div className="form-actions">
-            <button type="submit" className="btn-submit" disabled={submitting}>
-              {submitting ? 'Đang gửi...' : 'Gửi đánh giá'}
-            </button>
-            <button type="button" className="btn-cancel" onClick={() => setShowForm(false)}>
-              Hủy
-            </button>
-          </div>
-        </form>
-      )}
-
       {/* Reviews List */}
-      <div className="reviews-list">
-        <h3>Các đánh giá ({reviews.length})</h3>
+      <div className="rs-reviews-list">
+        <h3 className="rs-subtitle">Các đánh giá ({reviews.length})</h3>
 
         {loading ? (
-          <div className="loading-reviews">Đang tải đánh giá...</div>
+          <div className="rs-loading">Đang tải đánh giá...</div>
         ) : reviews.length === 0 ? (
-          <div className="no-reviews">Chưa có đánh giá nào. Hãy là người đầu tiên!</div>
+          <div className="rs-empty">Chưa có đánh giá nào. Hãy là người đầu tiên!</div>
         ) : (
           reviews.map(review => (
-            <div key={review.review_id} className="review-item">
-              <div className="review-header">
-                <div className="review-author">
+            <article key={review.review_id} className="rs-review-item">
+              <div className="rs-review-header">
+                <div className="rs-review-author">
                   <strong>{review.username || 'Ẩn danh'}</strong>
-                  <div className="review-rating">
+                  <div className="rs-review-rating">
                     {[...Array(5)].map((_, i) => (
                       <FaStar
                         key={i}
@@ -209,13 +174,69 @@ export default function ReviewSection({ movieId }) {
                     <span>{review.rating}/5</span>
                   </div>
                 </div>
-                <span className="review-date">
+                <span className="rs-review-date">
                   {new Date(review.created_at).toLocaleDateString('vi-VN')}
                 </span>
               </div>
-              {review.comment && <p className="review-comment">{review.comment}</p>}
-            </div>
+              {review.comment && <p className="rs-review-comment">{review.comment}</p>}
+            </article>
           ))
+        )}
+      </div>
+
+      {/* Review Action */}
+      <div className="rs-action-area">
+        <h3 className="rs-action-title">Chia sẻ cảm nhận của bạn</h3>
+        {!user && <p className="rs-auth-hint">Đăng nhập để gửi đánh giá cho bộ phim này.</p>}
+
+        {error && <div className="rs-error">{error}</div>}
+        {success && <div className="rs-success">{success}</div>}
+
+        {!showForm ? (
+          <button
+            className="rs-btn-write"
+            onClick={() => {
+              if (!user) {
+                setError('Vui lòng đăng nhập để bình luận')
+                return
+              }
+              setError('')
+              setShowForm(true)
+            }}
+          >
+            ⭐ Viết đánh giá của bạn
+          </button>
+        ) : (
+          <form className="rs-form" onSubmit={handleSubmit}>
+            <h3>Viết đánh giá</h3>
+
+            <div className="rs-form-group">
+              <label>Đánh giá của bạn</label>
+              <StarRating value={rating} onChange={setRating} interactive={true} />
+            </div>
+
+            <div className="rs-form-group">
+              <label htmlFor="comment">Bình luận (tùy chọn)</label>
+              <textarea
+                id="comment"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Chia sẻ cảm nhận của bạn về bộ phim này..."
+                maxLength={500}
+                rows={4}
+              />
+              <small>{comment.length}/500</small>
+            </div>
+
+            <div className="rs-form-actions">
+              <button type="submit" className="rs-btn-submit" disabled={submitting}>
+                {submitting ? 'Đang gửi...' : 'Gửi đánh giá'}
+              </button>
+              <button type="button" className="rs-btn-cancel" onClick={() => setShowForm(false)}>
+                Hủy
+              </button>
+            </div>
+          </form>
         )}
       </div>
     </section>

@@ -181,7 +181,7 @@ export const ShowtimeModel = {
    */
   async create(showtimeData) {
     const caps = await getSchemaCapabilities();
-    const {
+    let {
       movie_id,
       room_id,
       start_time,
@@ -192,6 +192,13 @@ export const ShowtimeModel = {
       available_seats,
       status = ACTIVE_SHOWTIME_STATUS,
     } = showtimeData;
+
+    movie_id = Number(movie_id);
+    room_id = Number(room_id);
+    if (!movie_id || !room_id) {
+      throw buildAppError("Thông tin phim hoặc phòng chiếu không hợp lệ.");
+    }
+
     const normalizedStatus = normalizeStoredShowtimeStatus(status);
     const movie = await this.getMovieById(movie_id);
     const room = await this.getRoomById(room_id);
@@ -206,9 +213,13 @@ export const ShowtimeModel = {
       startTime: normalizedStartTime,
       endTime: calculatedEndTime,
     });
-    const standardPrice = price_standard ?? price ?? 0;
-    const vipPrice = price_vip ?? standardPrice;
-    const couplePrice = price_couple ?? standardPrice;
+
+    const standardPrice = Number(price_standard ?? price ?? 0) || 0;
+    const vipPrice = Number(price_vip ?? standardPrice) || standardPrice;
+    const couplePrice = Number(price_couple ?? standardPrice) || standardPrice;
+    const seats = Number(available_seats ?? room.total_seat ?? 0);
+    const normalizedSeats = Number.isNaN(seats) ? 0 : seats;
+
     const columns = [
       "movie_id",
       "room_id",
@@ -224,7 +235,7 @@ export const ShowtimeModel = {
       normalizedStartTime,
       calculatedEndTime,
       standardPrice,
-      available_seats ?? room.total_seat ?? 0,
+      normalizedSeats,
       normalizedStatus,
     ];
 
@@ -257,6 +268,7 @@ export const ShowtimeModel = {
    * @returns {{ created: number[], skipped: Array<{date:string, reason:string}> }}
    */
   async createRecurring(data) {
+    const caps = await getSchemaCapabilities();
     const {
       movie_id,
       room_id,
@@ -273,10 +285,11 @@ export const ShowtimeModel = {
     const movie = await this.getMovieById(movie_id);
     const room  = await this.getRoomById(room_id);
 
-    const standardPrice = price_standard ?? price ?? 0;
-    const vipPrice      = price_vip   ?? standardPrice;
-    const couplePrice   = price_couple ?? standardPrice;
-    const seats         = available_seats ?? room.total_seat ?? 0;
+    const standardPrice = Number(price_standard ?? price ?? 0) || 0;
+    const vipPrice      = Number(price_vip ?? standardPrice) || standardPrice;
+    const couplePrice   = Number(price_couple ?? standardPrice) || standardPrice;
+    const seats         = Number(available_seats ?? room.total_seat ?? 0);
+    const normalizedSeats = Number.isNaN(seats) ? 0 : seats;
 
     // parse start/end date
     const startD = new Date(`${start_date}T00:00:00`);
@@ -341,9 +354,44 @@ export const ShowtimeModel = {
           continue;
         }
 
+        const columns = [
+          "movie_id",
+          "room_id",
+          "start_time",
+          "end_time",
+          "price",
+          "available_seats",
+          "status",
+        ];
+        const params = [
+          movie_id,
+          room_id,
+          startTime,
+          endTime,
+          standardPrice,
+          normalizedSeats,
+          ACTIVE_SHOWTIME_STATUS,
+        ];
+
+        if (caps.showtimes.hasPriceStandard) {
+          columns.splice(5, 0, "price_standard");
+          params.splice(5, 0, standardPrice);
+        }
+        if (caps.showtimes.hasPriceVip) {
+          const insertIndex = columns.indexOf("price") + 1;
+          columns.splice(insertIndex, 0, "price_vip");
+          params.splice(insertIndex, 0, vipPrice);
+        }
+        if (caps.showtimes.hasPriceCouple) {
+          const insertIndex = columns.indexOf("price") + 1;
+          columns.splice(insertIndex, 0, "price_couple");
+          params.splice(insertIndex, 0, couplePrice);
+        }
+
+        const placeholders = columns.map(() => "?").join(", ");
         const [result] = await db.query(
-          "INSERT INTO Showtimes (movie_id, room_id, start_time, end_time, price, price_standard, price_vip, price_couple, available_seats, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [movie_id, room_id, startTime, endTime, standardPrice, standardPrice, vipPrice, couplePrice, seats, ACTIVE_SHOWTIME_STATUS],
+          `INSERT INTO Showtimes (${columns.join(", ")}) VALUES (${placeholders})`,
+          params,
         );
         created.push(result.insertId);
         todayCreatedSlots.push({ startTime, endTime, hour, minute });
@@ -360,7 +408,7 @@ export const ShowtimeModel = {
    */
   async update(id, showtimeData) {
     const caps = await getSchemaCapabilities();
-    const {
+    let {
       movie_id,
       room_id,
       start_time,
@@ -371,6 +419,13 @@ export const ShowtimeModel = {
       available_seats,
       status,
     } = showtimeData;
+
+    movie_id = Number(movie_id);
+    room_id = Number(room_id);
+    if (!movie_id || !room_id) {
+      throw buildAppError("Thông tin phim hoặc phòng chiếu không hợp lệ.");
+    }
+
     const normalizedStatus = normalizeStoredShowtimeStatus(status);
     const movie = await this.getMovieById(movie_id);
     const room = await this.getRoomById(room_id);
@@ -386,9 +441,11 @@ export const ShowtimeModel = {
       endTime: calculatedEndTime,
       excludeShowtimeId: id,
     });
-    const standardPrice = price_standard ?? price ?? 0;
-    const vipPrice = price_vip ?? standardPrice;
-    const couplePrice = price_couple ?? standardPrice;
+    const standardPrice = Number(price_standard ?? price ?? 0) || 0;
+    const vipPrice = Number(price_vip ?? standardPrice) || standardPrice;
+    const couplePrice = Number(price_couple ?? standardPrice) || standardPrice;
+    const seats = Number(available_seats ?? room.total_seat ?? 0);
+    const normalizedSeats = Number.isNaN(seats) ? 0 : seats;
     const setClauses = [
       "movie_id = ?",
       "room_id = ?",
@@ -404,7 +461,7 @@ export const ShowtimeModel = {
       normalizedStartTime,
       calculatedEndTime,
       standardPrice,
-      available_seats ?? room.total_seat ?? 0,
+      normalizedSeats,
       normalizedStatus,
     ];
 

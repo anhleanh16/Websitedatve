@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { adminShowtimeService } from "../../services/adminApi";
+import { adminShowtimeService, adminMovieService } from "../../services/adminApi";
 import './showtimes.css';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -874,7 +874,7 @@ export default function AdminShowtimes() {
         adminShowtimeService.getAll(),
         adminShowtimeService.getCinemas(),
         adminShowtimeService.getRooms(),
-        fetch('/api/admin/movies').then(r => r.json()),
+        adminMovieService.getAllMovies(false),
       ]);
 
       // Chuẩn hoá dữ liệu từ DB sang format component cần

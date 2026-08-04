@@ -221,7 +221,7 @@ export const BookingModel = {
         SELECT order_id, booking_code
         FROM Orders
         WHERE status = 'pending'
-          AND payment_status IN ('pending', 'unpaid')
+          AND payment_status = 'pending'
           AND created_at < NOW() - INTERVAL 5 MINUTE
         FOR UPDATE
         `,
@@ -261,7 +261,7 @@ export const BookingModel = {
         await connection.query(
           `
           UPDATE Orders
-          SET status = 'cancelled', payment_status = 'expired'
+          SET status = 'cancelled', payment_status = 'failed'
           WHERE order_id = ?
           `,
           [order.order_id],

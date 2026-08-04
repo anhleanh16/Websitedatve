@@ -1389,9 +1389,12 @@
   }
 
   .booking-seat-map-scroll {
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
     margin: 0;
-    padding: 0;
+    padding: 0 0 0.25rem;
   }
 
   .seat-map {
@@ -1412,9 +1415,9 @@
   }
 
   .seat-row-sections {
-    width: 100%;
-    min-width: 0;
-    justify-content: center;
+    width: max-content;
+    min-width: max-content;
+    justify-content: flex-start;
     gap: 0.2rem;
   }
 
@@ -1434,8 +1437,8 @@
   .booking-seat-grid-row {
     column-gap: var(--booking-seat-gap);
     width: max-content;
-    max-width: 100%;
-    margin: 0 auto;
+    max-width: none;
+    margin: 0;
   }
 
   .booking-seat {

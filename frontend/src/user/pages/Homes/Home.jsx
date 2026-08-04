@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import QuickBookWidget from '../../Components/QuickBookWidget/QuickBookWidget'
 import {
   FaPlay, FaTicketAlt, FaStar, FaMapMarkerAlt, FaClock,
-  FaFire, FaRobot, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt, FaEye
+  FaFire, FaRobot, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt, FaEye, FaPaperPlane, FaTimes, FaMicrophone, FaStop
 } from 'react-icons/fa'
 import { MdLocalOffer } from 'react-icons/md'
 import { useSelector } from 'react-redux'
@@ -279,6 +279,24 @@ const groupShowtimesByMovie = (items) => {
   return Array.from(grouped.values()).slice(0, 6)
 }
 
+const buildMiniAiReply = (message) => {
+  const text = String(message || '').toLowerCase()
+
+  if (text.includes('suất chiếu') || text.includes('lich chieu')) {
+    return 'Bạn có thể xem suất chiếu ngay ở khối "Suất chiếu hôm nay" tại trang chủ, chọn rạp và định dạng 2D/3D/IMAX để lọc nhanh.'
+  }
+
+  if (text.includes('đặt vé') || text.includes('dat ve')) {
+    return 'Để đặt vé nhanh: chọn phim -> chọn suất chiếu -> chọn ghế -> thêm combo -> thanh toán. Nếu cần, mình có thể hướng dẫn từng bước chi tiết.'
+  }
+
+  if (text.includes('khuyến mãi') || text.includes('uu dai') || text.includes('ưu đãi')) {
+    return 'Bạn xem ưu đãi tại mục "Ưu đãi hôm nay" ở cột phải. Mình cũng có thể gợi ý ưu đãi phù hợp theo loại vé bạn muốn mua.'
+  }
+
+  return 'Mình là AI Assistant mini. Bạn có thể hỏi về phim đang chiếu, suất chiếu, đặt vé, combo và ưu đãi.'
+}
+
 export default function Home() {
   const selectedCinema = useSelector((s) => s.cinema.selectedCinema)
   const navigate = useNavigate()
@@ -308,9 +326,26 @@ export default function Home() {
   const [showtimesError, setShowtimesError] = useState('')
   const [newsError, setNewsError] = useState('')
   const [blogError, setBlogError] = useState('')
+  const [isAiOpen, setIsAiOpen] = useState(false)
+  const [aiTyping, setAiTyping] = useState(false)
+  const [aiInput, setAiInput] = useState('')
+  const [aiMode, setAiMode] = useState('voice')
+  const [voiceSupported, setVoiceSupported] = useState(true)
+  const [voiceListening, setVoiceListening] = useState(false)
+  const [voiceStatus, setVoiceStatus] = useState('Sẵn sàng hội thoại bằng giọng nói')
+  const [aiMessages, setAiMessages] = useState([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      text: 'Xin chào, mình là AI Assistant. Bạn muốn tìm phim, suất chiếu hay ưu đãi?',
+    },
+  ])
 
   const heroTimer = useRef(null)
   const adTimer   = useRef(null)
+  const aiReplyTimer = useRef(null)
+  const aiMessagesEndRef = useRef(null)
+  const speechRecognitionRef = useRef(null)
 
   useEffect(() => {
     const loadHomeData = async () => {
@@ -515,17 +550,290 @@ export default function Home() {
     return () => clearInterval(adTimer.current)
   }, [])
 
+  useEffect(() => {
+    if (!isAiOpen) return
+    aiMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [aiMessages, aiTyping, isAiOpen])
+
+  useEffect(() => {
+    return () => {
+      if (aiReplyTimer.current) {
+        clearTimeout(aiReplyTimer.current)
+      }
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.stop()
+      }
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (aiMode !== 'voice') {
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.stop()
+      }
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
+      setVoiceListening(false)
+    }
+  }, [aiMode])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      setVoiceSupported(false)
+      setVoiceStatus('Thiết bị hoặc trình duyệt chưa hỗ trợ voice chat')
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'vi-VN'
+    recognition.continuous = false
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
+
+    recognition.onstart = () => {
+      setVoiceListening(true)
+      setVoiceStatus('Đang nghe... hãy nói ngay')
+    }
+
+    recognition.onresult = (event) => {
+      const transcript = event?.results?.[0]?.[0]?.transcript?.trim() || ''
+      if (!transcript) {
+        setVoiceStatus('Không nghe rõ. Bạn nói lại giúp mình nhé')
+        return
+      }
+
+      setVoiceStatus('Đã nhận câu hỏi, AI đang phản hồi bằng giọng nói...')
+      setAiTyping(true)
+
+      const replyText = buildMiniAiReply(transcript)
+      if (aiReplyTimer.current) {
+        clearTimeout(aiReplyTimer.current)
+      }
+
+      aiReplyTimer.current = setTimeout(() => {
+        setAiTyping(false)
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+          const utterance = new SpeechSynthesisUtterance(replyText)
+          utterance.lang = 'vi-VN'
+          utterance.rate = 1
+          utterance.pitch = 1
+          window.speechSynthesis.cancel()
+          window.speechSynthesis.speak(utterance)
+          setVoiceStatus('AI đã trả lời xong. Bạn có thể bấm micro để nói tiếp')
+        } else {
+          setVoiceStatus('Không thể phát giọng nói trên trình duyệt này')
+        }
+      }, 360)
+    }
+
+    recognition.onerror = (event) => {
+      if (event?.error === 'not-allowed') {
+        setVoiceStatus('Bạn cần cấp quyền micro để dùng voice chat')
+      } else if (event?.error === 'no-speech') {
+        setVoiceStatus('Không phát hiện giọng nói. Hãy thử lại')
+      } else {
+        setVoiceStatus('Voice chat gặp lỗi, vui lòng thử lại')
+      }
+      setVoiceListening(false)
+      setAiTyping(false)
+    }
+
+    recognition.onend = () => {
+      setVoiceListening(false)
+    }
+
+    speechRecognitionRef.current = recognition
+
+    return () => {
+      recognition.onstart = null
+      recognition.onresult = null
+      recognition.onerror = null
+      recognition.onend = null
+      recognition.stop()
+      speechRecognitionRef.current = null
+    }
+  }, [])
+
   /* Movie carousel */
   const goMovies = (dir) => setMovieOff(p => Math.min(Math.max(p + dir, 0), maxOff))
+
+  const toggleAiPanel = () => {
+    setIsAiOpen((prev) => {
+      const next = !prev
+      if (!next) {
+        if (speechRecognitionRef.current) {
+          speechRecognitionRef.current.stop()
+        }
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+          window.speechSynthesis.cancel()
+        }
+        setVoiceListening(false)
+        setAiTyping(false)
+      }
+      return next
+    })
+  }
+
+  const toggleVoiceListening = () => {
+    if (!voiceSupported || !speechRecognitionRef.current) return
+
+    if (voiceListening) {
+      speechRecognitionRef.current.stop()
+      setVoiceStatus('Đã dừng nghe. Bấm micro để nói tiếp')
+      return
+    }
+
+    try {
+      speechRecognitionRef.current.start()
+    } catch {
+      setVoiceStatus('Voice chat đang bận. Vui lòng thử lại sau 1 giây')
+    }
+  }
+
+  const handleAiSubmit = (e) => {
+    e.preventDefault()
+    const message = aiInput.trim()
+    if (!message) return
+
+    const userMessage = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      text: message,
+    }
+
+    setAiMessages((prev) => [...prev, userMessage])
+    setAiInput('')
+    setAiTyping(true)
+
+    if (aiReplyTimer.current) {
+      clearTimeout(aiReplyTimer.current)
+    }
+
+    aiReplyTimer.current = setTimeout(() => {
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          id: `a-${Date.now()}`,
+          role: 'assistant',
+          text: buildMiniAiReply(message),
+        },
+      ])
+      setAiTyping(false)
+    }, 520)
+  }
 
   return (
     <div className='home-page'>
 
       {/* AI Float */}
-      <Link to='/ai-assistant' className='ai-float-btn'>
+      <button
+        type='button'
+        className={`ai-float-btn${isAiOpen ? ' is-open' : ''}`}
+        onClick={toggleAiPanel}
+        aria-label='Mở AI Assistant mini'
+        aria-expanded={isAiOpen}
+        aria-controls='ai-mini-chat'
+      >
         <span className='ai-float-icon'><FaRobot /></span>
         <span className='ai-float-label'>AI Assistant</span>
-      </Link>
+      </button>
+
+      {isAiOpen && (
+        <section className='ai-mini-chat' id='ai-mini-chat' role='dialog' aria-label='AI Assistant mini'>
+          <header className='ai-mini-header'>
+            <div className='ai-mini-title'>
+              <span className='ai-mini-dot' />
+              AI Assistant
+            </div>
+            <button
+              type='button'
+              className='ai-mini-close'
+              onClick={toggleAiPanel}
+              aria-label='Đóng hộp chat AI'
+            >
+              <FaTimes />
+            </button>
+          </header>
+
+          <div className='ai-mini-mode-switch'>
+            <button
+              type='button'
+              className={`ai-mini-mode-btn${aiMode === 'voice' ? ' active' : ''}`}
+              onClick={() => setAiMode('voice')}
+            >
+              Voice
+            </button>
+            <button
+              type='button'
+              className={`ai-mini-mode-btn${aiMode === 'text' ? ' active' : ''}`}
+              onClick={() => setAiMode('text')}
+            >
+              Text
+            </button>
+          </div>
+
+          {aiMode === 'voice' && (
+            <div className='ai-mini-voice-wrap'>
+              <button
+                type='button'
+                className={`ai-voice-btn${voiceListening ? ' listening' : ''}`}
+                onClick={toggleVoiceListening}
+                disabled={!voiceSupported}
+              >
+                {voiceListening ? <FaStop /> : <FaMicrophone />}
+              </button>
+              <div className='ai-voice-title'>Voice chat trực tiếp</div>
+              <p className='ai-voice-note'>
+                {voiceSupported
+                  ? 'Nội dung bạn nói sẽ không hiển thị thành tin nhắn text. AI phản hồi bằng giọng nói ngay sau khi nghe xong.'
+                  : 'Trình duyệt chưa hỗ trợ voice chat. Bạn có thể chuyển sang Text mode.'}
+              </p>
+              <div className='ai-voice-status'>{aiTyping ? 'AI đang suy nghĩ...' : voiceStatus}</div>
+            </div>
+          )}
+
+          {aiMode === 'text' && (
+          <>
+          <div className='ai-mini-body'>
+            {aiMessages.map((item) => (
+              <div key={item.id} className={`ai-mini-msg ${item.role}`}>
+                <div className='ai-mini-bubble'>{item.text}</div>
+              </div>
+            ))}
+            {aiTyping && (
+              <div className='ai-mini-msg assistant'>
+                <div className='ai-mini-bubble typing'>AI đang trả lời...</div>
+              </div>
+            )}
+            <div ref={aiMessagesEndRef} />
+          </div>
+
+          <form className='ai-mini-input-wrap' onSubmit={handleAiSubmit}>
+            <input
+              value={aiInput}
+              onChange={(e) => setAiInput(e.target.value)}
+              placeholder='Nhập câu hỏi của bạn...'
+              maxLength={300}
+            />
+            <button type='submit' disabled={!aiInput.trim()} aria-label='Gửi tin nhắn'>
+              <FaPaperPlane />
+            </button>
+          </form>
+          </>
+          )}
+
+          <div className='ai-mini-footer'>
+            <Link to='/ai-assistant' className='ai-mini-full-link'>Mở trang AI đầy đủ</Link>
+          </div>
+        </section>
+      )}
 
       {/* ══════════════════════════════════════════
           LAYOUT CHÍNH: 2 CỘT

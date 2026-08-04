@@ -39,6 +39,20 @@ const mapMovieCategories = (movies, categoryRows) => {
   }));
 };
 
+const normalizeMoviePosters = (posters) => {
+  if (!posters) return [];
+  if (Array.isArray(posters)) return posters.filter(Boolean);
+  if (typeof posters === "string") {
+    try {
+      const parsed = JSON.parse(posters);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 export const getPublicCinemas = async (req, res) => {
   try {
     const cinemas = await CinemaModel.findAll();
@@ -328,7 +342,7 @@ export const userGetMovieById = async (req, res) => {
       JOIN Cinemas c ON r.cinema_id = c.cinemas_id
       WHERE s.movie_id = ?
         AND s.status = 'active'
-        AND DATE(CONVERT_TZ(s.start_time, '+00:00', '+07:00')) BETWEEN DATE(CONVERT_TZ(NOW(), '+00:00', '+07:00')) AND DATE_ADD(DATE(CONVERT_TZ(NOW(), '+00:00', '+07:00')), INTERVAL 6 DAY)
+        AND DATE(CONVERT_TZ(s.start_time, '+00:00', '+07:00')) >= DATE(CONVERT_TZ(NOW(), '+00:00', '+07:00'))
       ORDER BY c.cinema_name ASC, s.start_time ASC
     `,
       [movieId],
@@ -350,7 +364,7 @@ export const userGetMovieById = async (req, res) => {
     res.json({
       movie: {
         ...movie,
-        posters: movie.posters ? JSON.parse(movie.posters) : [],
+        posters: normalizeMoviePosters(movie.posters),
         categories,
         rating: Number(reviewStats?.average_rating || 0),
         review_count: totalReviews,
