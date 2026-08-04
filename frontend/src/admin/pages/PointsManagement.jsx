@@ -161,108 +161,138 @@ export default function PointsManagement() {
       {error && <div className="points-alert points-alert-error">{error}</div>}
       {loading ? <div className="points-loading">Đang tải...</div> : (
         <div className="points-grid">
-          {/* =======================================================================
-              CARD 1 — GỘP TOÀN BỘ QUY TẮC TÍCH ĐIỂM VÀO MỘT KHỐI DUY NHẤT
-              (gộp policy summary + ví dụ + form tạo/sửa + list quy tắc)
-              ======================================================================= */}
+          {/* ── CARD: QUY TẮC TÍCH ĐIỂM ── */}
           <section className="points-card points-policy-card" style={{ gridColumn: "1 / -1" }}>
             <h2>Quy tắc tích điểm</h2>
 
-            {activeRules.length > 0 ? (
-              <>
-                {/* Thông báo chính (lấy quy tắc tổng đơn hàng đầu tiên làm tiêu điểm) */}
+            <div className="points-rule-layout">
+              {/* ── CỘT TRÁI: Form nhập ── */}
+              <div className="points-rule-left">
+                <h3 className="points-sub-title">
+                  {editingRuleId ? '✏️ Cập nhật quy tắc' : '➕ Thêm quy tắc mới'}
+                </h3>
+                <form onSubmit={handleRuleSubmit} className="points-form">
+                  <label>
+                    Tên quy tắc
+                    <input
+                      placeholder="VD: Tích điểm theo đơn hàng"
+                      value={ruleForm.ruleName}
+                      onChange={(e) => setRuleForm({ ...ruleForm, ruleName: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Loại quy tắc
+                    <select value={ruleForm.ruleScope} onChange={(e) => setRuleForm({ ...ruleForm, ruleScope: e.target.value })}>
+                      <option value="order">Tổng đơn hàng</option>
+                      <option value="seat">Loại ghế</option>
+                      <option value="combo">Combo</option>
+                    </select>
+                  </label>
+                  <label>
+                    Mã định danh (key)
+                    <input
+                      placeholder="VD: regular, vip, couple..."
+                      value={ruleForm.ruleKey}
+                      onChange={(e) => setRuleForm({ ...ruleForm, ruleKey: e.target.value })}
+                    />
+                  </label>
+                  <div className="points-form-row">
+                    <label>
+                      Chi tiêu tối thiểu (đ)
+                      <input type="number" min="0" value={ruleForm.spendingAmount} onChange={(e) => setRuleForm({ ...ruleForm, spendingAmount: Number(e.target.value) })} />
+                    </label>
+                    <label>
+                      Điểm nhận được
+                      <input type="number" min="0" value={ruleForm.earnedPoints} onChange={(e) => setRuleForm({ ...ruleForm, earnedPoints: Number(e.target.value) })} />
+                    </label>
+                  </div>
+                  <div className="points-form-row">
+                    <label>
+                      Điểm cố định / loại
+                      <input type="number" min="0" value={ruleForm.pointsValue} onChange={(e) => setRuleForm({ ...ruleForm, pointsValue: Number(e.target.value) })} />
+                    </label>
+                    <label>
+                      Hết hạn sau (tháng)
+                      <input type="number" min="1" value={ruleForm.expiresInMonths} onChange={(e) => setRuleForm({ ...ruleForm, expiresInMonths: Number(e.target.value) })} />
+                    </label>
+                  </div>
+                  <label className="checkbox-row">
+                    <input type="checkbox" checked={ruleForm.status} onChange={(e) => setRuleForm({ ...ruleForm, status: e.target.checked })} />
+                    Kích hoạt quy tắc
+                  </label>
+                  <div className="points-form-btns">
+                    <button type="submit" disabled={saving} className="points-btn-primary">
+                      {saving ? '⏳ Đang lưu...' : editingRuleId ? '💾 Cập nhật' : '➕ Thêm quy tắc'}
+                    </button>
+                    {editingRuleId && (
+                      <button type="button" className="points-btn-cancel" onClick={() => { setEditingRuleId(null); setRuleForm(defaultRuleForm); }}>
+                        Huỷ
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              {/* ── CỘT PHẢI: Thông tin + danh sách ── */}
+              <div className="points-rule-right">
+                {/* Tóm tắt chính sách */}
                 {primaryRule && (
-                  <>
-                    <p className="points-policy-summary">
-                      Mỗi <strong>{formatCurrency(primaryRule.spendingAmount || primaryRule.spending_amount || 0)}</strong> chi tiêu sẽ tích được <strong>{Number(primaryRule.earnedPoints || primaryRule.earned_points || 0)} điểm</strong>.
-                    </p>
-                    <div className="points-policy-list">
-                      <div className="points-policy-item">
-                        <span>1 điểm tương đương</span>
-                        <strong>{formatCurrency(primaryRule.spendingAmount || primaryRule.spending_amount || 0)}</strong>
-                      </div>
-                      <div className="points-policy-item">
-                        <span>Điểm được tính trên</span>
-                        <strong>tổng giá trị đơn hàng</strong>
-                      </div>
-                      <div className="points-policy-item">
-                        <span>Vé + combo đều được tính</span>
-                        <strong>có thể tích điểm</strong>
-                      </div>
-                      <div className="points-policy-item">
-                        <span>Hết hạn sau</span>
-                        <strong>{primaryRule.expiresInMonths || primaryRule.expires_in_months || 12} tháng</strong>
-                      </div>
+                  <div className="points-summary-box">
+                    <div className="points-summary-title">📊 Chính sách hiện tại</div>
+                    <div className="points-policy-item">
+                      <span>Chi tiêu</span>
+                      <strong>{formatCurrency(primaryRule.spendingAmount || primaryRule.spending_amount || 0)}</strong>
                     </div>
-                  </>
+                    <div className="points-policy-item">
+                      <span>Tích được</span>
+                      <strong className="points-highlight">{Number(primaryRule.earnedPoints || primaryRule.earned_points || 0)} điểm</strong>
+                    </div>
+                    <div className="points-policy-item">
+                      <span>Hết hạn sau</span>
+                      <strong>{primaryRule.expiresInMonths || primaryRule.expires_in_months || 12} tháng</strong>
+                    </div>
+                  </div>
                 )}
 
-                {/* ========= VÍ DỤ NHANH — GỘP TẤT CẢ RULES VÀO MỘT LIST (KHÔNG CHIA RA) ========= */}
-                <div className="points-example-box">
-                  <h3>Toàn bộ quy tắc đang áp dụng</h3>
-                  {activeRules.map((rule) => {
-                    const scope = rule.ruleScope || rule.rule_scope || "order";
-                    const key = rule.ruleKey || rule.rule_key || "";
-                    const desc =
-                      scope === "seat"
-                        ? `Ghế ${key || "đặc biệt"}: +${Number(rule.pointsValue || rule.points_value || 0)} điểm / vé`
-                        : scope === "combo"
-                          ? `Combo ${key || "đặc biệt"}: +${Number(rule.pointsValue || rule.points_value || 0)} điểm / combo`
-                          : `Mỗi ${formatCurrency(rule.spendingAmount || rule.spending_amount || 0)} chi tiêu → +${Number(rule.earnedPoints || rule.earned_points || 0)} điểm`;
+                {/* Danh sách quy tắc */}
+                <div className="points-rule-list-header">
+                  <span>Danh sách quy tắc</span>
+                  <span className="points-rule-count">{rules.length} quy tắc</span>
+                </div>
+                <div className="points-list">
+                  {rules.length === 0 && (
+                    <p className="points-empty">Chưa có quy tắc nào. Thêm quy tắc đầu tiên.</p>
+                  )}
+                  {rules.map((rule) => {
+                    const scope = rule.ruleScope || rule.rule_scope || 'order';
+                    const desc = scope === 'seat'
+                      ? `Ghế ${rule.ruleKey || rule.rule_key || '—'}: +${Number(rule.pointsValue || rule.points_value || 0)} điểm`
+                      : scope === 'combo'
+                        ? `Combo ${rule.ruleKey || rule.rule_key || '—'}: +${Number(rule.pointsValue || rule.points_value || 0)} điểm`
+                        : `${Number(rule.spendingAmount || rule.spending_amount || 0).toLocaleString()}đ → +${Number(rule.earnedPoints || rule.earned_points || 0)} điểm`;
+                    const scopeLabel = scope === 'seat' ? '🪑' : scope === 'combo' ? '🍿' : '🧾';
                     return (
-                      <div key={rule.id} className="points-example-row">
-                        <span>
-                          {rule.ruleName}
-                          <span style={{ fontSize: 12, color: "#999", marginLeft: 8 }}>
-                            ({scope === "order" ? "Đơn hàng" : scope === "seat" ? "Loại ghế" : "Combo"})
-                          </span>
-                        </span>
-                        <strong>{desc.split(": ")[1] || desc}</strong>
+                      <div key={rule.id} className="points-item">
+                        <div className="points-item-body">
+                          <div className="points-item-name">
+                            <span className="points-item-scope">{scopeLabel}</span>
+                            <strong>{rule.ruleName}</strong>
+                            <span className={`points-item-status ${rule.status ? 'on' : 'off'}`}>
+                              {rule.status ? 'Bật' : 'Tắt'}
+                            </span>
+                          </div>
+                          <div className="points-item-desc">{desc}</div>
+                        </div>
+                        <div className="points-actions">
+                          <button className="points-btn-edit" onClick={() => { setEditingRuleId(rule.id); setRuleForm({ ...rule }); }}>Sửa</button>
+                          <button className="points-btn-del" onClick={() => deleteRule(rule.id)}>Xóa</button>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              </>
-            ) : (
-              <p className="points-policy-summary">Chưa có quy tắc tích điểm nào được kích hoạt.</p>
-            )}
-
-            {/* FORM tạo/sửa quy tắc — nằm GỘP trong cùng card */}
-            <hr style={{ margin: "24px 0", borderColor: "#1e2a55" }} />
-            <h3 style={{ marginTop: 0 }}>{editingRuleId ? "Cập nhật quy tắc" : "Thêm quy tắc tích điểm"}</h3>
-            <form onSubmit={handleRuleSubmit} className="points-form">
-              <label>Tên quy tắc<input value={ruleForm.ruleName} onChange={(e) => setRuleForm({ ...ruleForm, ruleName: e.target.value })} /></label>
-              <label>Loại quy tắc<select value={ruleForm.ruleScope} onChange={(e) => setRuleForm({ ...ruleForm, ruleScope: e.target.value })}><option value="order">Tổng đơn hàng</option><option value="seat">Ghế</option><option value="combo">Combo</option></select></label>
-              <label>Mã quy tắc (ví dụ: regular, vip, couple, combo1)<input value={ruleForm.ruleKey} onChange={(e) => setRuleForm({ ...ruleForm, ruleKey: e.target.value })} /></label>
-              <label>Chi tiêu tối thiểu<input type="number" value={ruleForm.spendingAmount} onChange={(e) => setRuleForm({ ...ruleForm, spendingAmount: Number(e.target.value) })} /></label>
-              <label>Điểm nhận được<input type="number" value={ruleForm.earnedPoints} onChange={(e) => setRuleForm({ ...ruleForm, earnedPoints: Number(e.target.value) })} /></label>
-              <label>Điểm cố định cho loại này<input type="number" value={ruleForm.pointsValue} onChange={(e) => setRuleForm({ ...ruleForm, pointsValue: Number(e.target.value) })} /></label>
-              <label>Hết hạn sau (tháng)<input type="number" value={ruleForm.expiresInMonths} onChange={(e) => setRuleForm({ ...ruleForm, expiresInMonths: Number(e.target.value) })} /></label>
-              <label className="checkbox-row"><input type="checkbox" checked={ruleForm.status} onChange={(e) => setRuleForm({ ...ruleForm, status: e.target.checked })} /> Kích hoạt</label>
-              <button type="submit" disabled={saving}>{saving ? 'Đang lưu...' : editingRuleId ? 'Cập nhật quy tắc' : 'Thêm quy tắc'}</button>
-            </form>
-
-            {/* Danh sách tất cả quy tắc — cùng card, không chia tách */}
-            <h3 style={{ marginTop: 28 }}>Danh sách quy tắc ({rules.length})</h3>
-            <div className="points-list">
-              {rules.map((rule) => (
-                <div key={rule.id} className="points-item">
-                  <div>
-                    <strong>{rule.ruleName}</strong>
-                    <div>
-                      {rule.ruleScope === 'seat' ? `Ghế ${rule.ruleKey || 'đặc biệt'}: ${rule.pointsValue} điểm` : rule.ruleScope === 'combo' ? `Combo ${rule.ruleKey || 'đặc biệt'}: ${rule.pointsValue} điểm` : `Cho mỗi ${Number(rule.spendingAmount || 0).toLocaleString()}₫ nhận ${rule.earnedPoints} điểm`}
-                      <span style={{ marginLeft: 10, color: rule.status ? "#4ade80" : "#f87171", fontSize: 12 }}>
-                        ● {rule.status ? "Đang kích hoạt" : "Tạm tắt"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="points-actions">
-                    <button onClick={() => { setEditingRuleId(rule.id); setRuleForm(rule); }}>Sửa</button>
-                    <button onClick={() => deleteRule(rule.id)}>Xóa</button>
-                  </div>
-                </div>
-              ))}
-              {rules.length === 0 && <p style={{ color: "#999", fontSize: 13 }}>Chưa có quy tắc nào. Thêm quy tắc đầu tiên bên trên.</p>}
+              </div>
             </div>
           </section>
 

@@ -153,7 +153,8 @@ export const MovieModel = {
 
         return {
           ...movie,
-          posters: movie.posters ? JSON.parse(movie.posters) : [],
+          // Support both legacy single-string values and JSON arrays in DB.
+          posters: parsePosterList(movie.posters),
           categories: categories,
         };
       }),
