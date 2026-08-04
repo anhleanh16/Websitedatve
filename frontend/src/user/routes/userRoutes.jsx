@@ -15,6 +15,8 @@ import AIAssistant from "../pages/AIAssistant";
 import Notifications from "../pages/Notifications/Notifications";
 import Profile from "../pages/Profiles/Profile";
 import Login from "../pages/Logins/Login";
+import ForgotPassword from "../pages/Logins/ForgotPassword";
+import ResetPassword from "../pages/Logins/ResetPassword";
 import Register from "../pages/Registers/Register";
 import Membership from "../pages/Membership/Membership";
 import UserLayout from "../Layouts/UserLayout";
@@ -42,6 +44,10 @@ export function UserRoutes() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/login" element={<Login />} />
         <Route path="/Logins/Login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/Logins/ForgotPassword" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/Logins/ResetPassword" element={<ResetPassword />} />
         <Route path="/register" element={<Register />} />
         <Route path="/Registers/Register" element={<Register />} />
         <Route path="/Membership" element={<Membership />} />

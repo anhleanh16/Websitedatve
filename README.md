@@ -33,6 +33,28 @@ DB_NAME=sweetstar
 PORT=4000
 ```
 
+Để bật tính năng xác minh email khi đăng ký, bổ sung thêm:
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+EMAIL_FROM=Sweetstar Movie <your_email@gmail.com>
+
+# URL dùng trong email xác minh
+BACKEND_BASE_URL=http://localhost:4000
+FRONTEND_LOGIN_URL=http://localhost:5173/Logins/Login
+FRONTEND_RESET_PASSWORD_URL=http://localhost:5173/reset-password
+
+# TTL token xác minh (phút): 5
+EMAIL_VERIFY_TOKEN_TTL_MINUTES=5
+
+# TTL token đặt lại mật khẩu (phút): 5
+PASSWORD_RESET_TOKEN_TTL_MINUTES=5
+```
+
 **Thiết lập cơ sở dữ liệu**
 
 - Import `database/db.sql` vào MySQL (ví dụ dùng `mysql` CLI hoặc MySQL Workbench):

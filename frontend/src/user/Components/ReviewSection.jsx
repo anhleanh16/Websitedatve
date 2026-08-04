@@ -55,7 +55,7 @@ export default function ReviewSection({ movieId }) {
 
     try {
       await reviewService.createReview(movieId, rating, comment)
-      setSuccess('Đánh giá của bạn đã được gửi và chờ phê duyệt')
+      setSuccess('Đánh giá của bạn đã được đăng thành công')
       setRating(5)
       setComment('')
       setShowForm(false)

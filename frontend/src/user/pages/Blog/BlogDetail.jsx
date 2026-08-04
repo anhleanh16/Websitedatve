@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { FaCalendarAlt, FaClock, FaEye, FaTag } from 'react-icons/fa'
 import { blogService } from '../../services/blogService'
@@ -8,6 +8,44 @@ import './BlogDetail.css'
 const estimateReadTime = (content = '') => {
   const words = String(content).trim().split(/\s+/).filter(Boolean).length
   return `${Math.max(1, Math.ceil(words / 180))} phút đọc`
+}
+
+const normalizeAssetPath = (value = '') => {
+  const text = String(value || '').trim()
+  if (!text) return ''
+
+  try {
+    const parsed = new URL(text, window.location.origin)
+    return decodeURIComponent(parsed.pathname).replace(/\\/g, '/').toLowerCase()
+  } catch {
+    return decodeURIComponent(text.split('?')[0].split('#')[0])
+      .replace(/\\/g, '/')
+      .toLowerCase()
+  }
+}
+
+const removeThumbnailFromBody = (html, thumbnail) => {
+  const content = String(html || '')
+  if (!content || !thumbnail || typeof window === 'undefined') {
+    return content
+  }
+
+  const normalizedThumbnail = normalizeAssetPath(thumbnail)
+  if (!normalizedThumbnail) return content
+
+  try {
+    const parser = new window.DOMParser()
+    const doc = parser.parseFromString(content, 'text/html')
+    doc.querySelectorAll('img').forEach((img) => {
+      const src = img.getAttribute('src') || ''
+      if (normalizeAssetPath(src) === normalizedThumbnail) {
+        img.remove()
+      }
+    })
+    return doc.body.innerHTML
+  } catch {
+    return content
+  }
 }
 
 export default function BlogDetail() {
@@ -33,6 +71,11 @@ export default function BlogDetail() {
       setLoading(false)
     }
   }
+
+  const blogContentHtml = useMemo(
+    () => removeThumbnailFromBody(blog?.content || '', blog?.thumbnail || ''),
+    [blog?.content, blog?.thumbnail],
+  )
 
   if (loading) {
     return (
@@ -93,7 +136,7 @@ export default function BlogDetail() {
           </div>
         )}
 
-        <div className='blog-detail-content' dangerouslySetInnerHTML={{ __html: blog.content }} />
+        <div className='blog-detail-content' dangerouslySetInnerHTML={{ __html: blogContentHtml }} />
       </article>
 
       <div className='blog-detail-actions'>

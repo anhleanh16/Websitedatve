@@ -1,9 +1,27 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch } from 'react-redux'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { setUser } from '../../../redux/slices/userSlice'
 import { FaEye, FaEyeSlash, FaEnvelope, FaLock } from 'react-icons/fa'
 import './login.css'
+
+const formatCountdown = (totalSeconds) => {
+  const safe = Math.max(0, Number(totalSeconds || 0))
+  const minutes = Math.floor(safe / 60)
+  const seconds = safe % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+const parseResponseSafe = async (res) => {
+  const raw = await res.text()
+  if (!raw) return null
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return { message: raw }
+  }
+}
 
 export default function Login() {
   const [email,    setEmail]    = useState('')
@@ -11,9 +29,66 @@ export default function Login() {
   const [showPwd,  setShowPwd]  = useState(false)
   const [message,  setMessage]  = useState('')
   const [loading,  setLoading]  = useState(false)
+  const [verifyCountdown, setVerifyCountdown] = useState(null)
 
   const dispatch  = useDispatch()
   const navigate  = useNavigate()
+  const location  = useLocation()
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const verified = params.get('verified')
+    const reason = params.get('reason')
+    const sent = params.get('verify_email_sent')
+    const reset = params.get('reset')
+    const ttl = Number(params.get('ttl') || 300)
+
+    if (sent === '1') {
+      setMessage('Đăng ký thành công. Vui lòng mở email và bấm liên kết xác minh trước khi đăng nhập.')
+      setVerifyCountdown(Math.max(0, ttl))
+      return
+    }
+
+    if (verified === '1') {
+      setMessage('Xác minh email thành công. Bạn có thể đăng nhập ngay bây giờ.')
+      setVerifyCountdown(null)
+      return
+    }
+
+    if (verified === '0') {
+      setVerifyCountdown(null)
+      if (reason === 'invalid_or_expired') {
+        setMessage('Liên kết xác minh không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu gửi lại email xác minh.')
+      } else if (reason === 'missing_token') {
+        setMessage('Thiếu mã xác minh trong liên kết.')
+      } else {
+        setMessage('Không thể xác minh email vào lúc này. Vui lòng thử lại.')
+      }
+      return
+    }
+
+    if (reset === '1') {
+      setMessage('Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.')
+      setVerifyCountdown(null)
+      return
+    }
+
+    setVerifyCountdown(null)
+  }, [location.search])
+
+  useEffect(() => {
+    if (verifyCountdown === null || verifyCountdown <= 0) return
+
+    const timer = setInterval(() => {
+      setVerifyCountdown((prev) => {
+        if (prev === null) return null
+        const next = prev - 1
+        return next > 0 ? next : 0
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [verifyCountdown])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -26,10 +101,15 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ email, password }),
       })
-      const data = await res.json()
+      const data = await parseResponseSafe(res)
 
       if (!res.ok) {
-        setMessage(data.message || 'Đăng nhập thất bại')
+        setMessage(data?.message || 'Đăng nhập thất bại')
+        return
+      }
+
+      if (!data?.token || !data?.user) {
+        setMessage('Phản hồi đăng nhập không hợp lệ. Vui lòng thử lại.')
         return
       }
 
@@ -116,7 +196,10 @@ export default function Login() {
             </div>
 
             <div className='form-group'>
-              <label>Mật khẩu</label>
+              <div className='label-row'>
+                <label>Mật khẩu</label>
+                <Link to='/forgot-password' className='forgot-link'>Quên mật khẩu?</Link>
+              </div>
               <div className='input-wrapper'>
                 <FaLock className='input-icon' />
                 <input
@@ -141,6 +224,12 @@ export default function Login() {
             {message && (
               <div className='error-message'>
                 {message}
+              </div>
+            )}
+
+            {verifyCountdown !== null && (
+              <div className='countdown-message'>
+                Thời gian hiệu lực token xác minh còn: <strong>{formatCountdown(verifyCountdown)}</strong>
               </div>
             )}
 

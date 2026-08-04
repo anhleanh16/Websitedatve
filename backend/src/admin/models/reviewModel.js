@@ -103,15 +103,15 @@ export class ReviewModel {
 
   // Create review
   static async createReview(data) {
-    const { movieId, userId, rating, comment } = data
+    const { movieId, userId, rating, comment, status = 'approved' } = data
     
     try {
       const [results] = await db.query(
         `INSERT INTO Reviews (movie_id, user_id, rating, comment, status)
-         VALUES (?, ?, ?, ?, 'pending')`,
-        [movieId, userId, rating, comment]
+         VALUES (?, ?, ?, ?, ?)`,
+        [movieId, userId, rating, comment, status]
       )
-      return { review_id: results.insertId, ...data, status: 'pending' }
+      return { review_id: results.insertId, movieId, userId, rating, comment, status }
     } catch (error) {
       console.error('createReview error:', error)
       throw error

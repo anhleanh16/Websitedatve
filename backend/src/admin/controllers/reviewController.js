@@ -1,4 +1,5 @@
 import { ReviewModel } from '../models/reviewModel.js'
+import { detectSensitiveWords } from '../services/profanityService.js'
 
 export const reviewController = {
   // Get all reviews (admin)
@@ -60,6 +61,7 @@ export const reviewController = {
     try {
       const { movieId, rating, comment } = req.body
       const userId = req.userId
+      const normalizedComment = String(comment || '').trim()
 
       if (!userId) {
         return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập' })
@@ -67,6 +69,23 @@ export const reviewController = {
 
       if (!movieId || !rating) {
         return res.status(400).json({ success: false, message: 'Điểm đánh giá và ID phim là bắt buộc' })
+      }
+
+      const numericRating = parseFloat(rating)
+      if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+        return res.status(400).json({ success: false, message: 'Điểm đánh giá phải từ 1 đến 5' })
+      }
+
+      if (normalizedComment.length > 500) {
+        return res.status(400).json({ success: false, message: 'Bình luận tối đa 500 ký tự' })
+      }
+
+      const moderation = detectSensitiveWords(normalizedComment)
+      if (moderation.blocked) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bình luận chứa từ ngữ nhạy cảm. Vui lòng chỉnh sửa nội dung trước khi gửi.',
+        })
       }
 
       // Check if user already reviewed
@@ -78,11 +97,12 @@ export const reviewController = {
       const review = await ReviewModel.createReview({
         movieId,
         userId,
-        rating: parseFloat(rating),
-        comment: comment || ''
+        rating: numericRating,
+        comment: normalizedComment,
+        status: 'approved'
       })
 
-      res.status(201).json({ success: true, review, message: 'Đánh giá của bạn đã được gửi' })
+      res.status(201).json({ success: true, review, message: 'Đánh giá của bạn đã được đăng' })
     } catch (error) {
       console.error(error)
       res.status(500).json({ success: false, message: 'Lỗi tạo đánh giá' })

@@ -279,6 +279,21 @@
   text-align: center;
 }
 
+.countdown-message {
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  color: #dbeafe;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.countdown-message strong {
+  color: #fde68a;
+  font-variant-numeric: tabular-nums;
+}
+
 .submit-btn {
   width: 100%;
   padding: 15px;

@@ -5,6 +5,17 @@ import { setUser } from '../../../redux/slices/userSlice'
 import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaShieldAlt } from 'react-icons/fa'
 import './admin-login.css'
 
+const parseResponseSafe = async (res) => {
+  const raw = await res.text()
+  if (!raw) return null
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return { message: raw }
+  }
+}
+
 export default function AdminLogin() {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -37,11 +48,17 @@ export default function AdminLogin() {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ email: trimmedEmail, password: trimmedPassword }),
       })
-      const data = await res.json()
+      const data = await parseResponseSafe(res)
 
       if (!res.ok) {
         setMessageType('error')
-        setMessage(data.message || 'Đăng nhập thất bại')
+        setMessage(data?.message || 'Đăng nhập thất bại')
+        return
+      }
+
+      if (!data?.token || !data?.user) {
+        setMessageType('error')
+        setMessage('Phản hồi đăng nhập không hợp lệ. Vui lòng thử lại.')
         return
       }
 

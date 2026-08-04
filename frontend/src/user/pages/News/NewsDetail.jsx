@@ -26,6 +26,44 @@ const readTime = (content = "") => {
   return `${Math.max(1, Math.ceil(words / 180))} phút đọc`;
 };
 
+const normalizeAssetPath = (value = "") => {
+  const text = String(value || "").trim();
+  if (!text) return "";
+
+  try {
+    const parsed = new URL(text, window.location.origin);
+    return decodeURIComponent(parsed.pathname).replace(/\\/g, "/").toLowerCase();
+  } catch {
+    return decodeURIComponent(text.split("?")[0].split("#")[0])
+      .replace(/\\/g, "/")
+      .toLowerCase();
+  }
+};
+
+const removeThumbnailFromBody = (html, thumbnail) => {
+  const content = String(html || "");
+  if (!content || !thumbnail || typeof window === "undefined") {
+    return content;
+  }
+
+  const normalizedThumbnail = normalizeAssetPath(thumbnail);
+  if (!normalizedThumbnail) return content;
+
+  try {
+    const parser = new window.DOMParser();
+    const doc = parser.parseFromString(content, "text/html");
+    doc.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src") || "";
+      if (normalizeAssetPath(src) === normalizedThumbnail) {
+        img.remove();
+      }
+    });
+    return doc.body.innerHTML;
+  } catch {
+    return content;
+  }
+};
+
 export default function NewsDetail() {
   const { slug } = useParams();
   const [article, setArticle] = useState(null);
@@ -58,6 +96,11 @@ export default function NewsDetail() {
   const categoryLabel = useMemo(
     () => CATEGORY_LABELS[article?.category] || article?.category || "Tin tức",
     [article],
+  );
+
+  const articleContentHtml = useMemo(
+    () => removeThumbnailFromBody(article?.content || "", article?.thumbnail || ""),
+    [article?.content, article?.thumbnail],
   );
 
   if (loading) {
@@ -121,7 +164,7 @@ export default function NewsDetail() {
         )}
 
         <div className="news-detail-content">
-          <div dangerouslySetInnerHTML={{ __html: article.content || "" }} />
+          <div dangerouslySetInnerHTML={{ __html: articleContentHtml }} />
         </div>
       </article>
 

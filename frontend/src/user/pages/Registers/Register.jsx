@@ -3,6 +3,17 @@ import { Link, useNavigate } from 'react-router-dom'
 import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaUser, FaPhone, FaCalendar } from 'react-icons/fa'
 import './register.css'
 
+const parseResponseSafe = async (res) => {
+  const raw = await res.text()
+  if (!raw) return null
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return { message: raw }
+  }
+}
+
 export default function Register() {
   const [formData, setFormData] = useState({
     fullName: '',
@@ -52,10 +63,15 @@ export default function Register() {
                    : formData.gender === 'other' ? 'Khac' : null,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.message || 'Đăng ký thất bại')
-      
-      navigate('/Logins/Login')
+      const data = await parseResponseSafe(res)
+      if (!res.ok) throw new Error(data?.message || 'Đăng ký thất bại')
+
+      setMessage(data?.message || 'Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản.')
+      const ttlMinutes = Number(data?.tokenTtlMinutes || 5)
+      const ttlSeconds = Math.max(0, ttlMinutes * 60)
+      setTimeout(() => {
+        navigate(`/Logins/Login?verify_email_sent=1&ttl=${ttlSeconds}`)
+      }, 1200)
     } catch (err) {
       setMessage(err.message)
     } finally {
