@@ -55,7 +55,35 @@ const formatDateTime = (dateLike) => {
   })
 }
 
-const buildTicketEmailHtml = ({ booking, qrCidByCode }) => {
+const formatComboLabel = (combo) => {
+  const quantity = Number(combo?.quantity || 0)
+  const comboName = String(combo?.combo_name || '').trim()
+  const popcorn = String(combo?.selected_popcorn_type || '').trim()
+  const drink = String(combo?.selected_drink_type || '').trim()
+  const options = [popcorn, drink].filter(Boolean).join(' • ')
+
+  if (!comboName) return ''
+  return `${quantity > 0 ? `${quantity}x ` : ''}${comboName}${options ? ` (${options})` : ''}`
+}
+
+const buildConcessionQrPayload = (booking) => {
+  const bookingCode = String(booking?.booking_code || '').trim() || 'UNKNOWN'
+  const combos = Array.isArray(booking?.combos) ? booking.combos : []
+  const comboSummary = combos
+    .map(formatComboLabel)
+    .filter(Boolean)
+    .join(' | ')
+
+  return [
+    'SWEETSTAR-FOOD',
+    `BOOKING:${bookingCode}`,
+    `MOVIE:${String(booking?.movie_title || '').trim()}`,
+    `SHOW:${formatDateTime(booking?.start_time)}`,
+    `ITEMS:${comboSummary || 'NONE'}`,
+  ].join('\n')
+}
+
+const buildTicketEmailHtml = ({ booking, qrCidByCode, concessionQrCid, comboLines }) => {
   const bookingCode = escapeHtml(booking.booking_code || '')
   const fullName = escapeHtml(booking.full_name || 'Bạn')
   const movieTitle = escapeHtml(booking.movie_title || 'Đang cập nhật')
@@ -83,6 +111,27 @@ const buildTicketEmailHtml = ({ booking, qrCidByCode }) => {
       `
     })
     .join('')
+
+  const comboItemsHtml = comboLines.length
+    ? `
+      <div style="margin:10px 0 18px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;background:#fffdf5;">
+        <p style="margin:0 0 8px;font-size:13px;color:#111827;font-weight:700;">Combo / Bắp nước</p>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:#374151;">
+          ${comboLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}
+        </ul>
+      </div>
+    `
+    : ''
+
+  const concessionQrHtml = concessionQrCid
+    ? `
+      <div style="width:240px;display:inline-block;vertical-align:top;margin:10px;padding:14px;border:1px solid #fde68a;border-radius:12px;background:#fffbeb;">
+        <p style="margin:0 0 8px;font-size:13px;color:#92400e;font-weight:700;">QR nhận Combo / Bắp nước</p>
+        <img src="cid:${concessionQrCid}" alt="QR combo" style="width:180px;height:180px;display:block;margin:0 auto 10px;border-radius:8px;background:#fff;" />
+        <p style="margin:0;font-size:11px;line-height:1.5;color:#92400e;">QR này dùng riêng cho quầy đồ ăn, tách biệt với QR vé xem phim.</p>
+      </div>
+    `
+    : ''
 
   return `
     <div style="margin:0;padding:0;background:#0b1220;font-family:Arial,sans-serif;">
@@ -125,7 +174,9 @@ const buildTicketEmailHtml = ({ booking, qrCidByCode }) => {
                     </tr>
                   </table>
 
-                  <div style="text-align:center;margin:0 0 18px;">${qrItemsHtml || '<p style="color:#6b7280;">Không có dữ liệu QR.</p>'}</div>
+                  ${comboItemsHtml}
+
+                  <div style="text-align:center;margin:0 0 18px;">${qrItemsHtml || '<p style="color:#6b7280;">Không có dữ liệu QR vé.</p>'}${concessionQrHtml}</div>
 
                   <p style="margin:0 0 10px;font-size:13px;color:#4b5563;line-height:1.6;">Mẹo: Bạn có thể vào mục Vé của tôi để xem lại vé bất cứ lúc nào.</p>
                   <p style="margin:0;">
@@ -150,6 +201,9 @@ const buildTicketEmailHtml = ({ booking, qrCidByCode }) => {
 const buildTicketEmailText = ({ booking }) => {
   const seats = Array.isArray(booking.seats) ? booking.seats.join(', ') : ''
   const qrCodes = Array.isArray(booking.qr_codes) ? booking.qr_codes.join('\n') : ''
+  const comboLines = (Array.isArray(booking.combos) ? booking.combos : [])
+    .map(formatComboLabel)
+    .filter(Boolean)
 
   return [
     `Xin chào ${booking.full_name || 'bạn'},`,
@@ -161,9 +215,11 @@ const buildTicketEmailText = ({ booking }) => {
     `Suất chiếu: ${formatDateTime(booking.start_time)}`,
     `Ghế: ${seats}`,
     `Tổng thanh toán: ${toVnd(booking.total_price)}đ`,
+    comboLines.length ? `Combo/Bắp nước: ${comboLines.join(' | ')}` : '',
     '',
     'Mã QR vé:',
     qrCodes,
+    comboLines.length ? 'Mã QR quầy combo/bắp nước: có trong email (tách riêng QR vé).' : '',
     '',
     `Xem vé của tôi: ${FRONTEND_URL}/profile`,
     '',
@@ -185,6 +241,9 @@ export const sendTicketQrEmail = async (booking) => {
 
   const qrCidByCode = new Map()
   const attachments = []
+  const comboLines = (Array.isArray(booking?.combos) ? booking.combos : [])
+    .map(formatComboLabel)
+    .filter(Boolean)
 
   for (let i = 0; i < qrCodes.length; i += 1) {
     const qrValue = String(qrCodes[i])
@@ -211,6 +270,31 @@ export const sendTicketQrEmail = async (booking) => {
     })
   }
 
+  let concessionQrCid = null
+  if (comboLines.length > 0) {
+    const foodQrPayload = buildConcessionQrPayload(booking)
+    const foodQrDataUrl = await QRCode.toDataURL(foodQrPayload, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 360,
+      color: {
+        dark: '#7c2d12',
+        light: '#ffffff',
+      },
+    })
+
+    const foodBase64 = foodQrDataUrl.split(',')[1] || ''
+    if (foodBase64) {
+      concessionQrCid = `food-qr-${booking.booking_id || booking.booking_code || 'order'}@sweetstar`
+      attachments.push({
+        filename: `combo-qr-${booking.booking_code || booking.booking_id || 'order'}.png`,
+        content: Buffer.from(foodBase64, 'base64'),
+        contentType: 'image/png',
+        cid: concessionQrCid,
+      })
+    }
+  }
+
   if (attachments.length === 0) return { sent: false, reason: 'missing_qr_image' }
 
   await mailTransporter.sendMail({
@@ -218,7 +302,7 @@ export const sendTicketQrEmail = async (booking) => {
     to: toEmail,
     subject: `Vé điện tử ${booking.booking_code || ''} - Sweetstar Movie`,
     text: buildTicketEmailText({ booking }),
-    html: buildTicketEmailHtml({ booking, qrCidByCode }),
+    html: buildTicketEmailHtml({ booking, qrCidByCode, concessionQrCid, comboLines }),
     attachments,
   })
 

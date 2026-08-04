@@ -98,6 +98,22 @@ export default function Payment() {
   const comboTot = Number(comboTotal || 0)
   const base = Number(totalWithSnacks ?? (seatTot + snackTot + comboTot) || total)
   const foods = useMemo(() => Array.isArray(foodItems) ? foodItems.filter(i => Number(i?.quantity||0) > 0) : [], [foodItems])
+  const foodTransferSummary = useMemo(() => {
+    if (!foods.length) return ''
+
+    return foods
+      .map((item) => {
+        const qty = Number(item?.quantity || 0)
+        const name = String(item?.name || 'Mon').trim()
+        const options = [item?.popcornType, item?.drinkType]
+          .map((v) => String(v || '').trim())
+          .filter(Boolean)
+          .join('-')
+
+        return `${qty}x ${name}${options ? `(${options})` : ''}`
+      })
+      .join('; ')
+  }, [foods])
   const disc = promoOk && promoData ? promoData.discountAmount : 0
   const fee = 5000
   const total2 = base + fee - disc
@@ -119,6 +135,7 @@ export default function Payment() {
     toTransferSlug(day),
     toTransferSlug(time),
     seats.join(' '),
+    foodTransferSummary ? `FOOD ${toTransferSlug(foodTransferSummary)}` : '',
   ]
     .map((s) => s.trim())
     .filter(Boolean)
