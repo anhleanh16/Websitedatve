@@ -1,6 +1,7 @@
 import express from 'express';
 import {
 	login,
+	loginCustomer,
 	register,
 	getMe,
 	verifyEmail,
@@ -13,6 +14,7 @@ import { authMiddleware } from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 router.post('/login',    login);
+router.post('/user-login', loginCustomer);
 router.post('/register', register);
 router.get('/verify-email', verifyEmail);
 router.post('/resend-verification', resendVerificationEmail);

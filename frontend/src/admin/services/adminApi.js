@@ -356,6 +356,16 @@ export const adminSeatService = {
 };
 
 // ─── Employees ────────────────────────────────────────────────────────────────
+const buildEmployeeFormData = (data = {}, avatarFile) => {
+  const formData = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    formData.append(key, Array.isArray(value) ? value.join(",") : String(value));
+  });
+  if (avatarFile) formData.append("avatar", avatarFile);
+  return formData;
+};
+
 export const adminEmployeeService = {
   getAll: (params = {}) => {
     const q = new URLSearchParams(
@@ -366,10 +376,10 @@ export const adminEmployeeService = {
     return apiFetch(`/admin/employees${q ? `?${q}` : ""}`);
   },
   getById: (id) => apiFetch(`/admin/employees/${id}`),
-  create: (data) =>
-    apiFetch("/admin/employees", { method: "POST", body: JSON.stringify(data) }),
-  update: (id, data) =>
-    apiFetch(`/admin/employees/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  create: (data, avatarFile) =>
+    uploadFetch("/admin/employees", { method: "POST", body: buildEmployeeFormData(data, avatarFile) }),
+  update: (id, data, avatarFile) =>
+    uploadFetch(`/admin/employees/${id}`, { method: "PUT", body: buildEmployeeFormData(data, avatarFile) }),
   delete: (id) =>
     apiFetch(`/admin/employees/${id}`, { method: "DELETE" }),
 };

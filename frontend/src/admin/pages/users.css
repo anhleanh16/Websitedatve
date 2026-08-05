@@ -79,6 +79,7 @@
 .us-modal-close { background: rgba(255,255,255,0.06); border: none; color: #c0d0ff; width: 34px; height: 34px; border-radius: 10px; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; }
 .us-modal-close:hover { background: rgba(255,255,255,0.14); }
 .us-modal-body   { padding: 22px 28px; flex: 1; }
+.us-create-role-note { margin: 0 0 16px; padding: 10px 12px; border: 1px solid rgba(124,97,255,.28); border-radius: 10px; background: rgba(124,97,255,.1); color: #c8c0ff; font-size: 13px; line-height: 1.45; }
 .us-modal-footer { display: flex; gap: 12px; flex-wrap: wrap; padding: 16px 28px 22px; border-top: 1px solid rgba(255,255,255,0.07); }
 .us-profile-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
 .us-profile-info { display: flex; flex-direction: column; gap: 6px; }

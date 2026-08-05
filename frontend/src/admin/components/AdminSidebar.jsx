@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 
 const NAV_ITEMS = [
   { to: "/admin/dashboard",     label: "Tổng quan",        icon: "⊞", roles: ["admin","manager"] },
-  { to: "/admin/users",         label: "Tài khoản",        icon: "👥", roles: ["admin","manager"] },
+  { to: "/admin/users",         label: "Tài khoản",        icon: "👥", roles: ["admin","manager","technician"] },
   { to: "/admin/staff",         label: "Nhân viên",        icon: "🧑‍💼", roles: ["admin","manager","technician"] },
   { to: "/admin/movies",        label: "Phim",             icon: "🎬", roles: ["admin","manager","technician"] },
   { to: "/admin/showtimes",     label: "Lịch chiếu",       icon: "🕐", roles: ["admin","manager","technician"] },

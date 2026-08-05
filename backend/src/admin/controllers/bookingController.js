@@ -1,5 +1,6 @@
 import { BookingModel } from "../models/bookingModel.js";
 import bcrypt from "bcryptjs";
+import { BIRTH_DATE_ERROR, isValidBirthDate } from "../../utils/birthDate.js";
 import { db } from "../../../config/db.js";
 import {
   emailExists,
@@ -56,6 +57,10 @@ export const staffCreateBooking = async (req, res) => {
       const phone = String(info.phone || "").trim();
       const birthday = info.birthday || null;
       const sex = info.sex || null;
+
+      if (birthday && !isValidBirthDate(birthday)) {
+        return res.status(400).json({ message: BIRTH_DATE_ERROR });
+      }
 
       if (!full_name) {
         return res.status(400).json({ message: "Vui lòng nhập họ tên khách hàng." });

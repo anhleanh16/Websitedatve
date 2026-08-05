@@ -1,4 +1,5 @@
 import { EmployeeModel } from "../models/employeeModel.js";
+import { BIRTH_DATE_ERROR, isValidBirthDate } from "../../utils/birthDate.js";
 
 export const getEmployees = async (req, res) => {
   try {
@@ -26,7 +27,13 @@ export const getEmployeeById = async (req, res) => {
 
 export const createEmployee = async (req, res) => {
   try {
-    const data = req.body;
+    const data = {
+      ...req.body,
+      ...(req.file ? { avatarUrl: `/uploads/staff/${req.file.filename}` } : {}),
+    };
+    if (data.dob && !isValidBirthDate(data.dob)) {
+      return res.status(400).json({ message: BIRTH_DATE_ERROR });
+    }
     if (!data.code && !data.position) {
       return res.status(400).json({ message: "Vui lòng nhập mã nhân viên và chức vụ." });
     }
@@ -42,13 +49,20 @@ export const createEmployee = async (req, res) => {
 export const updateEmployee = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const ok = await EmployeeModel.update(id, req.body);
+    const data = {
+      ...req.body,
+      ...(req.file ? { avatarUrl: `/uploads/staff/${req.file.filename}` } : {}),
+    };
+    if (data.dob && !isValidBirthDate(data.dob)) {
+      return res.status(400).json({ message: BIRTH_DATE_ERROR });
+    }
+    const ok = await EmployeeModel.update(id, data);
     if (!ok) return res.status(404).json({ message: "Không tìm thấy nhân viên." });
     const employee = await EmployeeModel.findById(id);
     res.json({ message: "Cập nhật nhân viên thành công.", employee });
   } catch (err) {
     console.error("Error in updateEmployee:", err);
-    res.status(500).json({ message: err.message || "Lỗi khi cập nhật nhân viên." });
+    res.status(err.statusCode || 500).json({ message: err.message || "Lỗi khi cập nhật nhân viên." });
   }
 };
 

@@ -220,3 +220,4 @@
 .sf-toast button { background: none; border: none; color: #7a8fc0; cursor: pointer; font-size: 14px; }
 @keyframes sf-toast-in { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
 @media (max-width: 768px) { .sf-form-grid { grid-template-columns: 1fr; } .sf-detail-grid { grid-template-columns: 1fr; } .sf-field-row { grid-template-columns: 1fr; } }
+.sf-account-hint { display: block; margin-top: 6px; color: #7a8fc0; font-size: 11px; line-height: 1.45; }

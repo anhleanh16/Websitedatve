@@ -12,6 +12,7 @@ export const UserModel = {
         u.full_name,
         u.email,
         u.phone as phone_number,
+        u.avatar,
         CASE
           WHEN u.id = 1 THEN 'admin'
           WHEN e.position IS NOT NULL AND e.position != '' THEN

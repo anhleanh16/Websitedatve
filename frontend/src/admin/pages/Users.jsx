@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { adminUserService } from "../services/adminApi.js";
+import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../utils/birthDate.js";
 import "./users.css";
 
 const MEMBERSHIP_LEVELS = [
@@ -658,6 +659,7 @@ function ResetPasswordModal({ user, onClose, onConfirm }) {
       e.email = "Email không hợp lệ.";
     if (!form.phone.trim()) e.phone = "Nhập số điện thoại.";
     if (!form.birthday) e.birthday = "Chọn ngày sinh.";
+    else if (!isValidBirthDate(form.birthday)) e.birthday = BIRTH_DATE_ERROR;
     if (!form.new_password) e.new_password = "Nhập mật khẩu mới.";
     else if (form.new_password.length < 6)
       e.new_password = "Mật khẩu mới ít nhất 6 ký tự.";
@@ -781,6 +783,8 @@ function ResetPasswordModal({ user, onClose, onConfirm }) {
                     type="date"
                     className={`us-input ${errors.birthday ? "error" : ""}`}
                     value={form.birthday}
+                    min={getBirthDateBounds().min}
+                    max={getBirthDateBounds().max}
                     onChange={(e) => set("birthday", e.target.value)}
                   />
                   {errors.birthday && (
@@ -909,6 +913,7 @@ function CreateUserModal({ onClose, onConfirm }) {
     if (!form.password) e.password = "Nhập mật khẩu.";
     else if (form.password.length < 6)
       e.password = "Mật khẩu ít nhất 6 ký tự.";
+    if (form.birthday && !isValidBirthDate(form.birthday)) e.birthday = BIRTH_DATE_ERROR;
     return e;
   };
 
@@ -958,6 +963,7 @@ function CreateUserModal({ onClose, onConfirm }) {
             </button>
           </div>
           <div className="us-modal-body">
+            <p className="us-create-role-note">Tài khoản mới được tạo với vai trò Khách hàng. Vai trò sẽ tự đổi thành Nhân viên khi tài khoản được thêm vào danh sách nhân viên.</p>
             <div className="us-detail-grid">
               <div className="us-detail-card">
                 <h4>Thông tin cơ bản *</h4>
@@ -1023,6 +1029,8 @@ function CreateUserModal({ onClose, onConfirm }) {
                     type="date"
                     className="us-input"
                     value={form.birthday}
+                    min={getBirthDateBounds().min}
+                    max={getBirthDateBounds().max}
                     onChange={(e) => set("birthday", e.target.value)}
                   />
                 </div>

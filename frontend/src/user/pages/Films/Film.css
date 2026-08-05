@@ -136,39 +136,56 @@
   background: linear-gradient(135deg, #31294a 0%, #121029 100%);
   background-size: cover;
   background-position: center;
-  height: 403px;
-  border-radius: 22px;
+  height: clamp(300px, 32vw, 430px);
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 26px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   color: rgba(255, 255, 255, 0.92);
   font-weight: 700;
   position: relative;
   overflow: hidden;
-  animation: slideFromRight 0.6s ease-in-out;
+  isolation: isolate;
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
-@keyframes slideFromRight {
+@keyframes bannerReveal {
   from {
     opacity: 0;
-    background-position: 120% center;
+    transform: scale(1.025);
   }
   to {
     opacity: 1;
-    background-position: center;
+    transform: scale(1);
   }
 }
 
 .hero-carousel.transition {
-  animation: slideFromRight 0.6s ease-in-out;
+  animation: bannerReveal 650ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .banner-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 22px;
+  background:
+    linear-gradient(90deg, rgba(4, 7, 22, 0.84) 0%, rgba(7, 10, 28, 0.52) 46%, rgba(7, 10, 28, 0.12) 100%),
+    linear-gradient(0deg, rgba(4, 7, 22, 0.48), transparent 55%);
+  border-radius: inherit;
+  z-index: 0;
 }
+
+.hero-carousel .banner-content {
+  position: relative;
+  z-index: 2;
+  max-width: min(66%, 660px);
+  margin-left: clamp(28px, 5vw, 72px);
+  padding: 0;
+  text-align: left;
+  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.52);
+}
+.hero-carousel .banner-content h2 { margin: 0 0 12px; color: #fff; font-size: clamp(30px, 3.4vw, 50px); line-height: 1.12; letter-spacing: -0.025em; }
+.hero-carousel .banner-content p { margin: 0; max-width: 560px; color: rgba(255,255,255,.92); font-size: clamp(15px, 1.2vw, 18px); font-weight: 500; line-height: 1.6; }
 
 .hero-controls {
   position: absolute;
@@ -176,60 +193,66 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 14px;
+  padding: 0 20px;
   pointer-events: none;
   z-index: 10;
 }
 .hero-controls .hc {
   pointer-events: auto;
-  background: rgba(10, 10, 20, 0.75);
+  background: rgba(9, 12, 30, 0.58);
   color: #fff;
-  border: none;
-  width: 40px;
-  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   cursor: pointer;
-  font-size: 18px;
-  transition: background 0.2s ease;
+  font-size: 28px;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 
 .hero-controls .hc:hover {
-  background: rgba(10, 10, 20, 0.95);
+  background: rgba(104, 72, 227, 0.82);
+  border-color: rgba(255, 255, 255, 0.7);
+  transform: scale(1.08);
 }
 
 .banner-indicators {
   position: absolute;
-  bottom: 14px;
+  bottom: 22px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  gap: 7px;
   z-index: 10;
 }
 
 .indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  width: 24px;
+  height: 5px;
+  padding: 0;
+  border-radius: 999px;
+  border: 0;
   background: rgba(255, 255, 255, 0.2);
   cursor: pointer;
   transition:
     background 0.3s ease,
-    border-color 0.3s ease;
+    border-color 0.3s ease,
+    width 0.3s ease;
 }
 
 .indicator.active {
-  background: rgba(255, 255, 255, 0.8);
-  border-color: #fff;
+  width: 42px;
+  background: #fff;
 }
 
 .indicator:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .tabs {
@@ -813,5 +836,27 @@
   }
   .hero-carousel {
     height: 200px;
+    border-radius: 18px;
+  }
+  .hero-carousel .banner-content {
+    max-width: calc(100% - 48px);
+    margin-left: 24px;
+  }
+  .hero-carousel .banner-content h2 {
+    font-size: 25px;
+  }
+  .hero-carousel .banner-content p {
+    font-size: 14px;
+  }
+  .hero-controls {
+    padding: 0 10px;
+  }
+  .hero-controls .hc {
+    width: 36px;
+    height: 36px;
+    font-size: 23px;
+  }
+  .banner-indicators {
+    bottom: 12px;
   }
 }

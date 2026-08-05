@@ -28,6 +28,19 @@ export const ensureEmployeeSchema = async () => {
 };
 
 /* ── Format row ─────────────────────────────────────────────────────── */
+const formatDateInput = (value) => {
+  if (!value) return "";
+  const isoDate = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoDate) return isoDate[1];
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+const normalizeDateForDb = (value) => formatDateInput(value) || null;
+
 const fmt = (row) => ({
   id:           Number(row.employee_id),
   userId:       row.user_id ? Number(row.user_id) : null,
@@ -39,11 +52,11 @@ const fmt = (row) => ({
   department:   row.department    || "",
   type:         row.type          || "full_time",
   shifts:       row.shifts        ? row.shifts.split(",").filter(Boolean) : [],
-  hireDate:     row.hire_date     ? String(row.hire_date).slice(0, 10) : "",
+  hireDate:     formatDateInput(row.hire_date),
   salary:       Number(row.salary || 0),
   status:       row.status        || "active",
   sex:          row.sex           || "",
-  dob:          row.dob           ? String(row.dob).slice(0, 10) : "",
+  dob:          formatDateInput(row.dob),
   address:      row.address       || "",
   avatarUrl:    row.avatar_url    || "",
   cinemaId:     row.cinema_id     ? Number(row.cinema_id) : null,
@@ -59,28 +72,26 @@ const resolveEmployeeRoleId = async (connection = db) => {
 
 const syncEmployeeRoleIds = async (connection = db) => {
   const staffRoleId = await resolveEmployeeRoleId(connection);
+  const managerRoleId = await ensureRoleExists('manager', 'Quản lý', connection);
+  const technicianRoleId = await ensureRoleExists('technician', 'Kỹ thuật viên', connection);
   const [[adminRole]] = await connection.query('SELECT role_id FROM Roles WHERE role_name = ? LIMIT 1', ['admin']);
   const adminRoleId = adminRole ? adminRole.role_id : null;
 
-  if (adminRoleId) {
-    await connection.query(
-      `UPDATE User u
-       JOIN Employees e ON e.user_id = u.id
-       SET u.role_id = ?
-       WHERE e.position IS NOT NULL AND e.position != ''
-         AND (u.role_id IS NULL OR u.role_id NOT IN (?, ?))`,
-      [staffRoleId, staffRoleId, adminRoleId]
-    );
-  } else {
-    await connection.query(
-      `UPDATE User u
-       JOIN Employees e ON e.user_id = u.id
-       SET u.role_id = ?
-       WHERE e.position IS NOT NULL AND e.position != ''
-         AND (u.role_id IS NULL OR u.role_id != ?)`,
-      [staffRoleId, staffRoleId]
-    );
-  }
+  const adminCondition = adminRoleId ? "AND u.role_id <> ?" : "";
+  const params = [managerRoleId, technicianRoleId, staffRoleId];
+  if (adminRoleId) params.push(adminRoleId);
+  await connection.query(
+    `UPDATE User u
+     JOIN Employees e ON e.user_id = u.id
+     SET u.role_id = CASE
+       WHEN LOWER(e.position) LIKE '%quản lý%' OR LOWER(e.position) LIKE '%manager%' THEN ?
+       WHEN LOWER(e.position) LIKE '%kỹ thuật%' OR LOWER(e.position) LIKE '%ky thuat%'
+         OR LOWER(e.position) LIKE '%technician%' THEN ?
+       ELSE ?
+     END
+     WHERE e.position IS NOT NULL AND e.position != '' ${adminCondition}`,
+    params,
+  );
 };
 
 const resolveUserRoleIdForEmployee = async (userId, connection = db) => {
@@ -197,20 +208,25 @@ export const EmployeeModel = {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           userId || null,
-          data.code         || "",
+          "",
           data.position     || "",
           data.department   || "",
           data.type         || "full_time",
-          data.hireDate     || null,
+          normalizeDateForDb(data.hireDate),
           Number(data.salary || 0),
           data.status       || "active",
           Array.isArray(data.shifts) ? data.shifts.join(",") : (data.shifts || ""),
           data.address      || "",
           data.sex          || "",
-          data.dob          || null,
+          normalizeDateForDb(data.dob),
           data.avatarUrl    || "",
           data.cinemaId     || null,
         ],
+      );
+      const generatedCode = `NV${String(result.insertId).padStart(5, "0")}`;
+      await connection.query(
+        "UPDATE Employees SET employee_code = ? WHERE employee_id = ?",
+        [generatedCode, result.insertId],
       );
       await syncEmployeeRoleIds(connection);
       await connection.commit();
@@ -237,13 +253,13 @@ export const EmployeeModel = {
       if (data.position   !== undefined) set("position",      data.position);
       if (data.department !== undefined) set("department",    data.department);
       if (data.type       !== undefined) set("type",          data.type);
-      if (data.hireDate   !== undefined) set("hire_date",     data.hireDate || null);
+      if (data.hireDate   !== undefined) set("hire_date",     normalizeDateForDb(data.hireDate));
       if (data.salary     !== undefined) set("salary",        Number(data.salary || 0));
       if (data.status     !== undefined) set("status",        data.status);
       if (data.shifts     !== undefined) set("shifts",        Array.isArray(data.shifts) ? data.shifts.join(",") : (data.shifts || ""));
       if (data.address    !== undefined) set("address",       data.address);
       if (data.sex        !== undefined) set("sex",           data.sex);
-      if (data.dob        !== undefined) set("dob",           data.dob || null);
+      if (data.dob        !== undefined) set("dob",           normalizeDateForDb(data.dob));
       if (data.avatarUrl  !== undefined) set("avatar_url",    data.avatarUrl);
       if (data.cinemaId   !== undefined) set("cinema_id",     data.cinemaId || null);
 

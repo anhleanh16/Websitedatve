@@ -8,6 +8,7 @@ import { NotificationModel } from "../../admin/models/notificationModel.js";
 import { PromotionModel } from "../../admin/models/promotionModel.js";
 import { NewsModel } from "../../admin/models/newsModel.js";
 import { sendTicketQrEmail } from '../services/ticketEmailService.js';
+import { BIRTH_DATE_ERROR, isValidBirthDate } from '../../utils/birthDate.js';
 import {
   isEmailVerificationConfigured,
   sendEmailChangeOtpEmail,
@@ -628,6 +629,10 @@ export const userUpdateProfile = async (req, res) => {
     const normalizedSex = ["Nam", "Nu", "Khac"].includes(String(sex || ""))
       ? String(sex)
       : null;
+
+    if (normalizedBirthday && !isValidBirthDate(normalizedBirthday)) {
+      return res.status(400).json({ message: BIRTH_DATE_ERROR });
+    }
 
     if (!trimmedName || !trimmedEmail) {
       return res.status(400).json({ message: "Họ tên và email là bắt buộc." });

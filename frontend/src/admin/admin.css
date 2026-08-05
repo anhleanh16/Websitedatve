@@ -3691,6 +3691,64 @@
   background: none; border: none;
   color: #7a8fc0; cursor: pointer; font-size: 14px;
 }
+
+/* Seat selection rule warning: fixed so it never replaces or obscures the map. */
+.admin-seat-rule-toast {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 100000;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: min(480px, calc(100vw - 32px));
+  padding: 14px 16px;
+  color: #ffe1a6;
+  background: rgba(76, 25, 11, 0.97);
+  border: 1px solid rgba(251, 146, 60, 0.75);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+  line-height: 1.45;
+  animation: sf-toast-in 0.25s ease;
+}
+.admin-seat-rule-toast > span:first-child { color: #fbbf24; font-weight: 800; }
+.admin-seat-rule-toast button {
+  padding: 0 0 0 6px;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* Staff booking – food and combo selection */
+.admin-food-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.admin-food-heading h3 { margin: 0; }
+.admin-food-heading p, .admin-food-section-title p { margin: 5px 0 0; color: #7a8fc0; font-size: 13px; }
+.admin-food-heading > strong { padding: 9px 12px; border-radius: 10px; color: #fcd34d; background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.22); white-space: nowrap; }
+.admin-food-sections { display: grid; gap: 22px; }
+.admin-food-section { padding: 18px; border: 1px solid rgba(143,166,255,.15); border-radius: 16px; background: linear-gradient(135deg, rgba(18,27,56,.78), rgba(10,16,32,.78)); }
+.admin-food-section-title { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+.admin-food-section-title > span { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: rgba(124,97,255,.16); font-size: 20px; }
+.admin-food-section-title h4 { margin: 0; color: #eef4ff; font-size: 15px; }
+.admin-food-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: 12px; }
+.admin-food-card { display: flex; align-items: center; gap: 12px; min-height: 104px; padding: 13px; border: 1px solid rgba(255,255,255,.09); border-radius: 14px; background: rgba(255,255,255,.035); transition: border-color .18s, transform .18s, background .18s; }
+.admin-food-card:hover { transform: translateY(-2px); border-color: rgba(124,97,255,.45); background: rgba(124,97,255,.07); }
+.admin-food-card.selected { border-color: rgba(251,191,36,.62); background: rgba(251,191,36,.075); }
+.admin-food-icon { flex: 0 0 42px; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: rgba(255,255,255,.08); font-size: 22px; }
+.admin-food-content { min-width: 0; flex: 1; }
+.admin-food-content h4 { margin: 0 0 4px; color: #eef4ff; font-size: 14px; line-height: 1.35; }
+.admin-food-content p { margin: 0 0 7px; color: #8fa6ff; font-size: 12px; }
+.admin-food-content strong { color: #fcd34d; font-size: 14px; }
+.admin-food-quantity { display: flex; align-items: center; overflow: hidden; border: 1px solid rgba(124,97,255,.35); border-radius: 10px; }
+.admin-food-quantity button { width: 30px; height: 32px; border: 0; color: #d9d1ff; background: rgba(124,97,255,.16); cursor: pointer; font-size: 20px; line-height: 1; }
+.admin-food-quantity button:hover:not(:disabled) { background: rgba(124,97,255,.36); }
+.admin-food-quantity button:disabled { color: #53617f; cursor: not-allowed; }
+.admin-food-quantity span { min-width: 28px; color: #fff; font-weight: 700; text-align: center; font-size: 13px; }
+.admin-food-empty, .admin-food-empty-section { padding: 24px; border: 1px dashed rgba(143,166,255,.22); border-radius: 14px; color: #8fa6ff; text-align: center; }
+.admin-food-empty-section { margin: 0; padding: 16px; }
 @keyframes sf-toast-in {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }

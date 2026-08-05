@@ -3,14 +3,9 @@ import "./Film.css";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import QuickBookWidget from "../../Components/QuickBookWidget/QuickBookWidget";
 import { userMovieService } from "../../services/userApi";
+import { getActiveHomeBanners, hydrateHomeBannerImages } from "../../utils/homeBanners";
 
 const VISITED_TAG_STORAGE_KEY = "sweetstar_user_tag_preferences";
-
-const banners = [
-  "/uploads/banners/banner1.jpg",
-  "/uploads/banners/banner2.jpg",
-  "/uploads/banners/banner3.jpg",
-];
 
 const normalizeMovieItem = (m) => ({
   id: m.movie_id,
@@ -32,6 +27,11 @@ export default function Film() {
   const navigate = useNavigate();
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [banners, setBanners] = useState(getActiveHomeBanners);
+
+  useEffect(() => {
+    hydrateHomeBannerImages(banners).then(setBanners);
+  }, []);
   const bookingContext = location.state?.bookingContext || null;
 
   const bookingSummary = useMemo(() => {
@@ -270,10 +270,14 @@ export default function Film() {
               <div
                 className={`hero-carousel ${isTransitioning ? "transition" : ""}`}
                 style={{
-                  backgroundImage: `url(${banners[currentBannerIndex]})`,
+                  backgroundImage: `url(${banners[currentBannerIndex]?.image})`,
                 }}
               >
                 <div className="banner-overlay" />
+                <div className="banner-content">
+                  <h2>{banners[currentBannerIndex]?.title}</h2>
+                  <p>{banners[currentBannerIndex]?.subtitle}</p>
+                </div>
               </div>
               <div className="hero-controls">
                 <button className="hc" onClick={goToPrevBanner}>
@@ -456,7 +460,7 @@ export default function Film() {
               to="/"
               className="ad"
               style={{
-                backgroundImage: `linear-gradient(180deg, rgba(7, 10, 24, 0.2), rgba(7, 10, 24, 0.76)), url(${banners[(currentBannerIndex + 1) % banners.length]})`,
+                backgroundImage: `linear-gradient(180deg, rgba(7, 10, 24, 0.2), rgba(7, 10, 24, 0.76)), url(${banners[(currentBannerIndex + 1) % banners.length]?.image})`,
               }}
             >
               <div className="ad-content">

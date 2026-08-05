@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaUser, FaPhone, FaCalendar } from 'react-icons/fa'
 import './register.css'
+import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from '../../../utils/birthDate'
 
 const parseResponseSafe = async (res) => {
   const raw = await res.text()
@@ -44,6 +45,12 @@ export default function Register() {
 
     if (formData.password !== formData.confirmPassword) {
       setMessage('Mật khẩu không khớp!')
+      setLoading(false)
+      return
+    }
+
+    if (formData.birthDate && !isValidBirthDate(formData.birthDate)) {
+      setMessage(BIRTH_DATE_ERROR)
       setLoading(false)
       return
     }
@@ -230,6 +237,8 @@ export default function Register() {
                     type='date'
                     name='birthDate'
                     value={formData.birthDate}
+                    min={getBirthDateBounds().min}
+                    max={getBirthDateBounds().max}
                     onChange={handleChange}
                   />
                 </div>

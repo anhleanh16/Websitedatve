@@ -98,7 +98,7 @@ export default function Login() {
     setMessage('')
 
     try {
-      const res  = await fetch('/api/auth/login', {
+      const res  = await fetch('/api/auth/user-login', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ email, password }),
@@ -115,9 +115,9 @@ export default function Login() {
         return
       }
 
-      // Kiểm tra xem người dùng có phải admin không
-      if (data.user?.role === 'admin') {
-        setMessage('Tài khoản admin không thể đăng nhập tại đây. Vui lòng truy cập trang quản trị.')
+      // Frontend guard mirrors the server-side user-login role gate.
+      if (['admin', 'staff', 'manager', 'technician'].includes(String(data.user?.role || '').toLowerCase())) {
+        setMessage('Tài khoản nhân viên chỉ được đăng nhập tại trang quản trị.')
         return
       }
 

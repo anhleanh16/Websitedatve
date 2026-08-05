@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import './staff.css';
+import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../utils/birthDate.js";
 import BookingWizard from "./Bookings/BookingWizard.jsx";
 import {
   adminBookingService,
@@ -188,7 +189,7 @@ const getInitials = (name) => name.split(" ").slice(-2).map(w => w[0]).join("").
 const fmtSalary   = (type, n) => type === "part_time" ? `${n.toLocaleString()} ₫/giờ` : `${n.toLocaleString()} ₫/tháng`;
 
 const EMPTY_STAFF = {
-  name: "", code: "", email: "", phone: "",
+  userId: "", name: "", code: "", email: "", phone: "",
   dob: "", sex: "Nam", address: "",
   cinemaId: "", departmentId: "",
   role: "staff", type: "full_time",
@@ -203,8 +204,19 @@ const mapDepartmentId = (departmentName) => {
   return match ? match.id : "";
 };
 
+const getStaffRoleFromPosition = (position) => {
+  const normalized = String(position || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (normalized.includes("quan ly") || normalized.includes("manager")) return "manager";
+  if (normalized.includes("ky thuat") || normalized.includes("technician") || normalized.includes("technical")) return "technician";
+  return "staff";
+};
+
 const mapEmployeeToStaff = (employee, localFallback = null) => ({
   id: employee.id,
+  userId: employee.userId || "",
   name: employee.name || "",
   code: employee.code || "",
   email: employee.email || "",
@@ -215,7 +227,7 @@ const mapEmployeeToStaff = (employee, localFallback = null) => ({
   avatar: employee.avatarUrl || employee.avatar || "",
   cinemaId: employee.cinemaId ?? "",
   departmentId: mapDepartmentId(employee.department) || "",
-  role: employee.position?.toLowerCase().includes("quản lý") ? "manager" : employee.position?.toLowerCase().includes("kỹ thuật") ? "technician" : "staff",
+  role: getStaffRoleFromPosition(employee.position),
   type: employee.type || "full_time",
   salary: employee.salary ?? "",
   baseSalary: employee.salary ?? "",
@@ -255,7 +267,7 @@ function Confirm({ message, onClose, onConfirm }) {
 }
 
 // ─── Staff Form ───────────────────────────────────────────────────────────────
-function StaffForm({ staff, onClose, onSave }) {
+function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
   const isEdit = !!staff;
   const [form, setForm] = useState(staff ? { ...staff } : { ...EMPTY_STAFF });
   const [errors, setErrors] = useState({});
@@ -276,16 +288,37 @@ function StaffForm({ staff, onClose, onSave }) {
     set("avatar", "");
   };
 
+  const selectCustomerAccount = (userId) => {
+    const account = customerAccounts.find((item) => String(item.user_id) === String(userId));
+    if (!account) {
+      set("userId", "");
+      return;
+    }
+    setForm((previous) => ({
+      ...previous,
+      userId: account.user_id,
+      name: account.full_name || previous.name,
+      email: account.email || previous.email,
+      phone: account.phone_number || previous.phone,
+      dob: String(account.birthday || "").slice(0, 10),
+      sex: account.sex || previous.sex,
+      avatar: account.avatar || previous.avatar,
+    }));
+    setErrors((previous) => ({ ...previous, name: undefined, email: undefined, phone: undefined }));
+  };
+
   const validate = () => {
     const e = {};
+    if (!isEdit && !form.userId) e.userId = "Chọn tài khoản người dùng để tạo nhân viên.";
     if (!form.name.trim())     e.name     = "Nhập họ tên.";
-    if (!form.code.trim())     e.code     = "Nhập mã nhân viên.";
+    if (isEdit && !form.code.trim()) e.code = "Mã nhân viên không hợp lệ.";
     if (!form.email.trim())    e.email    = "Nhập email.";
     if (!form.phone.trim())    e.phone    = "Nhập số điện thoại.";
     if (!form.cinemaId)        e.cinemaId = "Chọn rạp.";
     if (!form.departmentId)    e.departmentId = "Chọn bộ phận.";
     if (!form.salary || form.salary <= 0) e.salary = "Nhập mức lương.";
     if (!form.hireDate)        e.hireDate = "Chọn ngày vào làm.";
+    if (form.dob && !isValidBirthDate(form.dob)) e.dob = BIRTH_DATE_ERROR;
     if (form.shifts.length === 0) e.shifts = "Chọn ít nhất một ca.";
     return e;
   };
@@ -311,10 +344,36 @@ function StaffForm({ staff, onClose, onSave }) {
           <div className="sf-form-grid">
             {/* Col 1 */}
             <div className="sf-form-col">
+              <div className="sf-field">
+                <label>Tài khoản người dùng *</label>
+                <select
+                  className={errors.userId ? "error" : ""}
+                  value={form.userId || ""}
+                  onChange={(e) => selectCustomerAccount(e.target.value)}
+                  disabled={isEdit}
+                >
+                  <option value="">-- Chọn tài khoản khách hàng để đồng bộ --</option>
+                  {customerAccounts.map((account) => (
+                    <option key={account.user_id} value={account.user_id}>
+                      {account.full_name} · {account.email}
+                    </option>
+                  ))}
+                </select>
+                <small className="sf-account-hint">
+                  {isEdit ? "Tài khoản liên kết không thể thay đổi khi đang chỉnh sửa." : "Tên, email, số điện thoại, ngày sinh và giới tính sẽ được điền tự động."}
+                </small>
+                {errors.userId && <span className="sf-error">{errors.userId}</span>}
+              </div>
               <div className="sf-field-row">
                 <div className="sf-field">
-                  <label>Mã nhân viên *</label>
-                  <input className={errors.code ? "error" : ""} value={form.code} onChange={e => set("code", e.target.value)} placeholder="NV001…" />
+                  <label>Mã nhân viên</label>
+                  <input
+                    className={errors.code ? "error" : ""}
+                    value={isEdit ? form.code : "Tự động tạo sau khi lưu"}
+                    onChange={e => set("code", e.target.value)}
+                    placeholder="Tự động tạo"
+                    disabled={!isEdit}
+                  />
                   {errors.code && <span className="sf-error">{errors.code}</span>}
                 </div>
                 <div className="sf-field">
@@ -340,7 +399,8 @@ function StaffForm({ staff, onClose, onSave }) {
               <div className="sf-field-row">
                 <div className="sf-field">
                   <label>Ngày sinh</label>
-                  <input type="date" value={form.dob} onChange={e => set("dob", e.target.value)} />
+                  <input type="date" className={errors.dob ? "error" : ""} value={form.dob} min={getBirthDateBounds().min} max={getBirthDateBounds().max} onChange={e => set("dob", e.target.value)} />
+                  {errors.dob && <span className="sf-error">{errors.dob}</span>}
                 </div>
                 <div className="sf-field">
                   <label>Giới tính</label>
@@ -1027,6 +1087,7 @@ export default function AdminStaff() {
       return [];
     }
   });
+  const [customerAccounts, setCustomerAccounts] = useState([]);
   const [activeTab,  setActiveTab]  = useState("list");
 
   const [viewStaff,   setViewStaff]   = useState(null);
@@ -1055,21 +1116,19 @@ export default function AdminStaff() {
 
   useEffect(() => {
     loadEmployees();
+    adminUserService.getAllUsers()
+      .then((response) => setCustomerAccounts(
+        (response?.users || []).filter((user) => String(user?.role || "").toLowerCase() === "user"),
+      ))
+      .catch((err) => showToast(`Không thể tải tài khoản người dùng: ${err.message}`));
   }, []);
 
   const handleSave = async (data) => {
     try {
-      const { id, ...rest } = data;
+      const { id, avatarFile, ...rest } = data;
       let payload = { ...rest };
 
-      if (data.avatarFile) {
-        payload.avatarUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(data.avatarFile);
-        });
-      } else if (data.avatar) {
+      if (data.avatar) {
         payload.avatarUrl = data.avatar;
       }
 
@@ -1077,7 +1136,12 @@ export default function AdminStaff() {
       payload.name = (payload.name || "").trim();
       payload.email = (payload.email || "").trim();
       payload.phone = (payload.phone || "").trim();
-      payload.position = payload.position || (payload.role === "manager" ? "Quản lý" : payload.role === "technician" ? "Kỹ thuật viên" : "Nhân viên");
+      // The selected role is authoritative; do not retain the employee's old position.
+      payload.position = payload.role === "manager"
+        ? "Quản lý"
+        : payload.role === "technician"
+          ? "Kỹ thuật viên"
+          : "Nhân viên";
       payload.department = DEPARTMENTS.find((item) => item.id === Number(payload.departmentId))?.name || "";
       payload.cinemaId = payload.cinemaId ? Number(payload.cinemaId) : null;
       payload.type = payload.type || "full_time";
@@ -1090,10 +1154,10 @@ export default function AdminStaff() {
       payload.address = payload.address || "";
 
       if (id && String(id).length < 12) {
-        await adminEmployeeService.update(id, payload);
+        await adminEmployeeService.update(id, payload, avatarFile);
         showToast(`Đã cập nhật nhân viên "${payload.name}".`);
       } else {
-        const created = await adminEmployeeService.create(payload);
+        const created = await adminEmployeeService.create(payload, avatarFile);
         if (created?.employee?.id) {
           payload.id = created.employee.id;
         }
@@ -1186,7 +1250,7 @@ export default function AdminStaff() {
       {activeTab === "tasks"      && <TaskOverview staff={staffList} />}
 
       {viewStaff   && <StaffDetail staff={viewStaff} onClose={() => setViewStaff(null)} onEdit={openEdit} onTask={openTask} onAttend={openAtt} />}
-      {editStaff  !== undefined && <StaffForm  staff={editStaff}  onClose={() => setEditStaff(undefined)} onSave={handleSave} />}
+      {editStaff  !== undefined && <StaffForm  staff={editStaff} customerAccounts={customerAccounts} onClose={() => setEditStaff(undefined)} onSave={handleSave} />}
       {taskStaff   && <TaskModal   staff={taskStaff}   onClose={() => setTaskStaff(null)}   onSave={handleSaveTasks} />}
       {attendStaff && <AttendanceModal staff={attendStaff} onClose={() => setAttendStaff(null)} onSave={handleSaveAttend} />}
       {deleteTarget && <Confirm message={`Xóa nhân viên "${deleteTarget.name}"? Hành động này không thể hoàn tác.`} onClose={() => setDeleteTarget(null)} onConfirm={handleConfirmDelete} />}

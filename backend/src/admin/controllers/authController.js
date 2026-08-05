@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { BIRTH_DATE_ERROR, isValidBirthDate } from '../../utils/birthDate.js';
 import {
   createUser,
   emailExists,
@@ -91,7 +92,7 @@ function getEmailDeliveryErrorMessage(error, purpose = 'xác minh') {
 }
 
 /* ─── ĐĂNG NHẬP ──────────────────────────────────────────────────────────── */
-export const login = async (req, res) => {
+const loginWithAudience = async (req, res, { customersOnly = false } = {}) => {
   try {
     await ensureEmailVerificationSchema();
     const { email, password } = req.body;
@@ -115,6 +116,11 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng.' });
 
     const role = (user.role_name || user.role || 'user').toLowerCase();
+    if (customersOnly && role !== 'user') {
+      return res.status(403).json({
+        message: 'Tài khoản nhân viên chỉ được đăng nhập tại trang quản trị.',
+      });
+    }
     if (role === 'user' && Number(user.email_verified || 0) !== 1) {
       return res.status(403).json({
         message: 'Tài khoản chưa xác minh email. Vui lòng kiểm tra email và bấm liên kết xác minh.',
@@ -147,12 +153,19 @@ export const login = async (req, res) => {
   }
 };
 
+// General login is used by the admin portal; customer login has its own role gate.
+export const login = (req, res) => loginWithAudience(req, res);
+export const loginCustomer = (req, res) => loginWithAudience(req, res, { customersOnly: true });
+
 /* ─── ĐĂNG KÝ ────────────────────────────────────────────────────────────── */
 export const register = async (req, res) => {
   let connection = null;
   try {
     await ensureEmailVerificationSchema();
     const { full_name, email, password, phone, birthday, sex } = req.body;
+
+    if (birthday && !isValidBirthDate(birthday))
+      return res.status(400).json({ message: BIRTH_DATE_ERROR });
 
     if (!full_name || !email || !password)
       return res.status(400).json({ message: 'Vui lòng nhập đầy đủ họ tên, email và mật khẩu.' });

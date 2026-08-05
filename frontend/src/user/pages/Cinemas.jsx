@@ -3,12 +3,7 @@ import "./Cinemas.css";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import QuickBookWidget from "../Components/QuickBookWidget/QuickBookWidget";
 import { userCinemaService } from "../services/userApi";
-
-const banners = [
-  "/uploads/banners/banner1.jpg",
-  "/uploads/banners/banner2.jpg",
-  "/uploads/banners/banner3.jpg",
-];
+import { getActiveHomeBanners, hydrateHomeBannerImages } from "../utils/homeBanners";
 
 const FALLBACK_BANNER = "/uploads/banners/banner1.jpg";
 
@@ -57,6 +52,12 @@ export default function Cinemas() {
   const [selectedCinemaId, setSelectedCinemaId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [banners, setBanners] = useState(getActiveHomeBanners);
+  const featuredBanner = banners[0];
+
+  useEffect(() => {
+    hydrateHomeBannerImages(banners).then(setBanners);
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -197,15 +198,14 @@ export default function Cinemas() {
               <div
                 className="hero-banner"
                 style={{
-                  backgroundImage: `url(${banners[0]})`,
+                  backgroundImage: `url(${featuredBanner?.image || FALLBACK_BANNER})`,
                 }}
               >
                 <div className="banner-overlay" />
                 <div className="banner-content">
-                  <h2>Rạp chiếu phim</h2>
+                  <h2>{featuredBanner?.title || "Rạp chiếu phim"}</h2>
                   <p>
-                    Xem danh sách rạp thật, phòng chiếu đang có và chọn rạp phù
-                    hợp để đặt vé nhanh.
+                    {featuredBanner?.subtitle || "Xem danh sách rạp, phòng chiếu đang có và chọn rạp phù hợp để đặt vé nhanh."}
                   </p>
                 </div>
               </div>
@@ -268,7 +268,7 @@ export default function Cinemas() {
                       <div className="cinema-card-top">
                         <div className="cinema-cover">
                           <img
-                            src={cinema.image || banners[0] || FALLBACK_BANNER}
+                            src={cinema.image || featuredBanner?.image || FALLBACK_BANNER}
                             alt={cinema.cinema_name}
                           />
                         </div>

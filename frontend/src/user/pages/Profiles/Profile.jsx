@@ -10,6 +10,7 @@ import {
 } from 'react-icons/fa'
 import './profile.css'
 import { setUser } from '../../../redux/slices/userSlice'
+import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from '../../../utils/birthDate'
 import {
   userBookingService,
   userNotificationService,
@@ -288,6 +289,10 @@ export default function Profile() {
     if (!profile?.id) return
     setSaveError('')
     setSaveMessage('')
+    if (editForm.dob && !isValidBirthDate(editForm.dob)) {
+      setSaveError(BIRTH_DATE_ERROR)
+      return
+    }
     try {
       const sex = editForm.gender === 'male' ? 'Nam' : editForm.gender === 'female' ? 'Nu' : 'Khac'
       const normalizedCurrentEmail = String(currentEmail || '').trim().toLowerCase()
@@ -675,7 +680,7 @@ export default function Profile() {
                 </div>
                 <div className='ef-field'>
                   <label>Ngày sinh</label>
-                  <input name='dob' type='date' value={editForm.dob} onChange={handleEditChange} />
+                  <input name='dob' type='date' value={editForm.dob} min={getBirthDateBounds().min} max={getBirthDateBounds().max} onChange={handleEditChange} />
                 </div>
                 <div className='ef-field'>
                   <label>Giới tính</label>

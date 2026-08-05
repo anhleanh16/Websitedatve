@@ -1,10 +1,11 @@
 import bcrypt from "bcryptjs";
+import { BIRTH_DATE_ERROR, isValidBirthDate } from "../../utils/birthDate.js";
 import { db } from "../../../config/db.js";
 import { UserModel } from "../models/userModel.js";
 import {
   createUser,
   emailExists,
-  getRoleIdByName,
+  ensureRoleExists,
 } from "../models/authModel.js";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -35,7 +36,6 @@ export const createAdminUser = async (req, res) => {
       phone,
       birthday,
       sex,
-      role = "user",
       status = "active",
     } = req.body || {};
 
@@ -51,6 +51,10 @@ export const createAdminUser = async (req, res) => {
         .json({ message: "Mật khẩu phải có ít nhất 6 ký tự." });
     }
 
+    if (birthday && !isValidBirthDate(birthday)) {
+      return res.status(400).json({ message: BIRTH_DATE_ERROR });
+    }
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ message: "Email không hợp lệ." });
     }
@@ -59,11 +63,9 @@ export const createAdminUser = async (req, res) => {
       return res.status(409).json({ message: "Email đã được sử dụng." });
     }
 
-    const normalizedRole = ["user", "admin"].includes(role) ? role : "user";
-    const roleId = await getRoleIdByName(normalizedRole);
-    if (!roleId) {
-      return res.status(400).json({ message: "Vai trò không hợp lệ." });
-    }
+    // Accounts created from user management always start as customers.
+    // Employee assignment is the only workflow that promotes the role to staff.
+    const roleId = await ensureRoleExists("user", "Khách hàng");
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const sexMap = { male: "Nam", female: "Nu", other: "Khac" };

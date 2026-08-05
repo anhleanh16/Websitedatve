@@ -7,6 +7,7 @@ import {
   adminSeatService,
   adminComboService,
 } from "../../services/adminApi.js";
+import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../../utils/birthDate.js";
 
 const SEAT_PRICES = {
   Standard: 80000,
@@ -14,16 +15,164 @@ const SEAT_PRICES = {
   VIP:      100000,
   Couple:   120000,
 };
-const getSeatPrice = (type) =>
-  Number(SEAT_PRICES[String(type || "Standard")] || 80000);
+const getSeatPrice = (type, showtime) => {
+  const normalizedType = String(type || "Standard").toLowerCase();
+  const configuredPrice = normalizedType === "vip"
+    ? showtime?.price_vip
+    : normalizedType === "couple"
+      ? showtime?.price_couple
+      : showtime?.price_standard ?? showtime?.price;
+  return Number(configuredPrice) > 0
+    ? Number(configuredPrice)
+    : Number(SEAT_PRICES[normalizedType === "regular" ? "Standard" : normalizedType[0]?.toUpperCase() + normalizedType.slice(1)] || 80000);
+};
 
 const fmtMoney = (n) => `${Number(n || 0).toLocaleString("vi-VN")} ₫`;
+
+const normalizeCinemaList = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.cinemas)) return payload.cinemas;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.cinemas)) return payload.data.cinemas;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+};
 
 /** Trả về ngày theo giờ VN (UTC+7) dạng "YYYY-MM-DD" */
 const toVNDateString = (date = new Date()) => {
   const vn = new Date(date.getTime() + 7 * 60 * 60 * 1000);
   return vn.toISOString().slice(0, 10);
 };
+
+// Keep the staff booking flow subject to the same seat-selection policy as customer booking.
+const buildSeatSelectionMeta = (seatLayout, soldSeatCodes) => {
+  const units = [];
+  const soldCodes = soldSeatCodes || new Set();
+
+  (seatLayout?.rows || []).forEach((row, rowIndex) => {
+    const rowUnits = [...(row.units || [])].sort(
+      (a, b) => a.columnStart - b.columnStart || a.span - b.span,
+    );
+    let sectionIndex = -1;
+    let previousEnd = 0;
+
+    rowUnits.forEach((unit, unitIndex) => {
+      const columnStart = Number(unit.columnStart || 1);
+      const span = Math.max(1, Number(unit.span || 1));
+      if (unitIndex === 0 || columnStart > previousEnd + 1) sectionIndex += 1;
+
+      units.push({
+        ...unit,
+        sold: unit.sold || unit.seatCodes.some((code) => soldCodes.has(String(code).toUpperCase())),
+        rowIndex,
+        unitIndex,
+        sectionIndex,
+      });
+      previousEnd = columnStart + span - 1;
+    });
+  });
+
+  const unitMap = new Map(units.map((unit) => [unit.id, unit]));
+  const availableBySectionRow = new Map();
+  units.filter((unit) => !unit.sold).forEach((unit) => {
+    if (!availableBySectionRow.has(unit.sectionIndex)) {
+      availableBySectionRow.set(unit.sectionIndex, new Map());
+    }
+    const rowMap = availableBySectionRow.get(unit.sectionIndex);
+    if (!rowMap.has(unit.rowIndex)) rowMap.set(unit.rowIndex, []);
+    rowMap.get(unit.rowIndex).push(unit);
+  });
+  availableBySectionRow.forEach((rowMap) => rowMap.forEach((rowUnits) => {
+    rowUnits.sort((a, b) => a.unitIndex - b.unitIndex);
+  }));
+
+  return { unitMap, availableBySectionRow };
+};
+
+const validateSeatSelectionRules = (selectedSeatIds, selectionMeta) => {
+  if (!selectedSeatIds.length) return "";
+  const { unitMap, availableBySectionRow } = selectionMeta;
+  const selectedUnits = selectedSeatIds.map((id) => unitMap.get(id)).filter(Boolean).sort(
+    (a, b) => a.sectionIndex - b.sectionIndex || a.rowIndex - b.rowIndex || a.unitIndex - b.unitIndex,
+  );
+  if (selectedUnits.length !== selectedSeatIds.length) return "Không thể xác định đầy đủ ghế đã chọn. Vui lòng chọn lại.";
+
+  const sectionIndex = selectedUnits[0].sectionIndex;
+  if (selectedUnits.some((unit) => unit.sectionIndex !== sectionIndex)) {
+    return "Chỉ được chọn ghế trong cùng một nhánh, không vượt qua khoảng cách giữa.";
+  }
+
+  const selectedByRow = new Map();
+  selectedUnits.forEach((unit) => {
+    if (!selectedByRow.has(unit.rowIndex)) selectedByRow.set(unit.rowIndex, []);
+    selectedByRow.get(unit.rowIndex).push(unit);
+  });
+  const rowIndexes = [...selectedByRow.keys()].sort((a, b) => a - b);
+
+  for (const rowIndex of rowIndexes) {
+    const selectedRowUnits = [...selectedByRow.get(rowIndex)].sort((a, b) => a.unitIndex - b.unitIndex);
+    if (selectedRowUnits.length <= 1) continue;
+    const availableRowUnits = availableBySectionRow.get(sectionIndex)?.get(rowIndex) || [];
+    const min = selectedRowUnits[0].unitIndex;
+    const max = selectedRowUnits[selectedRowUnits.length - 1].unitIndex;
+    const selectedIds = new Set(selectedRowUnits.map((unit) => unit.id));
+    const skipped = availableRowUnits.find((unit) => unit.unitIndex >= min && unit.unitIndex <= max && !selectedIds.has(unit.id));
+    if (skipped) {
+      return `Không được bỏ trống ghế giữa các ghế đã chọn. Ghế ${skipped.label || skipped.id} còn trống và nằm giữa ghế đã chọn.`;
+    }
+  }
+
+  for (let index = 1; index < rowIndexes.length; index += 1) {
+    if (rowIndexes[index] !== rowIndexes[index - 1] + 1) return "Chỉ được chọn thêm ghế ở hàng trên hoặc dưới liền kề.";
+  }
+
+  const partialRows = rowIndexes.filter((rowIndex) => {
+    const available = availableBySectionRow.get(sectionIndex)?.get(rowIndex) || [];
+    return selectedByRow.get(rowIndex).length < available.length;
+  });
+  if (partialRows.length > 1) return "Hàng ngang trong nhánh hiện tại phải kín trước khi chọn sang hàng trên hoặc dưới.";
+  if (partialRows.length === 1 && rowIndexes.length > 1 && partialRows[0] !== rowIndexes[0] && partialRows[0] !== rowIndexes[rowIndexes.length - 1]) {
+    return "Chỉ được mở rộng sang hàng trên hoặc dưới khi các hàng ở giữa đã chọn kín.";
+  }
+  return "";
+};
+
+const getFoodIcon = (item) => {
+  const popcornQty = Number(item?.popcorn_quantity || 0);
+  const drinkQty = Number(item?.drink_quantity || 0);
+  if (popcornQty > 0 && drinkQty === 0) return "🍿";
+  if (drinkQty > 0 && popcornQty === 0) return "🥤";
+  if (drinkQty >= 4) return "🎉";
+  return "🍿🥤";
+};
+
+const getFoodSummary = (item) => {
+  const contents = [];
+  const popcornQty = Number(item?.popcorn_quantity || 0);
+  const drinkQty = Number(item?.drink_quantity || 0);
+  if (popcornQty > 0) contents.push(`${popcornQty} bắp`);
+  if (drinkQty > 0) contents.push(`${drinkQty} nước`);
+  return contents.join(" + ") || String(item?.description || "Tùy chọn").trim();
+};
+
+function FoodItemCard({ item, quantity, onChange }) {
+  const selected = quantity > 0;
+  return (
+    <article className={`admin-food-card${selected ? " selected" : ""}`}>
+      <div className="admin-food-icon" aria-hidden="true">{getFoodIcon(item)}</div>
+      <div className="admin-food-content">
+        <h4>{item.combo_name}</h4>
+        <p>{getFoodSummary(item)}</p>
+        <strong>{fmtMoney(item.price)}</strong>
+      </div>
+      <div className="admin-food-quantity" aria-label={`Số lượng ${item.combo_name}`}>
+        <button type="button" onClick={() => onChange(-1)} disabled={quantity === 0} aria-label={`Giảm ${item.combo_name}`}>−</button>
+        <span>{quantity}</span>
+        <button type="button" onClick={() => onChange(1)} aria-label={`Tăng ${item.combo_name}`}>+</button>
+      </div>
+    </article>
+  );
+}
 
 export default function BookingWizard({ onToast, onBookingSuccess }) {
   const [step, setStep] = useState(1);
@@ -52,7 +201,8 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
   const [soldSeatCodes, setSoldSeatCodes] = useState(new Set());
   const [roomSeatGaps, setRoomSeatGaps] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [seatError, setSeatError] = useState("");
+  const [seatLoadError, setSeatLoadError] = useState("");
+  const [seatRuleError, setSeatRuleError] = useState("");
 
   // Step 4: Combos
   const [comboList, setComboList] = useState([]);
@@ -64,18 +214,44 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
   const [bookingResult, setBookingResult] = useState(null);
 
   const debounceRef = useRef(null);
+  const seatRuleTimerRef = useRef(null);
+
+  const showSeatRuleError = (message) => {
+    setSeatRuleError(message);
+    if (seatRuleTimerRef.current) clearTimeout(seatRuleTimerRef.current);
+    seatRuleTimerRef.current = setTimeout(() => {
+      setSeatRuleError("");
+      seatRuleTimerRef.current = null;
+    }, 5000);
+  };
 
   // Initial load: cinemas, combos
   useEffect(() => {
+    let ignore = false;
     (async () => {
       try {
-        const [cinemaData, comboData] = await Promise.all([
-          adminCinemaService.getAllCinemas().catch(() => ({ cinemas: [] })),
-          adminComboService.getAll().catch(() => ({ combos: [] })),
+        const [cinemaResult, comboResult, showtimeCinemaResult] = await Promise.allSettled([
+          adminCinemaService.getAllCinemas(),
+          adminComboService.getAll(),
+          adminShowtimeService.getCinemas(),
         ]);
-        const listC = Array.isArray(cinemaData?.cinemas) ? cinemaData.cinemas : (Array.isArray(cinemaData) ? cinemaData : []);
-        const listCombo = Array.isArray(comboData?.combos) ? comboData.combos : (Array.isArray(comboData) ? comboData : []);
-        setCinemas(listC);
+
+        if (ignore) return;
+
+        const listC = normalizeCinemaList(
+          cinemaResult.status === "fulfilled" ? cinemaResult.value : null,
+        );
+        const fromShowtimeCinemas = normalizeCinemaList(
+          showtimeCinemaResult.status === "fulfilled" ? showtimeCinemaResult.value : null,
+        );
+        const finalCinemas = listC.length > 0 ? listC : fromShowtimeCinemas;
+
+        const comboData = comboResult.status === "fulfilled" ? comboResult.value : null;
+        const listCombo = Array.isArray(comboData?.combos)
+          ? comboData.combos
+          : (Array.isArray(comboData) ? comboData : []);
+
+        setCinemas(finalCinemas);
         setComboList(listCombo);
         setComboCounts(
           listCombo.reduce((acc, c) => {
@@ -87,6 +263,14 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
         console.error(e);
       }
     })();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => () => {
+    if (seatRuleTimerRef.current) clearTimeout(seatRuleTimerRef.current);
   }, []);
 
   // Search user (debounced)
@@ -154,7 +338,8 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     let ignore = false;
     (async () => {
       setSeatLoading(true);
-      setSeatError("");
+      setSeatLoadError("");
+      setSeatRuleError("");
       try {
         const roomId = selectedShowtime.room_id;
         const showtimeId = selectedShowtime.showtime_id || selectedShowtime.id;
@@ -190,7 +375,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
           setRoomSeatGaps([]);
         }
       } catch (e) {
-        if (!ignore) setSeatError("Không thể tải ghế.");
+        if (!ignore) setSeatLoadError("Không thể tải ghế.");
       } finally {
         if (!ignore) setSeatLoading(false);
       }
@@ -205,6 +390,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newCustomerForm.email))
       e.email = "Email không hợp lệ.";
     if (!newCustomerForm.phone.trim()) e.phone = "Nhập số điện thoại.";
+    if (newCustomerForm.birthday && !isValidBirthDate(newCustomerForm.birthday)) e.birthday = BIRTH_DATE_ERROR;
     return e;
   };
 
@@ -220,26 +406,24 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
   const goStep3 = () => { if (canGoStep3()) setStep(3); };
   const canGoStep4 = () => selectedSeats.length > 0;
   const goStep4 = () => {
-    if (!canGoStep4()) { setSeatError("Vui lòng chọn ít nhất một ghế."); return; }
-    setSeatError(""); setStep(4);
+    if (!canGoStep4()) { showSeatRuleError("Vui lòng chọn ít nhất một ghế."); return; }
+    setSeatRuleError(""); setStep(4);
   };
   const goStep5 = () => setStep(5);
 
-  const seatTotal = selectedSeats.reduce((sum, s) => sum + getSeatPrice(s.seat_type), 0);
-  const comboTotal = comboList.reduce(
-    (sum, c) => sum + Number(comboCounts[c.combo_id] || 0) * Number(c.price || 0),
-    0,
-  );
-  const totalAmount = seatTotal + comboTotal;
-
-  const toggleSeat = (seat) => {
-    if (soldSeatCodes.has(String(seat.seat_code || "").toUpperCase())) return;
+  const toggleSeat = (seatId) => {
     setSelectedSeats((prev) => {
-      const idx = prev.findIndex(s => s.seat_id === seat.seat_id);
-      if (idx >= 0) return prev.filter((_, i) => i !== idx);
-      return [...prev, seat];
+      const next = prev.includes(seatId)
+        ? prev.filter((id) => id !== seatId)
+        : [...prev, seatId];
+      const ruleMessage = validateSeatSelectionRules(next, seatSelectionMeta);
+      if (ruleMessage) {
+        showSeatRuleError(ruleMessage);
+        return prev;
+      }
+      setSeatRuleError("");
+      return next;
     });
-    setSeatError("");
   };
 
   const seatsByRow = useMemo(() => {
@@ -339,7 +523,39 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     });
 
     return { rows, totalVisualColumns: Math.max(1, maxSeatNumber - minSeatNumber + 1 + totalGapSeats) };
-  }, [seats]);
+  }, [seats, roomSeatGaps]);
+
+  const seatSelectionMeta = useMemo(
+    () => buildSeatSelectionMeta(seatLayout, soldSeatCodes),
+    [seatLayout, soldSeatCodes],
+  );
+  const selectedSeatUnits = useMemo(
+    () => selectedSeats.map((id) => seatSelectionMeta.unitMap.get(id)).filter(Boolean),
+    [selectedSeats, seatSelectionMeta],
+  );
+  const seatTotal = selectedSeatUnits.reduce(
+    (sum, unit) => sum + getSeatPrice(unit.type, selectedShowtime),
+    0,
+  );
+  const comboTotal = comboList.reduce(
+    (sum, c) => sum + Number(comboCounts[c.combo_id] || 0) * Number(c.price || 0),
+    0,
+  );
+  const totalAmount = seatTotal + comboTotal;
+  const singleFoodItems = useMemo(
+    () => comboList.filter((item) => String(item?.category || "combo").toLowerCase() === "single"),
+    [comboList],
+  );
+  const comboFoodItems = useMemo(
+    () => comboList.filter((item) => String(item?.category || "combo").toLowerCase() !== "single"),
+    [comboList],
+  );
+  const changeFoodQuantity = (comboId, delta) => {
+    setComboCounts((previous) => ({
+      ...previous,
+      [comboId]: Math.max(0, Number(previous[comboId] || 0) + delta),
+    }));
+  };
 
   const handleSubmit = async () => {
     if (!canGoStep2()) return;
@@ -352,11 +568,11 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
             new_user: { ...newCustomerForm, phone: newCustomerForm.phone.trim() },
           };
 
-      const seatUnits = selectedSeats.map(s => ({
-        id: s.seat_code,
-        label: s.seat_code,
-        type: String(s.seat_type || "Standard").toLowerCase(),
-        seatCodes: [s.seat_code],
+      const seatUnits = selectedSeatUnits.map((unit) => ({
+        id: unit.id,
+        label: unit.label,
+        type: unit.type,
+        seatCodes: unit.seatCodes,
       }));
 
       const foodItems = comboList
@@ -419,7 +635,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
           <div className="sf-detail-row"><span>Suất</span><strong>
             {b.start_time ? new Date(b.start_time).toLocaleString("vi-VN") : (selectedShowtime?.start_time ? new Date(selectedShowtime.start_time).toLocaleString("vi-VN") : "—")}
           </strong></div>
-          <div className="sf-detail-row"><span>Ghế</span><strong>{(b.seats || selectedSeats.map(s => s.seat_code)).join(", ")}</strong></div>
+          <div className="sf-detail-row"><span>Ghế</span><strong>{(b.seats || selectedSeatUnits.flatMap((unit) => unit.seatCodes)).join(", ")}</strong></div>
           <div className="sf-detail-row"><span>Tổng tiền</span><strong style={{ color: "#fbbf24", fontSize: 18 }}>{fmtMoney(b.total_price || totalAmount)}</strong></div>
           {nu && (
             <div style={{ marginTop: 16, padding: 14, borderRadius: 8, background: "rgba(251,191,36,0.12)", border: "1px dashed #fbbf24" }}>
@@ -567,8 +783,11 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                       <input
                         type="date"
                         value={newCustomerForm.birthday}
+                        min={getBirthDateBounds().min}
+                        max={getBirthDateBounds().max}
                         onChange={(e) => setNewCustomerForm(p => ({ ...p, birthday: e.target.value }))}
                       />
+                      {newCustomerErrors.birthday && <span className="sf-error">{newCustomerErrors.birthday}</span>}
                     </div>
                   </div>
                   <div className="sf-field">
@@ -785,8 +1004,8 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
             }} />
             {seatLoading ? (
               <div style={{ padding: 30, textAlign: "center", color: "#8fa6ff" }}>Đang tải ghế…</div>
-            ) : seatError ? (
-              <div style={{ padding: 20, textAlign: "center", color: "#f87171" }}>{seatError}</div>
+            ) : seatLoadError ? (
+              <div style={{ padding: 20, textAlign: "center", color: "#f87171" }}>{seatLoadError}</div>
             ) : seatLayout.rows.length === 0 ? (
               <div style={{ padding: 30, textAlign: "center", color: "#8fa6ff" }}>Không có dữ liệu ghế cho phòng này.</div>
             ) : (
@@ -810,20 +1029,14 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                           >
                             {row.units.map((unit) => {
                               const isSold = unit.sold || unit.seatCodes.some(c => soldSeatCodes.has(String(c).toUpperCase()));
-                              const isSelected = unit.seatCodes.some(code => selectedSeats.some(s => String(s.seat_code || "").toUpperCase() === String(code).toUpperCase()));
+                              const isSelected = selectedSeats.includes(unit.id);
                               const t = unit.type || "regular";
                               return (
                                 <button
                                   key={unit.id}
                                   type="button"
                                   disabled={isSold}
-                                  onClick={() => {
-                                    if (isSold) return;
-                                    unit.seatCodes.forEach((code) => {
-                                      const obj = seats.find(s => String(s.seat_code || "").toUpperCase() === String(code).toUpperCase());
-                                      if (obj) toggleSeat(obj);
-                                    });
-                                  }}
+                                  onClick={() => !isSold && toggleSeat(unit.id)}
                                   title={unit.seatCodes.join(", ")}
                                   className={`booking-seat booking-seat-${t}${isSold ? " booking-seat-sold" : ""}${isSelected ? " selected" : ""}`}
                                   style={{ gridColumn: `${unit.columnStart} / span ${unit.span}` }}
@@ -863,9 +1076,15 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                 Đã bán
               </span>
             </div>
-            {seatError && <p style={{ color: "#f87171", marginTop: 12, textAlign: "center" }}>{seatError}</p>}
+            {seatRuleError && (
+              <div className="admin-seat-rule-toast" role="alert">
+                <span>⚠</span>
+                <span>{seatRuleError}</span>
+                <button type="button" onClick={() => setSeatRuleError("")} aria-label="Đóng cảnh báo">×</button>
+              </div>
+            )}
             <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>Đã chọn <strong style={{ color: "#7c61ff" }}>{selectedSeats.length}</strong> ghế · Tổng: <strong style={{ color: "#fbbf24" }}>{fmtMoney(seatTotal)}</strong></div>
+              <div>Đã chọn <strong style={{ color: "#7c61ff" }}>{selectedSeats.length}</strong> vị trí · Tổng: <strong style={{ color: "#fbbf24" }}>{fmtMoney(seatTotal)}</strong></div>
               <div style={{ display: "flex", gap: 10 }}>
                 <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(2)}>← Quay lại</button>
                 <button className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep4}>Tiếp theo →</button>
@@ -877,38 +1096,59 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
         {/* STEP 4: Combos */}
         {step === 4 && (
           <div>
-            <h3 style={{ marginBottom: 16 }}>Bước 4: Chọn đồ ăn / Combo (tùy chọn)</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
-              {comboList.length === 0 ? (
-                <div style={{ padding: 30, textAlign: "center", color: "#8fa6ff", gridColumn: "1 / -1" }}>Hiện chưa có combo nào.</div>
-              ) : comboList.map(c => {
-                const qty = Number(comboCounts[c.combo_id] || 0);
-                return (
-                  <div key={c.combo_id} className="sf-detail-card" style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                    <div style={{ fontSize: 34 }}>
-                      {String(c.combo_name || "").includes("4 Người") ? "👨‍👩‍👧‍👦" : "🎁"}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <strong style={{ fontSize: 14 }}>{c.combo_name}</strong>
-                      <div style={{ fontSize: 12, color: "#7a8fc0" }}>{fmtMoney(c.price)}</div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <button
-                        className="sf-btn sf-btn-secondary sm"
-                        onClick={() => setComboCounts(p => ({ ...p, [c.combo_id]: Math.max(0, qty - 1) }))}
-                      >-</button>
-                      <strong style={{ minWidth: 20, textAlign: "center" }}>{qty}</strong>
-                      <button
-                        className="sf-btn sf-btn-add sm"
-                        onClick={() => setComboCounts(p => ({ ...p, [c.combo_id]: qty + 1 }))}
-                      >+</button>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="admin-food-heading">
+              <div>
+                <h3>Bước 4: Bắp, nước &amp; combo</h3>
+                <p>Chọn món lẻ hoặc combo phù hợp cho khách hàng.</p>
+              </div>
+              {comboTotal > 0 && <strong>Đã chọn: {fmtMoney(comboTotal)}</strong>}
             </div>
+
+            {comboList.length === 0 ? (
+              <div className="admin-food-empty">Hiện chưa có sản phẩm nào đang bán.</div>
+            ) : (
+              <div className="admin-food-sections">
+                <section className="admin-food-section">
+                  <div className="admin-food-section-title">
+                    <span>🍿</span>
+                    <div><h4>Bắp &amp; nước lẻ</h4><p>Thêm riêng từng phần theo nhu cầu.</p></div>
+                  </div>
+                  {singleFoodItems.length > 0 ? (
+                    <div className="admin-food-grid">
+                      {singleFoodItems.map((item) => (
+                        <FoodItemCard
+                          key={item.combo_id}
+                          item={item}
+                          quantity={Number(comboCounts[item.combo_id] || 0)}
+                          onChange={(delta) => changeFoodQuantity(item.combo_id, delta)}
+                        />
+                      ))}
+                    </div>
+                  ) : <p className="admin-food-empty-section">Chưa có bắp hoặc nước lẻ.</p>}
+                </section>
+
+                <section className="admin-food-section">
+                  <div className="admin-food-section-title">
+                    <span>🎁</span>
+                    <div><h4>Combo</h4><p>Tiết kiệm hơn khi mua theo phần.</p></div>
+                  </div>
+                  {comboFoodItems.length > 0 ? (
+                    <div className="admin-food-grid">
+                      {comboFoodItems.map((item) => (
+                        <FoodItemCard
+                          key={item.combo_id}
+                          item={item}
+                          quantity={Number(comboCounts[item.combo_id] || 0)}
+                          onChange={(delta) => changeFoodQuantity(item.combo_id, delta)}
+                        />
+                      ))}
+                    </div>
+                  ) : <p className="admin-food-empty-section">Chưa có combo nào đang bán.</p>}
+                </section>
+              </div>
+            )}
             <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>Tạm tính combo: <strong style={{ color: "#fbbf24" }}>{fmtMoney(comboTotal)}</strong></div>
+              <div>Tạm tính đồ ăn: <strong style={{ color: "#fbbf24" }}>{fmtMoney(comboTotal)}</strong></div>
               <div style={{ display: "flex", gap: 10 }}>
                 <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(3)}>← Quay lại</button>
                 <button className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep5}>Tiếp theo →</button>
@@ -947,7 +1187,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                   {selectedShowtime?.start_time ? new Date(selectedShowtime.start_time).toLocaleString("vi-VN") : "—"}
                 </strong></div>
                 <div className="sf-detail-row"><span>Phòng</span><strong>{selectedShowtime?.room_name || `#${selectedShowtime?.room_id}`}</strong></div>
-                <div className="sf-detail-row"><span>Ghế ({selectedSeats.length})</span><strong>{selectedSeats.map(s => s.seat_code).join(", ")}</strong></div>
+                <div className="sf-detail-row"><span>Ghế ({selectedSeats.length})</span><strong>{selectedSeatUnits.map((unit) => unit.label).join(", ")}</strong></div>
               </div>
             </div>
             <div className="sf-detail-card" style={{ marginTop: 14 }}>

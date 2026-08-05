@@ -37,6 +37,7 @@ export function AdminRoutes() {
     <Route key="index" path="" element={<AdminLayout><Bookings /></AdminLayout>} />,
   ];
   const technicianRoutes = [
+    <Route key="users" path="users" element={<AdminLayout><Users /></AdminLayout>} />,
     <Route key="staff" path="staff" element={<AdminLayout><Staff /></AdminLayout>} />,
     <Route key="movies" path="movies" element={<AdminLayout><Movies /></AdminLayout>} />,
     <Route key="showtimes" path="showtimes" element={<AdminLayout><Showtimes /></AdminLayout>} />,

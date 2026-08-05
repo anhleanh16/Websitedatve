@@ -103,38 +103,49 @@
   background: linear-gradient(135deg, #31294a 0%, #121029 100%);
   background-size: cover;
   background-position: center;
-  height: 403px;
-  border-radius: 22px;
+  height: clamp(300px, 32vw, 430px);
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: rgba(255, 255, 255, 0.92);
   position: relative;
   overflow: hidden;
+  isolation: isolate;
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .banner-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  border-radius: 22px;
+  background: linear-gradient(90deg, rgba(4, 7, 22, 0.84), rgba(7, 10, 28, 0.48) 48%, rgba(7, 10, 28, 0.1)), linear-gradient(0deg, rgba(4, 7, 22, 0.42), transparent 55%);
+  border-radius: inherit;
+  z-index: 0;
 }
 
 .banner-content {
   position: relative;
-  z-index: 10;
-  text-align: center;
+  z-index: 2;
+  max-width: min(66%, 660px);
+  margin-left: clamp(28px, 5vw, 72px);
+  text-align: left;
+  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.52);
 }
 
 .banner-content h2 {
-  font-size: 32px;
-  margin: 0 0 8px 0;
+  font-size: clamp(30px, 3.4vw, 50px);
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  margin: 0 0 12px;
 }
 
 .banner-content p {
-  font-size: 16px;
+  font-size: clamp(15px, 1.2vw, 18px);
   margin: 0;
-  opacity: 0.9;
+  max-width: 560px;
+  line-height: 1.6;
+  opacity: 0.92;
 }
 
 .filter-section {
@@ -604,6 +615,17 @@
   }
   .banner-content h2 {
     font-size: 24px;
+  }
+  .hero-banner {
+    height: 220px;
+    border-radius: 18px;
+  }
+  .banner-content {
+    max-width: calc(100% - 48px);
+    margin-left: 24px;
+  }
+  .banner-content p {
+    font-size: 14px;
   }
   .filter-section {
     flex-direction: column;

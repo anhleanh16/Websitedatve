@@ -93,7 +93,7 @@ import {
   updateAdminCombo,
   deleteAdminCombo,
 } from "../controllers/comboController.js";
-import { uploadMovieFilesMiddleware, uploadCinemaImage, uploadNewsImage, uploadCkeditorNewsImage } from "../../../config/upload.js";
+import { uploadMovieFilesMiddleware, uploadCinemaImage, uploadNewsImage, uploadCkeditorNewsImage, uploadStaffAvatar } from "../../../config/upload.js";
 import { authMiddleware, adminOnly, adminManagerOnly, staffBasicOnly } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -105,8 +105,8 @@ router.get("/dashboard", authMiddleware, adminManagerOnly, getDashboardStats);
 router.get("/statistics", authMiddleware, staffBasicOnly, getStatistics);
 
 // ─── User Management ─────────────────────────────────────────────────────────
-router.get("/users", authMiddleware, staffBasicOnly, getAdminUsers);
-router.get("/users/search", authMiddleware, staffBasicOnly, searchAdminUsers);
+router.get("/users", authMiddleware, adminOnly, getAdminUsers);
+router.get("/users/search", authMiddleware, adminOnly, searchAdminUsers);
 router.post("/users", authMiddleware, adminOnly, createAdminUser);
 router.put("/users/:userId/deactivate", authMiddleware, adminOnly, deactivateAdminUser);
 router.put("/users/:userId/lock", authMiddleware, adminOnly, lockAdminUser);
@@ -241,11 +241,12 @@ router.put("/categories/:id", authMiddleware, adminOnly, updateCategory);
 router.delete("/categories/:id", authMiddleware, adminOnly, deleteCategory);
 
 // ─── Showtime Management ──────────────────────────────────────────────────────
+// Technicians manage showtimes in the admin UI, so use the technical-admin role gate.
 router.get("/showtimes/cinemas", authMiddleware, adminOnly, getShowtimeCinemas);
 router.get("/showtimes/rooms", authMiddleware, adminOnly, getShowtimeRooms);
 router.get("/showtimes", authMiddleware, adminOnly, getShowtimes);
 router.get("/showtimes/:id", authMiddleware, adminOnly, getShowtimeById);
-router.get("/showtimes/:id/sold-seats", authMiddleware, adminOnly, async (req, res) => {
+router.get("/showtimes/:id/sold-seats", authMiddleware, staffBasicOnly, async (req, res) => {
   try {
     const { db } = await import("../../../config/db.js");
     const showtimeId = Number(req.params.id);
@@ -287,8 +288,8 @@ router.put("/seats/bulk", authMiddleware, adminOnly, bulkUpdateSeats);
 // ─── Employee Management ─────────────────────────────────────────────────────
 router.get("/employees",     authMiddleware, adminOnly, getEmployees);
 router.get("/employees/:id", authMiddleware, adminOnly, getEmployeeById);
-router.post("/employees",    authMiddleware, adminOnly, createEmployee);
-router.put("/employees/:id", authMiddleware, adminOnly, updateEmployee);
+router.post("/employees",    authMiddleware, adminOnly, uploadStaffAvatar.single("avatar"), createEmployee);
+router.put("/employees/:id", authMiddleware, adminOnly, uploadStaffAvatar.single("avatar"), updateEmployee);
 router.delete("/employees/:id", authMiddleware, adminOnly, deleteEmployee);
 
 export default router;
