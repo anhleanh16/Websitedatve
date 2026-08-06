@@ -44,6 +44,7 @@ export default function ReviewSection({ movieId }) {
   }
 
   const currentUserReview = reviews.find(review => Number(review.user_id) === Number(user?.id)) || null
+  const emailNotVerified = Boolean(user) && user.email_verified === false
 
   useEffect(() => {
     if (currentUserReview && !editReviewId && !showForm) {
@@ -56,6 +57,10 @@ export default function ReviewSection({ movieId }) {
     e.preventDefault()
     if (!user) {
       setError('Vui lòng đăng nhập để bình luận')
+      return
+    }
+    if (emailNotVerified) {
+      setError('Vui lòng xác minh email trước khi gửi hoặc chỉnh sửa bình luận.')
       return
     }
 
@@ -195,7 +200,7 @@ export default function ReviewSection({ movieId }) {
                 </span>
               </div>
               {review.comment && <p className="rs-review-comment">{review.comment}</p>}
-              {user && Number(review.user_id) === Number(user.id) && (
+              {user && !emailNotVerified && Number(review.user_id) === Number(user.id) && (
                 <div className="rs-review-actions">
                   <button
                     type="button"
@@ -224,6 +229,7 @@ export default function ReviewSection({ movieId }) {
       <div className="rs-action-area">
         <h3 className="rs-action-title">{editReviewId ? 'Chỉnh sửa đánh giá của bạn' : 'Chia sẻ cảm nhận của bạn'}</h3>
         {!user && <p className="rs-auth-hint">Đăng nhập để gửi đánh giá cho bộ phim này.</p>}
+        {user && emailNotVerified && <p className="rs-auth-hint">⚠ Vui lòng xác minh email trước khi gửi hoặc chỉnh sửa bình luận.</p>}
         {user && currentUserReview && !showForm && (
           <p className="rs-auth-hint">Bạn đã có một đánh giá cho bộ phim này. Có thể bấm biểu tượng cây bút để cập nhật.</p>
         )}
@@ -234,9 +240,14 @@ export default function ReviewSection({ movieId }) {
         {!showForm ? (
           <button
             className="rs-btn-write"
+            disabled={emailNotVerified}
             onClick={() => {
               if (!user) {
                 setError('Vui lòng đăng nhập để bình luận')
+                return
+              }
+              if (emailNotVerified) {
+                setError('Vui lòng xác minh email trước khi gửi bình luận')
                 return
               }
               setError('')

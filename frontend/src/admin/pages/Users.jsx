@@ -41,9 +41,14 @@ const MEMBERSHIP_LEVELS = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const STATUS_MAP = {
-  active: { label: "Hoạt động", cls: "confirmed" },
-  inactive: { label: "Không hoạt động", cls: "pending" },
+  verified: { label: "Đã xác minh", cls: "confirmed" },
+  unverified: { label: "Chưa xác minh", cls: "pending" },
   blocked: { label: "Bị khóa", cls: "cancelled" },
+};
+
+const getAccountStatus = (user) => {
+  if (user.status === "blocked") return "blocked";
+  return user.email_verified ? "verified" : "unverified";
 };
 const ROLE_MAP = {
   user: { label: "Khách hàng", cls: "role-user" },
@@ -94,8 +99,12 @@ export default function UsersPage() {
       const data = await adminUserService.getAllUsers();
       const processedUsers = data.users.map((u) => ({
         ...u,
+        email_verified: Boolean(u.email_verified) && !String(u.email || "").endsWith("@unlinked.local"),
+      })).map((u) => ({
+        ...u,
         id: u.user_id,
         name: u.full_name,
+        email: String(u.email || "").endsWith("@unlinked.local") ? "" : u.email || "",
         phone: u.phone_number,
         createdAt: new Date(u.created_at).toLocaleDateString("vi-VN"),
         points: u.points || 0,
@@ -103,6 +112,7 @@ export default function UsersPage() {
         sex: u.sex || "N/A",
         transactions: u.transactions || [],
         employee_position: u.employee_position || null,
+        accountStatus: getAccountStatus(u),
       }));
       setUsers(processedUsers);
       setError(null);
@@ -222,9 +232,10 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
     const q = search.toLowerCase();
     const matchQ =
       u.name.toLowerCase().includes(q) ||
+      String(u.user_name || "").toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q) ||
       (u.phone && u.phone.includes(q));
-    const matchS = filterStatus === "all" || u.status === filterStatus;
+    const matchS = filterStatus === "all" || u.accountStatus === filterStatus;
     const matchR = filterRole === "all" || u.role === filterRole;
     return matchQ && matchS && matchR;
   });
@@ -235,7 +246,7 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
       <div className="us-toolbar">
         <input
           className="us-search"
-          placeholder="Tìm tên, email, số điện thoại…"
+          placeholder="Tìm tên, tên người dùng, email, số điện thoại…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -245,8 +256,8 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
           onChange={(e) => setFS(e.target.value)}
         >
           <option value="all">Tất cả trạng thái</option>
-          <option value="active">Hoạt động</option>
-          <option value="inactive">Không hoạt động</option>
+          <option value="verified">Đã xác minh email</option>
+          <option value="unverified">Chưa xác minh email</option>
           <option value="blocked">Bị khóa</option>
         </select>
         <select
@@ -289,7 +300,7 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
               </tr>
             ) : (
               pageItems.map((u) => {
-                const st = STATUS_MAP[u.status] || STATUS_MAP.inactive;
+                const st = STATUS_MAP[u.accountStatus] || STATUS_MAP.unverified;
                 const rl = ROLE_MAP[u.role] || ROLE_MAP.user;
                 const roleLabel = rl.label;
                 const roleCls = rl.cls;
@@ -309,6 +320,7 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
                         </div>
                         <div>
                           <strong>{u.name}</strong>
+                          {u.user_name && <span>@{u.user_name}</span>}
                           <span>{u.email}</span>
                         </div>
                       </div>
@@ -392,7 +404,7 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
 /** Chi tiết người dùng (modal) */
 function UserDetail({ user, onClose, onToggleStatus, onAdjustPoints, onResetPassword }) {
   if (!user) return null;
-  const st = STATUS_MAP[user.status] || STATUS_MAP.inactive;
+  const st = STATUS_MAP[user.accountStatus || getAccountStatus(user)] || STATUS_MAP.unverified;
   const rl = ROLE_MAP[user.role] || ROLE_MAP.user;
   const roleLabel = rl.label;
   const roleCls = rl.cls;
@@ -889,6 +901,7 @@ function ResetPasswordModal({ user, onClose, onConfirm }) {
 function CreateUserModal({ onClose, onConfirm }) {
   const [form, setForm] = useState({
     full_name: "",
+    user_name: "",
     email: "",
     password: "",
     phone: "",
@@ -910,9 +923,13 @@ function CreateUserModal({ onClose, onConfirm }) {
   const validate = () => {
     const e = {};
     if (!form.full_name.trim()) e.full_name = "Nhập họ tên.";
-    if (!form.email.trim()) e.email = "Nhập email.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+    if (!form.user_name.trim()) e.user_name = "Nhập tên người dùng.";
+    else if (!/^[a-zA-Z0-9._-]{3,30}$/.test(form.user_name.trim()))
+      e.user_name = "Tên người dùng gồm 3–30 ký tự: chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.";
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       e.email = "Email không hợp lệ.";
+    if (!form.email.trim() && !form.phone.trim())
+      e.phone = "Nhập số điện thoại khi chưa có email.";
     if (!form.password) e.password = "Nhập mật khẩu.";
     else if (form.password.length < 6)
       e.password = "Mật khẩu ít nhất 6 ký tự.";
@@ -931,6 +948,7 @@ function CreateUserModal({ onClose, onConfirm }) {
     try {
       await adminUserService.createUser({
         full_name: form.full_name.trim(),
+        user_name: form.user_name.trim(),
         email: form.email.trim(),
         password: form.password,
         phone: form.phone.trim() || null,
@@ -966,7 +984,7 @@ function CreateUserModal({ onClose, onConfirm }) {
             </button>
           </div>
           <div className="us-modal-body">
-            <p className="us-create-role-note">Tài khoản mới được tạo với vai trò Khách hàng. Vai trò sẽ tự đổi thành Nhân viên khi tài khoản được thêm vào danh sách nhân viên.</p>
+            <p className="us-create-role-note">Tài khoản mới được tạo với vai trò Khách hàng. Email không bắt buộc; nếu chưa có email, người dùng sẽ liên kết email sau khi đăng nhập. Vai trò sẽ tự đổi thành Nhân viên khi tài khoản được thêm vào danh sách nhân viên.</p>
             <div className="us-detail-grid">
               <div className="us-detail-card">
                 <h4>Thông tin cơ bản *</h4>
@@ -985,11 +1003,26 @@ function CreateUserModal({ onClose, onConfirm }) {
                 </div>
 
                 <div className="us-form-field">
-                  <label>Email</label>
+                  <label>Tên người dùng</label>
+                  <input
+                    type="text"
+                    className={`us-input ${errors.user_name ? "error" : ""}`}
+                    placeholder="Ví dụ: nguyenvana"
+                    value={form.user_name}
+                    onChange={(e) => set("user_name", e.target.value)}
+                    autoComplete="username"
+                  />
+                  {errors.user_name && (
+                    <span className="us-field-error">{errors.user_name}</span>
+                  )}
+                </div>
+
+                <div className="us-form-field">
+                  <label>Email (không bắt buộc)</label>
                   <input
                     type="email"
                     className={`us-input ${errors.email ? "error" : ""}`}
-                    placeholder="example@email.com"
+                    placeholder="Chưa liên kết — có thể bổ sung sau"
                     value={form.email}
                     onChange={(e) => set("email", e.target.value)}
                   />
@@ -1016,11 +1049,14 @@ function CreateUserModal({ onClose, onConfirm }) {
                   <label>Số điện thoại</label>
                   <input
                     type="tel"
-                    className="us-input"
+                    className={`us-input ${errors.phone ? "error" : ""}`}
                     placeholder="09xxxxxxxx"
                     value={form.phone}
                     onChange={(e) => set("phone", e.target.value)}
                   />
+                  {errors.phone && (
+                    <span className="us-field-error">{errors.phone}</span>
+                  )}
                 </div>
               </div>
 
@@ -1053,14 +1089,14 @@ function CreateUserModal({ onClose, onConfirm }) {
                 </div>
 
                 <div className="us-form-field">
-                  <label>Trạng thái</label>
+                  <label>Xác minh email</label>
                   <select
                     className="us-select"
                     value={form.status}
                     onChange={(e) => set("status", e.target.value)}
                   >
-                    <option value="active">Hoạt động</option>
-                    <option value="inactive">Không hoạt động</option>
+                    <option value="active">Đã xác minh email</option>
+                    <option value="inactive">Chưa xác minh email</option>
                     <option value="blocked">Bị khóa</option>
                   </select>
                 </div>

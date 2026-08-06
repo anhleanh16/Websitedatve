@@ -74,6 +74,7 @@ export default function Payment() {
   const navigate = useNavigate()
   const currentUser = useSelector((s) => s.user?.profile)
   const storedToken = typeof window !== 'undefined' ? getValidStoredToken() : null
+  const emailNotVerified = Boolean(currentUser) && currentUser.email_verified === false
   const { movieId=null, showtimeId=null, movieTitle='', cinema='', roomName='', roomType='', day='', time='',
     selectedSeats=[], selectedSeatLabels=[], selectedSeatUnits=[], seatTotal=0, comboTotal=0,
     snackTotal=0, totalWithSnacks, foodItems=[], total=0 } = location.state ?? {}
@@ -161,6 +162,11 @@ export default function Payment() {
   const pay = async () => {
     if (!agreed || busy) return
     if (!currentUser?.id) { setErr('Vui lòng đăng nhập trước khi thanh toán.'); navigate('/login', { state: { from: '/payment', paymentState: location.state ?? null } }); return }
+    if (emailNotVerified) {
+      setErr('Vui lòng xác minh email trước khi thanh toán.')
+      navigate('/profile?tab=edit')
+      return
+    }
     if (!showtimeId) { setErr('Không xác định được suất chiếu.'); return }
     if (!selectedSeatUnits?.length) { setErr('Bạn chưa chọn ghế hợp lệ.'); return }
     setBusy(true); setErr('')
@@ -211,6 +217,12 @@ export default function Payment() {
       navigate('/login', { replace: true, state: { from: '/payment', paymentState: location.state ?? null } })
     }
   }, [currentUser?.id, location.state, navigate, storedToken])
+
+  useEffect(() => {
+    if (emailNotVerified) {
+      navigate('/profile?tab=edit', { replace: true })
+    }
+  }, [emailNotVerified, navigate])
 
   return (
     <div className="pay-page">

@@ -183,16 +183,16 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className='auth-form'>
             <div className='form-group'>
-              <label>Email</label>
+              <label>Tên người dùng, email hoặc số điện thoại</label>
               <div className='input-wrapper'>
                 <FaEnvelope className='input-icon' />
                 <input
-                  type='email'
-                  placeholder='example@email.com'
+                  type='text'
+                  placeholder='Tên người dùng, email hoặc số điện thoại'
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  autoComplete='email'
+                  autoComplete='username'
                 />
               </div>
             </div>

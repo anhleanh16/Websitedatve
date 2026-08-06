@@ -1,6 +1,7 @@
 import express from 'express'
 import { reviewController } from '../controllers/reviewController.js'
 import { authMiddleware, adminOnly } from '../middleware/authMiddleware.js'
+import { requireVerifiedEmail } from '../../user/middleware/requireVerifiedEmail.js'
 
 const router = express.Router()
 
@@ -13,7 +14,7 @@ router.delete('/admin/reviews/:reviewId', authMiddleware, adminOnly, reviewContr
 // User routes (public)
 router.get('/movie/:movieId/reviews', reviewController.getMovieReviews)
 router.get('/movie/:movieId/review-stats', reviewController.getMovieStats)
-router.post('/reviews', authMiddleware, reviewController.createReview)
-router.put('/reviews/:reviewId', authMiddleware, reviewController.updateReview)
+router.post('/reviews', authMiddleware, requireVerifiedEmail, reviewController.createReview)
+router.put('/reviews/:reviewId', authMiddleware, requireVerifiedEmail, reviewController.updateReview)
 
 export default router

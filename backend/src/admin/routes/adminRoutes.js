@@ -288,8 +288,8 @@ router.put("/seats/bulk", authMiddleware, adminOnly, bulkUpdateSeats);
 // ─── Employee Management ─────────────────────────────────────────────────────
 router.get("/employees",     authMiddleware, adminOnly, getEmployees);
 router.get("/employees/:id", authMiddleware, adminOnly, getEmployeeById);
-router.post("/employees",    authMiddleware, adminOnly, uploadStaffAvatar.single("avatar"), createEmployee);
-router.put("/employees/:id", authMiddleware, adminOnly, uploadStaffAvatar.single("avatar"), updateEmployee);
+router.post("/employees",    authMiddleware, adminOnly, uploadStaffAvatar.fields([{ name: "avatar", maxCount: 1 }, { name: "idCardFront", maxCount: 1 }, { name: "idCardBack", maxCount: 1 }]), createEmployee);
+router.put("/employees/:id", authMiddleware, adminOnly, uploadStaffAvatar.fields([{ name: "avatar", maxCount: 1 }, { name: "idCardFront", maxCount: 1 }, { name: "idCardBack", maxCount: 1 }]), updateEmployee);
 router.delete("/employees/:id", authMiddleware, adminOnly, deleteEmployee);
 
 export default router;

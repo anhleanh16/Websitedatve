@@ -65,8 +65,11 @@
 .sf-modal-close.sm { width: 26px; height: 26px; font-size: 12px; }
 .sf-modal-body   { padding: 20px 26px; flex: 1; display: flex; flex-direction: column; gap: 16px; }
 .sf-modal-footer { display: flex; gap: 10px; padding: 16px 26px 22px; border-top: 1px solid rgba(255,255,255,0.07); flex-wrap: wrap; }
-.sf-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.sf-form-col { display: flex; flex-direction: column; gap: 14px; }
+.sf-form-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+.sf-form-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; padding: 18px; border: 1px solid rgba(135, 104, 255, 0.18); border-radius: 16px; background: linear-gradient(135deg, rgba(42, 35, 84, 0.32), rgba(12, 18, 36, 0.22)); }
+.sf-form-col > .sf-field-row, .sf-form-col > .sf-form-section-title, .sf-form-col > .sf-account-field, .sf-form-col > .sf-shifts-field { grid-column: 1 / -1; }
+.sf-form-section-title { grid-column: 1 / -1; margin: -2px 0 2px; color: #c9bcff; font-size: 13px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
+.sf-form-col > .sf-field-row { gap: 18px; }
 .sf-field { display: flex; flex-direction: column; gap: 5px; }
 .sf-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sf-field label { font-size: 13px; color: #8fa6ff; font-weight: 500; }
@@ -219,5 +222,5 @@
 .sf-toast { position: fixed; bottom: 24px; right: 24px; background: rgba(10,16,32,0.96); border: 1px solid rgba(124,97,255,0.35); border-radius: 16px; padding: 14px 20px; color: #d4c8ff; font-size: 14px; display: flex; align-items: center; gap: 12px; z-index: 99999; box-shadow: 0 16px 48px rgba(0,0,0,0.45); animation: sf-toast-in 0.3s ease; }
 .sf-toast button { background: none; border: none; color: #7a8fc0; cursor: pointer; font-size: 14px; }
 @keyframes sf-toast-in { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-@media (max-width: 768px) { .sf-form-grid { grid-template-columns: 1fr; } .sf-detail-grid { grid-template-columns: 1fr; } .sf-field-row { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .sf-form-grid, .sf-form-col { grid-template-columns: 1fr; } .sf-detail-grid { grid-template-columns: 1fr; } .sf-field-row { grid-template-columns: 1fr; } }
 .sf-account-hint { display: block; margin-top: 6px; color: #7a8fc0; font-size: 11px; line-height: 1.45; }

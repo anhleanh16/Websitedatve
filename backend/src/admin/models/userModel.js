@@ -10,6 +10,7 @@ export const UserModel = {
       `SELECT
         u.id as user_id,
         u.full_name,
+        u.user_name,
         u.email,
         u.phone as phone_number,
         u.avatar,
@@ -25,6 +26,7 @@ export const UserModel = {
         END as role,
         e.position as employee_position,
         u.status,
+        u.email_verified,
         u.birthday,
         u.sex,
         u.point as points,

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FaEye, FaEyeSlash, FaEnvelope, FaLock, FaUser, FaPhone, FaCalendar } from 'react-icons/fa'
 import './register.css'
@@ -18,6 +18,7 @@ const parseResponseSafe = async (res) => {
 export default function Register() {
   const [formData, setFormData] = useState({
     fullName: '',
+    userName: '',
     email: '',
     phone: '',
     password: '',
@@ -28,7 +29,13 @@ export default function Register() {
   const [showPwd, setShowPwd] = useState(false)
   const [showConfirmPwd, setShowConfirmPwd] = useState(false)
   const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState('')
   const [loading, setLoading] = useState(false)
+  const [registrationOtp, setRegistrationOtp] = useState(null)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpLoading, setOtpLoading] = useState(false)
+  const [nowTs, setNowTs] = useState(Date.now())
+  const [resendAvailableAt, setResendAvailableAt] = useState(0)
   const navigate = useNavigate()
 
   const handleChange = (e) => {
@@ -38,19 +45,28 @@ export default function Register() {
     })
   }
 
+  useEffect(() => {
+    if (!registrationOtp?.expiresAt && !resendAvailableAt) return undefined
+    const timer = window.setInterval(() => setNowTs(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [registrationOtp?.expiresAt, resendAvailableAt])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setMessage('')
+    setMessageType('')
 
     if (formData.password !== formData.confirmPassword) {
       setMessage('Mật khẩu không khớp!')
+      setMessageType('error')
       setLoading(false)
       return
     }
 
     if (formData.birthDate && !isValidBirthDate(formData.birthDate)) {
       setMessage(BIRTH_DATE_ERROR)
+      setMessageType('error')
       setLoading(false)
       return
     }
@@ -61,6 +77,7 @@ export default function Register() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: formData.fullName,
+          user_name: formData.userName,
           email:     formData.email,
           password:  formData.password,
           phone:     formData.phone,
@@ -73,17 +90,140 @@ export default function Register() {
       const data = await parseResponseSafe(res)
       if (!res.ok) throw new Error(data?.message || 'Đăng ký thất bại')
 
-      setMessage(data?.message || 'Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản.')
+      setMessage(data?.message || 'Đăng ký thành công. Mã OTP đã được gửi đến email của bạn.')
+      setMessageType('success')
       const ttlMinutes = Number(data?.tokenTtlMinutes || 5)
-      const ttlSeconds = Math.max(0, ttlMinutes * 60)
-      setTimeout(() => {
-        navigate(`/Logins/Login?verify_email_sent=1&ttl=${ttlSeconds}`)
-      }, 1200)
+      setRegistrationOtp({ userId: data?.userId, expiresAt: Date.now() + Math.max(0, ttlMinutes * 60) * 1000 })
     } catch (err) {
       setMessage(err.message)
+      setMessageType('error')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleConfirmOtp = async () => {
+    if (!registrationOtp?.userId) return
+    if (!/^\d{6}$/.test(otpCode)) {
+      setMessage('Vui lòng nhập mã OTP gồm 6 chữ số.')
+      setMessageType('error')
+      return
+    }
+
+    setOtpLoading(true)
+    setMessage('')
+    setMessageType('')
+    try {
+      const res = await fetch('/api/auth/register/confirm-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: registrationOtp.userId, otpCode }),
+      })
+      const data = await parseResponseSafe(res)
+      if (!res.ok) throw new Error(data?.message || 'Xác minh OTP thất bại.')
+
+      setMessage(data?.message || 'Xác minh OTP thành công. Bạn có thể đăng nhập.')
+      setMessageType('success')
+      setTimeout(() => navigate('/Logins/Login?verified=1'), 1200)
+    } catch (err) {
+      setMessage(err.message)
+      setMessageType('error')
+    } finally {
+      setOtpLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (!registrationOtp?.userId) return
+    setOtpLoading(true)
+    setMessage('')
+    setMessageType('')
+    try {
+      const res = await fetch('/api/auth/register/resend-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: registrationOtp.userId }),
+      })
+      const data = await parseResponseSafe(res)
+      if (!res.ok) throw new Error(data?.message || 'Không thể gửi lại OTP.')
+      const ttlMinutes = Number(data?.tokenTtlMinutes || 5)
+      setRegistrationOtp((prev) => ({ ...prev, expiresAt: Date.now() + ttlMinutes * 60 * 1000 }))
+      setOtpCode('')
+      setResendAvailableAt(Date.now() + 30 * 1000)
+      setMessage(data?.message || 'Mã OTP mới đã được gửi đến email của bạn.')
+      setMessageType('success')
+    } catch (err) {
+      setMessage(err.message)
+      setMessageType('error')
+    } finally {
+      setOtpLoading(false)
+    }
+  }
+
+  const otpRemaining = registrationOtp?.expiresAt
+    ? Math.max(0, Math.ceil((registrationOtp.expiresAt - nowTs) / 1000))
+    : 0
+  const resendRemaining = Math.max(0, Math.ceil((resendAvailableAt - nowTs) / 1000))
+
+  if (registrationOtp) {
+    return (
+      <div className='auth-page'>
+        <div className='orb orb-1'></div>
+        <div className='orb orb-2'></div>
+        <div className='orb orb-3'></div>
+        <div className='auth-container register-container' style={{ zIndex: 1 }}>
+          <div className='auth-card register-otp-card'>
+            <div className='auth-header register-otp-header'>
+              <h1>Xác minh đăng ký</h1>
+              <p>Mã OTP 6 số đã được gửi đến email của bạn.</p>
+            </div>
+
+            {message && (
+              <div className={`register-message ${messageType || 'error'}`}>
+                {message}
+              </div>
+            )}
+
+            <div className='register-otp-form'>
+              <label htmlFor='registration-otp'>Nhập mã xác minh</label>
+              <input
+                id='registration-otp'
+                type='text'
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder='Nhập OTP 6 số'
+                inputMode='numeric'
+                autoComplete='one-time-code'
+                autoFocus
+                disabled={otpRemaining === 0 || otpLoading}
+              />
+              <p className={`register-otp-expiry ${otpRemaining === 0 ? 'expired' : ''}`}>
+                {otpRemaining > 0
+                  ? `Mã còn hiệu lực ${String(Math.floor(otpRemaining / 60)).padStart(2, '0')}:${String(otpRemaining % 60).padStart(2, '0')}.`
+                  : 'Mã OTP đã hết hạn. Vui lòng gửi lại mã mới.'}
+              </p>
+              <button type='button' className='submit-btn' onClick={handleConfirmOtp} disabled={otpLoading || otpRemaining === 0}>
+                {otpLoading ? 'Đang xác minh...' : 'Xác minh OTP'}
+              </button>
+              <p className='register-resend-note'>
+                <span>* Chưa nhận được mã? </span>
+                {resendRemaining > 0 ? (
+                  <strong>Gửi lại sau {resendRemaining}s</strong>
+                ) : (
+                  <button type='button' className='register-resend-link' onClick={handleResendOtp} disabled={otpLoading}>
+                    {otpLoading ? 'Đang gửi...' : 'Gửi lại'}
+                  </button>
+                )}
+              </p>
+            </div>
+
+            <div className='auth-footer'>
+              <p>Đã có tài khoản? <Link to='/Logins/Login'>Đăng nhập ngay</Link></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -135,6 +275,25 @@ export default function Register() {
                   placeholder='Nhập họ và tên'
                   value={formData.fullName}
                   onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className='form-group'>
+              <label>Tên người dùng</label>
+              <div className='input-wrapper'>
+                <FaUser className='input-icon' />
+                <input
+                  type='text'
+                  name='userName'
+                  placeholder='Ví dụ: nguyenvana'
+                  value={formData.userName}
+                  onChange={handleChange}
+                  minLength='3'
+                  maxLength='30'
+                  pattern='[A-Za-z0-9._-]+'
+                  autoComplete='username'
                   required
                 />
               </div>
@@ -251,15 +410,42 @@ export default function Register() {
             </div>
 
             {message && (
-              <div className='error-message'>
+              <div className={`register-message ${messageType || 'error'}`}>
                 {message}
               </div>
             )}
 
-            <button type='submit' disabled={loading} className='submit-btn'>
+            <button type='submit' disabled={loading || Boolean(registrationOtp)} className='submit-btn'>
               {loading ? 'Đang đăng ký...' : 'Đăng ký'}
             </button>
           </form>
+
+          {registrationOtp && (
+            <div className='register-otp-panel'>
+              <h3>Xác minh đăng ký bằng OTP</h3>
+              <p>Nhập mã OTP 6 số đã gửi tới email của bạn. {otpRemaining > 0 ? `Mã còn hiệu lực ${String(Math.floor(otpRemaining / 60)).padStart(2, '0')}:${String(otpRemaining % 60).padStart(2, '0')}.` : 'Mã OTP đã hết hạn.'}</p>
+              <div className='register-otp-actions'>
+                <input
+                  type='text'
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder='Nhập OTP 6 số'
+                  inputMode='numeric'
+                  autoComplete='one-time-code'
+                  disabled={otpRemaining === 0 || otpLoading}
+                />
+                {otpRemaining > 0 ? (
+                  <button type='button' className='submit-btn' onClick={handleConfirmOtp} disabled={otpLoading}>
+                    {otpLoading ? 'Đang xác minh...' : 'Xác minh OTP'}
+                  </button>
+                ) : (
+                  <button type='button' className='submit-btn' onClick={handleResendOtp} disabled={otpLoading}>
+                    {otpLoading ? 'Đang gửi...' : 'Gửi lại OTP'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className='auth-divider'>
             <span>hoặc</span>

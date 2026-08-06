@@ -48,7 +48,7 @@ const storage = multer.diskStorage({
     } else if (file.fieldname === "upload") {
       // CKEditor inline images (inserted inside news body)
       cb(null, newsInlineUploadDir);
-    } else if (file.fieldname === "avatar") {
+    } else if (["avatar", "idCardFront", "idCardBack"].includes(file.fieldname)) {
       // For staff avatars
       cb(null, staffUploadDir);
     }
@@ -67,6 +67,10 @@ const storage = multer.diskStorage({
       cb(null, "news-inline-" + uniqueSuffix + path.extname(file.originalname));
     } else if (file.fieldname === "avatar") {
       cb(null, "avatar-" + uniqueSuffix + path.extname(file.originalname));
+    } else if (file.fieldname === "idCardFront") {
+      cb(null, "cccd-front-" + uniqueSuffix + path.extname(file.originalname));
+    } else if (file.fieldname === "idCardBack") {
+      cb(null, "cccd-back-" + uniqueSuffix + path.extname(file.originalname));
     }
   },
 });
@@ -78,7 +82,7 @@ const fileFilter = (req, file, cb) => {
     file.fieldname === "image" ||
     file.fieldname === "thumbnailFile" ||
     file.fieldname === "upload" ||
-    file.fieldname === "avatar"
+    ["avatar", "idCardFront", "idCardBack"].includes(file.fieldname)
   ) {
     // Gộp filter cho ảnh
     const allowedTypes = /jpeg|jpg|png|gif|webp/;

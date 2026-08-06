@@ -17,6 +17,8 @@
     "bootstrap": "^5.3.8",
     "json-server": "^0.17.4",
     "json-server-auth": "^2.1.0",
+    "jspdf": "^4.2.1",
+    "qrcode": "^1.5.4",
     "react": "^19.2.6",
     "react-bootstrap": "^2.10.10",
     "react-dom": "^19.2.6",

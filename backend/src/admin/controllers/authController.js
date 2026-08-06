@@ -6,6 +6,7 @@ import {
   createUser,
   emailExists,
   ensureEmailVerificationSchema,
+  ensureUserNameSchema,
   ensurePasswordResetSchema,
   findUserForResendVerification,
   findUserForPasswordReset,
@@ -16,11 +17,13 @@ import {
   setPasswordResetToken,
   setEmailVerificationToken,
   updateLastLogin,
+  userNameExists,
   verifyEmailByToken,
 } from '../models/authModel.js';
 import {
   isEmailVerificationConfigured,
   sendPasswordResetEmail,
+  sendRegistrationOtpEmail,
   sendVerificationEmail,
 } from '../services/emailVerificationService.js';
 import { db } from '../../../config/db.js';
@@ -30,6 +33,9 @@ const JWT_EXPIRES = '7d';
 const TOKEN_TTL_MINUTES = 5;
 const EMAIL_VERIFY_TTL_MINUTES = TOKEN_TTL_MINUTES;
 const PASSWORD_RESET_TTL_MINUTES = TOKEN_TTL_MINUTES;
+const isUnlinkedEmail = (email) => String(email || '').toLowerCase().endsWith('@unlinked.local');
+const makeRegistrationOtpToken = (userId, otpCode) =>
+  crypto.createHmac('sha256', JWT_SECRET).update(`${userId}:${otpCode}`).digest('hex');
 const FRONTEND_LOGIN_URL = process.env.FRONTEND_LOGIN_URL || 'http://localhost:5173/Logins/Login';
 const FRONTEND_RESET_PASSWORD_URL = process.env.FRONTEND_RESET_PASSWORD_URL || 'http://localhost:5173/reset-password';
 
@@ -98,11 +104,11 @@ const loginWithAudience = async (req, res, { customersOnly = false } = {}) => {
     const { email, password } = req.body;
 
     if (!email || !password)
-      return res.status(400).json({ message: 'Vui lòng nhập email và mật khẩu.' });
+      return res.status(400).json({ message: 'Vui lòng nhập tên người dùng, email hoặc số điện thoại và mật khẩu.' });
 
     const user = await findUserWithRoleByEmail(email);
     if (!user)
-      return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng.' });
+      return res.status(401).json({ message: 'Thông tin đăng nhập hoặc mật khẩu không đúng.' });
 
     if (String(user.status || '').toLowerCase() === 'blocked') {
       return res.status(403).json({
@@ -113,24 +119,19 @@ const loginWithAudience = async (req, res, { customersOnly = false } = {}) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
-      return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng.' });
+      return res.status(401).json({ message: 'Thông tin đăng nhập hoặc mật khẩu không đúng.' });
 
     const role = (user.role_name || user.role || 'user').toLowerCase();
+    const emailUnlinked = isUnlinkedEmail(user.email);
     if (customersOnly && role !== 'user') {
       return res.status(403).json({
         message: 'Tài khoản nhân viên chỉ được đăng nhập tại trang quản trị.',
       });
     }
-    if (role === 'user' && Number(user.email_verified || 0) !== 1) {
-      return res.status(403).json({
-        message: 'Tài khoản chưa xác minh email. Vui lòng kiểm tra email và bấm liên kết xác minh.',
-      });
-    }
-
     await updateLastLogin(user.id);
     const token = makeToken({
       userId: user.id,
-      email: user.email,
+      email: emailUnlinked ? '' : user.email,
       name: user.full_name,
       role,
     });
@@ -140,7 +141,8 @@ const loginWithAudience = async (req, res, { customersOnly = false } = {}) => {
       user: {
         id: user.id,
         name: user.full_name,
-        email: user.email,
+        email: emailUnlinked ? '' : user.email,
+        email_verified: !emailUnlinked && Number(user.email_verified || 0) === 1,
         phone: user.phone,
         avatar: user.avatar,
         point: user.point,
@@ -162,19 +164,27 @@ export const register = async (req, res) => {
   let connection = null;
   try {
     await ensureEmailVerificationSchema();
-    const { full_name, email, password, phone, birthday, sex } = req.body;
+    await ensureUserNameSchema();
+    const { full_name, user_name, email, password, phone, birthday, sex } = req.body;
+    const normalizedUserName = String(user_name || '').trim().toLowerCase();
 
     if (birthday && !isValidBirthDate(birthday))
       return res.status(400).json({ message: BIRTH_DATE_ERROR });
 
-    if (!full_name || !email || !password)
-      return res.status(400).json({ message: 'Vui lòng nhập đầy đủ họ tên, email và mật khẩu.' });
+    if (!full_name || !normalizedUserName || !email || !password)
+      return res.status(400).json({ message: 'Vui lòng nhập đầy đủ họ tên, tên người dùng, email và mật khẩu.' });
+
+    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUserName))
+      return res.status(400).json({ message: 'Tên người dùng gồm 3–30 ký tự: chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.' });
 
     if (password.length < 6)
       return res.status(400).json({ message: 'Mật khẩu phải ít nhất 6 ký tự.' });
 
     if (await emailExists(email))
       return res.status(409).json({ message: 'Email đã được sử dụng.' });
+
+    if (await userNameExists(normalizedUserName))
+      return res.status(409).json({ message: 'Tên người dùng đã được sử dụng.' });
 
     if (!isEmailVerificationConfigured()) {
       return res.status(500).json({
@@ -188,12 +198,13 @@ export const register = async (req, res) => {
 
     const roleId = await getRoleIdByName('user', connection);
     const hashedPassword = await bcrypt.hash(password, 10);
-    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const otpCode = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
     const expiresAt = new Date(Date.now() + EMAIL_VERIFY_TTL_MINUTES * 60 * 1000);
 
     const userId = await createUser({
       roleId,
       full_name,
+      user_name: normalizedUserName,
       email,
       password: hashedPassword,
       phone,
@@ -201,18 +212,21 @@ export const register = async (req, res) => {
       sex,
     }, connection);
 
+    const verificationToken = makeRegistrationOtpToken(userId, otpCode);
     await setEmailVerificationToken(userId, verificationToken, expiresAt, connection);
-    await sendVerificationEmail({
+    await sendRegistrationOtpEmail({
       toEmail: email,
       fullName: full_name,
-      verifyUrl: buildVerifyUrl(req, verificationToken, expiresAt),
+      otpCode,
       ttlMinutes: EMAIL_VERIFY_TTL_MINUTES,
     });
 
     await connection.commit();
 
     res.status(201).json({
-      message: 'Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.',
+      message: 'Đăng ký thành công. Mã OTP 6 số đã được gửi đến email của bạn.',
+      userId,
+      otpRequired: true,
       tokenTtlMinutes: EMAIL_VERIFY_TTL_MINUTES,
     });
   } catch (err) {
@@ -228,6 +242,89 @@ export const register = async (req, res) => {
     res.status(500).json({ message: friendlyMessage || 'Lỗi máy chủ, vui lòng thử lại.' });
   } finally {
     if (connection) connection.release();
+  }
+};
+
+export const confirmRegistrationOtp = async (req, res) => {
+  try {
+    await ensureEmailVerificationSchema();
+    const userId = Number(req.body?.userId || 0);
+    const otpCode = String(req.body?.otpCode || '').trim();
+    if (!userId || !/^\d{6}$/.test(otpCode)) {
+      return res.status(400).json({ message: 'Vui lòng nhập mã OTP gồm 6 chữ số.' });
+    }
+
+    const [[user]] = await db.query(
+      `SELECT id, email_verify_token, email_verify_expires
+       FROM User WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+    if (!user?.email_verify_token || !user?.email_verify_expires) {
+      return res.status(400).json({ message: 'Không tìm thấy yêu cầu xác minh OTP.' });
+    }
+    if (new Date(user.email_verify_expires).getTime() < Date.now()) {
+      return res.status(400).json({ message: 'Mã OTP đã hết hạn. Vui lòng đăng ký lại.' });
+    }
+
+    const expectedToken = makeRegistrationOtpToken(userId, otpCode);
+    const savedToken = String(user.email_verify_token);
+    const isValid = savedToken.length === expectedToken.length &&
+      crypto.timingSafeEqual(Buffer.from(savedToken), Buffer.from(expectedToken));
+    if (!isValid) {
+      return res.status(400).json({ message: 'Mã OTP không đúng.' });
+    }
+
+    await db.query(
+      `UPDATE User
+       SET email_verified = 1, email_verify_token = NULL, email_verify_expires = NULL,
+           email_verified_at = NOW(), updated_at = NOW()
+       WHERE id = ?`,
+      [userId],
+    );
+    return res.json({ message: 'Xác minh OTP thành công. Bạn có thể đăng nhập.' });
+  } catch (err) {
+    console.error('confirmRegistrationOtp error:', err);
+    return res.status(500).json({ message: 'Không thể xác minh OTP lúc này.' });
+  }
+};
+
+export const resendRegistrationOtp = async (req, res) => {
+  try {
+    await ensureEmailVerificationSchema();
+    if (!isEmailVerificationConfigured()) {
+      return res.status(500).json({ message: 'Thiếu cấu hình SMTP để gửi OTP.' });
+    }
+    const userId = Number(req.body?.userId || 0);
+    if (!userId) return res.status(400).json({ message: 'Tài khoản đăng ký không hợp lệ.' });
+
+    const [[user]] = await db.query(
+      'SELECT id, full_name, email, email_verified, status FROM User WHERE id = ? LIMIT 1',
+      [userId],
+    );
+    if (!user || String(user.status || '').toLowerCase() === 'blocked') {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản cần xác minh.' });
+    }
+    if (Number(user.email_verified) === 1) {
+      return res.status(400).json({ message: 'Email của tài khoản này đã được xác minh.' });
+    }
+
+    const otpCode = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+    const token = makeRegistrationOtpToken(userId, otpCode);
+    const expiresAt = new Date(Date.now() + EMAIL_VERIFY_TTL_MINUTES * 60 * 1000);
+    await setEmailVerificationToken(userId, token, expiresAt);
+    await sendRegistrationOtpEmail({
+      toEmail: user.email,
+      fullName: user.full_name,
+      otpCode,
+      ttlMinutes: EMAIL_VERIFY_TTL_MINUTES,
+    });
+    return res.json({
+      message: 'Mã OTP mới đã được gửi đến email của bạn.',
+      tokenTtlMinutes: EMAIL_VERIFY_TTL_MINUTES,
+    });
+  } catch (err) {
+    console.error('resendRegistrationOtp error:', err);
+    return res.status(500).json({ message: 'Không thể gửi lại mã OTP lúc này.' });
   }
 };
 

@@ -3,6 +3,7 @@ import './bookings.css';
 import BookingWizard from "./BookingWizard.jsx";
 import { adminBookingService } from "../../services/adminApi";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import { printTicketPdf } from "../../../utils/ticketPrint.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const STATUS_MAP = {
@@ -46,6 +47,8 @@ function mapBookingFromApi(item) {
     status: item?.status || "pending",
     bookingCode: item?.booking_code || "",
     qrCode: item?.primary_qr_code || item?.booking_code || "",
+    qrCodes: Array.isArray(item?.qr_codes) ? item.qr_codes.filter(Boolean) : [],
+    combos: Array.isArray(item?.combos) ? item.combos : [],
     checkInTime: item?.check_in_time ? new Date(item.check_in_time).toLocaleString("vi-VN") : null,
     createdAt: item?.created_at ? new Date(item.created_at).toLocaleString("vi-VN") : "",
   };
@@ -259,6 +262,9 @@ function BookingDetail({ booking, onClose, onCheck }) {
               Kiểm tra vé
             </button>
           )}
+          <button className="bk-btn bk-btn-view bk-btn-lg" onClick={() => printTicketPdf(booking)}>
+            In vé / Lưu PDF
+          </button>
           <button className="bk-btn bk-btn-secondary bk-btn-lg" onClick={onClose}>
             Đóng
           </button>
@@ -414,8 +420,15 @@ export default function AdminBookings() {
   };
 
   // Mở chi tiết
-  const handleView = (b) => {
-    setSelectedBooking(b);
+  const handleView = async (b) => {
+    try {
+      const data = await adminBookingService.getBookingDetail(b.orderId || b.id);
+      setSelectedBooking(mapBookingFromApi(data?.booking || data || b));
+    } catch (error) {
+      console.error("Failed to load booking detail", error);
+      setSelectedBooking(b);
+      showToast("Không thể tải đầy đủ chi tiết vé; đang dùng dữ liệu hiện có.", "error");
+    }
     setActiveTab("detail");
   };
 

@@ -29,7 +29,9 @@ export const createEmployee = async (req, res) => {
   try {
     const data = {
       ...req.body,
-      ...(req.file ? { avatarUrl: `/uploads/staff/${req.file.filename}` } : {}),
+      ...(req.files?.avatar?.[0] ? { avatarUrl: `/uploads/staff/${req.files.avatar[0].filename}` } : {}),
+      ...(req.files?.idCardFront?.[0] ? { idCardFrontUrl: `/uploads/staff/${req.files.idCardFront[0].filename}` } : {}),
+      ...(req.files?.idCardBack?.[0] ? { idCardBackUrl: `/uploads/staff/${req.files.idCardBack[0].filename}` } : {}),
     };
     if (data.dob && !isValidBirthDate(data.dob)) {
       return res.status(400).json({ message: BIRTH_DATE_ERROR });
@@ -51,7 +53,9 @@ export const updateEmployee = async (req, res) => {
     const id = Number(req.params.id);
     const data = {
       ...req.body,
-      ...(req.file ? { avatarUrl: `/uploads/staff/${req.file.filename}` } : {}),
+      ...(req.files?.avatar?.[0] ? { avatarUrl: `/uploads/staff/${req.files.avatar[0].filename}` } : {}),
+      ...(req.files?.idCardFront?.[0] ? { idCardFrontUrl: `/uploads/staff/${req.files.idCardFront[0].filename}` } : {}),
+      ...(req.files?.idCardBack?.[0] ? { idCardBackUrl: `/uploads/staff/${req.files.idCardBack[0].filename}` } : {}),
     };
     if (data.dob && !isValidBirthDate(data.dob)) {
       return res.status(400).json({ message: BIRTH_DATE_ERROR });

@@ -20,6 +20,7 @@ import { BookingModel } from '../../admin/models/bookingModel.js';
 import { NotificationModel } from '../../admin/models/notificationModel.js';
 import { authMiddleware, selfOrAdminOnly } from '../../admin/middleware/authMiddleware.js';
 import { sendTicketQrEmail } from '../services/ticketEmailService.js';
+import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
 
 const router = express.Router();
 
@@ -143,7 +144,7 @@ function buildGatewayUrl(appId, zpTransToken) {
 // ── POST /:userId/payments/zalopay — Tạo đơn hàng ZaloPay ────────────────────
 // KHÔNG tạo booking ngay — chỉ lưu pending data, tạo ZaloPay order
 // Booking thật được tạo trong callback khi thanh toán thành công
-router.post('/:userId/payments/zalopay', authMiddleware, selfOrAdminOnly, async (req, res) => {
+router.post('/:userId/payments/zalopay', authMiddleware, selfOrAdminOnly, requireVerifiedEmail, async (req, res) => {
   try {
     await ensurePendingPaymentsTable();
 

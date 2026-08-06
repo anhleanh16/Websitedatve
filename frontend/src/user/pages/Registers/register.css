@@ -286,15 +286,46 @@
   accent-color: #a78bfa;
 }
 
-.error-message {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
+.register-message {
   padding: 12px 16px;
   border-radius: 10px;
   font-size: 14px;
   text-align: center;
 }
+
+.register-message.error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.register-message.success { background: rgba(34, 197, 94, 0.14); border: 1px solid rgba(74, 222, 128, 0.32); color: #86efac; }
+
+.register-otp-panel { margin-top: 18px; padding: 16px; border: 1px solid rgba(167, 139, 250, 0.42); border-radius: 14px; background: rgba(76, 29, 149, 0.16); }
+.register-otp-panel h3 { margin: 0 0 8px; color: #ede9fe; font-size: 16px; }
+.register-otp-panel p { margin: 0 0 12px; color: rgba(221, 214, 254, 0.82); font-size: 13px; line-height: 1.55; }
+.register-otp-actions { display: flex; gap: 10px; }
+.register-otp-actions input { flex: 1; min-width: 0; border: 1px solid rgba(167, 139, 250, 0.5); border-radius: 10px; background: rgba(15, 23, 42, 0.75); color: #fff; padding: 0 12px; font: inherit; letter-spacing: .08em; }
+.register-otp-actions .submit-btn { width: auto; margin: 0; padding: 11px 16px; white-space: nowrap; }
+
+/* Màn hình xác minh đăng ký riêng */
+.register-otp-card { max-width: 430px; margin: 0 auto; }
+.register-otp-header { margin-bottom: 22px; }
+.register-otp-header p { color: rgba(255, 255, 255, 0.66) !important; line-height: 1.55; }
+.register-otp-card .register-message { margin: -6px 0 18px; }
+.register-otp-form { display: flex; flex-direction: column; gap: 12px; }
+.register-otp-form > label { color: rgba(255, 255, 255, 0.88); font-size: 14px; font-weight: 600; }
+.register-otp-form > input { width: 100%; padding: 15px 16px; border: 1px solid rgba(167, 139, 250, 0.52); border-radius: 12px; background: rgba(15, 23, 42, 0.78); color: #fff; outline: none; font: inherit; font-size: 18px; letter-spacing: .22em; text-align: center; transition: border-color .2s, box-shadow .2s; }
+.register-otp-form > input:focus { border-color: #a78bfa; box-shadow: 0 0 0 3px rgba(167, 139, 250, .2); }
+.register-otp-form > input::placeholder { letter-spacing: 0; font-size: 14px; color: rgba(255, 255, 255, .48); }
+.register-otp-expiry { margin: -2px 0 0; color: rgba(221, 214, 254, .78); font-size: 13px; text-align: center; }
+.register-otp-expiry.expired { color: #fda4af; }
+.register-otp-form .submit-btn { margin-top: 4px; }
+.register-resend-note { margin: 4px 0 0; color: rgba(255, 255, 255, .62); font-size: 13px; text-align: center; }
+.register-resend-note strong { color: #c4b5fd; font-weight: 600; }
+.register-resend-link { padding: 0; border: 0; background: transparent; color: #c4b5fd; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.register-resend-link:hover:not(:disabled) { color: #ede9fe; }
+.register-resend-link:disabled { cursor: wait; opacity: .65; }
 
 .submit-btn {
   width: 100%;

@@ -173,6 +173,22 @@ const buildEmailChangeOtpText = ({ fullName, otpCode, ttlMinutes }) => {
     ].join('\n')
 }
 
+const buildRegistrationOtpText = ({ fullName, otpCode, ttlMinutes }) => {
+    const safeName = String(fullName || 'bạn')
+    const safeCode = String(otpCode || '')
+    const safeTtl = Number(ttlMinutes || 5)
+
+    return [
+        `Xin chào ${safeName},`,
+        '',
+        'Cảm ơn bạn đã đăng ký tài khoản Sweetstar Movie.',
+        `Mã OTP xác minh tài khoản của bạn là: ${safeCode}`,
+        `Mã có hiệu lực trong ${safeTtl} phút. Vui lòng không chia sẻ mã này cho bất kỳ ai.`,
+        '',
+        'Sweetstar Movie Team',
+    ].join('\n')
+}
+
 const buildVerificationEmailHtml = ({ fullName, verifyUrl, ttlMinutes }) => {
     return buildEmailLayout({
         preheader: 'Kích hoạt tài khoản Sweetstar Movie chỉ trong vài giây.',
@@ -296,5 +312,40 @@ export const sendEmailChangeOtpEmail = async ({ toEmail, fullName, otpCode, ttlM
         subject: 'Mã OTP đổi email Sweetstar Movie',
         text: buildEmailChangeOtpText({ fullName, otpCode, ttlMinutes }),
         html: buildEmailChangeOtpEmailHtml({ fullName, otpCode, ttlMinutes }),
+    })
+}
+
+export const sendRegistrationOtpEmail = async ({ toEmail, fullName, otpCode, ttlMinutes }) => {
+    const mailTransporter = getTransporter()
+    if (!mailTransporter) {
+        throw new Error('Thiếu cấu hình SMTP để gửi OTP đăng ký.')
+    }
+
+    const safeCode = escapeHtml(otpCode)
+    const safeName = escapeHtml(fullName)
+    const safeTtl = Number(ttlMinutes || 5)
+    await mailTransporter.sendMail({
+        from: EMAIL_FROM,
+        to: String(toEmail || '').trim(),
+        subject: 'Mã OTP xác minh tài khoản Sweetstar Movie',
+        text: buildRegistrationOtpText({ fullName, otpCode, ttlMinutes }),
+        html: `
+          <div style="margin:0;padding:24px 12px;background:#0b1220;font-family:Arial,sans-serif;">
+            <div style="max-width:560px;margin:auto;overflow:hidden;border-radius:18px;background:#ffffff;">
+              <div style="padding:24px 28px;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;">
+                <div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Sweetstar Movie</div>
+                <h1 style="margin:10px 0 0;font-size:24px;">Xác minh đăng ký tài khoản</h1>
+              </div>
+              <div style="padding:28px;color:#374151;line-height:1.65;">
+                <p>Xin chào ${safeName},</p>
+                <p>Nhập mã OTP sau tại trang đăng ký để hoàn tất tạo tài khoản.</p>
+                <div style="margin:22px 0;padding:16px;border:1px dashed #8b5cf6;border-radius:12px;background:#f5f3ff;text-align:center;">
+                  <div style="font-size:13px;font-weight:700;color:#6d28d9;text-transform:uppercase;">Mã OTP của bạn</div>
+                  <div style="margin-top:6px;font-size:34px;font-weight:800;letter-spacing:6px;color:#312e81;">${safeCode}</div>
+                </div>
+                <p style="font-size:13px;color:#6b7280;">Mã có hiệu lực trong ${safeTtl} phút. Không chia sẻ mã này cho bất kỳ ai.</p>
+              </div>
+            </div>
+          </div>`,
     })
 }

@@ -15,7 +15,14 @@ import {
 } from '../../admin/services/emailVerificationService.js';
 
 const EMAIL_CHANGE_OTP_TTL_MINUTES = 5;
+const EMAIL_CHANGE_OTP_RESEND_COOLDOWN_SECONDS = 30;
 const PROFILE_AUDIT_MAX_LIMIT = 50;
+const isUnlinkedEmail = (email) => String(email || '').toLowerCase().endsWith('@unlinked.local');
+const makeEmailOtpToken = (userId, otpCode) =>
+  crypto
+    .createHmac('sha256', process.env.JWT_SECRET || 'sweetstar-email-otp')
+    .update(`${userId}:${otpCode}`)
+    .digest('hex');
 let profileSchemaReadyPromise = null;
 
 const ensureColumn = async (tableName, columnName, definitionSql) => {
@@ -34,7 +41,9 @@ const ensureUserProfileSchema = async () => {
   profileSchemaReadyPromise = (async () => {
     await ensureColumn('User', 'pending_email', 'VARCHAR(100) NULL AFTER email');
     await ensureColumn('User', 'email_change_otp', 'VARCHAR(10) NULL AFTER pending_email');
-    await ensureColumn('User', 'email_change_expires', 'DATETIME NULL AFTER email_change_otp');
+    await ensureColumn('User', 'email_change_otp_token', 'VARCHAR(128) NULL AFTER email_change_otp');
+    await ensureColumn('User', 'email_change_expires', 'DATETIME NULL AFTER email_change_otp_token');
+    await ensureColumn('User', 'email_change_requested_at', 'DATETIME NULL AFTER email_change_expires');
 
     await db.query(`
       CREATE TABLE IF NOT EXISTS User_Profile_Audits (
@@ -305,8 +314,10 @@ export const userGetProfile = async (req, res) => {
         id,
         full_name,
         email,
+        email_verified,
         pending_email,
         email_change_expires,
+        email_change_requested_at,
         phone,
         birthday,
         sex,
@@ -330,9 +341,11 @@ export const userGetProfile = async (req, res) => {
       user: {
         id: user.id,
         name: user.full_name,
-        email: user.email,
+        email: isUnlinkedEmail(user.email) ? "" : user.email,
+        email_verified: Boolean(user.email_verified) && !isUnlinkedEmail(user.email),
         pending_email: user.pending_email || "",
         email_change_expires: user.email_change_expires,
+        email_change_requested_at: user.email_change_requested_at,
         phone: user.phone || "",
         birthday: user.birthday,
         sex: user.sex,
@@ -634,8 +647,8 @@ export const userUpdateProfile = async (req, res) => {
       return res.status(400).json({ message: BIRTH_DATE_ERROR });
     }
 
-    if (!trimmedName || !trimmedEmail) {
-      return res.status(400).json({ message: "Họ tên và email là bắt buộc." });
+    if (!trimmedName) {
+      return res.status(400).json({ message: "Họ tên là bắt buộc." });
     }
 
     const [[currentUser]] = await db.query(
@@ -647,7 +660,12 @@ export const userUpdateProfile = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy tài khoản." });
     }
 
-    if (trimmedEmail !== String(currentUser.email || '').trim().toLowerCase()) {
+    const currentEmail = String(currentUser.email || '').trim().toLowerCase();
+    if (!trimmedEmail && !isUnlinkedEmail(currentEmail)) {
+      return res.status(400).json({ message: "Email không được để trống." });
+    }
+
+    if (trimmedEmail && trimmedEmail !== currentEmail) {
       return res.status(400).json({
         message: "Để đổi email, vui lòng dùng chức năng xác minh OTP email mới.",
         requiresEmailVerification: true,
@@ -667,7 +685,7 @@ export const userUpdateProfile = async (req, res) => {
     `,
       [
         trimmedName,
-        trimmedEmail,
+        trimmedEmail || currentUser.email,
         trimmedPhone || null,
         normalizedBirthday,
         normalizedSex,
@@ -695,7 +713,7 @@ export const userUpdateProfile = async (req, res) => {
       },
       {
         full_name: updatedUser.full_name,
-        email: updatedUser.email,
+        email: isUnlinkedEmail(updatedUser.email) ? "" : updatedUser.email,
         phone: updatedUser.phone,
         birthday: updatedUser.birthday,
         sex: updatedUser.sex,
@@ -885,7 +903,7 @@ export const userRequestEmailChangeOtp = async (req, res) => {
     }
 
     const [[currentUser]] = await db.query(
-      "SELECT id, full_name, email FROM User WHERE id = ? LIMIT 1",
+      "SELECT id, full_name, email, email_verified, email_change_requested_at FROM User WHERE id = ? LIMIT 1",
       [userId],
     );
 
@@ -893,7 +911,21 @@ export const userRequestEmailChangeOtp = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy tài khoản." });
     }
 
-    if (newEmail === String(currentUser.email || '').trim().toLowerCase()) {
+    const lastRequestedAt = currentUser.email_change_requested_at
+      ? new Date(currentUser.email_change_requested_at).getTime()
+      : 0;
+    const cooldownEndsAt = lastRequestedAt + EMAIL_CHANGE_OTP_RESEND_COOLDOWN_SECONDS * 1000;
+    if (lastRequestedAt && Date.now() < cooldownEndsAt) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((cooldownEndsAt - Date.now()) / 1000));
+      return res.status(429).json({
+        message: `Vui lòng chờ ${retryAfterSeconds} giây trước khi gửi lại mã OTP.`,
+        retryAfterSeconds,
+      });
+    }
+
+    const currentEmail = String(currentUser.email || '').trim().toLowerCase();
+    const isVerifyingRegisteredEmail = newEmail === currentEmail && Number(currentUser.email_verified || 0) !== 1;
+    if (newEmail === currentEmail && !isVerifyingRegisteredEmail) {
       return res.status(400).json({ message: "Email mới trùng với email hiện tại." });
     }
 
@@ -902,23 +934,26 @@ export const userRequestEmailChangeOtp = async (req, res) => {
       [newEmail],
     );
 
-    if (emailOwner) {
+    if (emailOwner && Number(emailOwner.id) !== userId) {
       return res.status(409).json({ message: "Email này đã được sử dụng." });
     }
 
     const otpCode = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+    const otpToken = makeEmailOtpToken(userId, otpCode);
     const expiresAt = new Date(Date.now() + EMAIL_CHANGE_OTP_TTL_MINUTES * 60 * 1000);
 
     await db.query(
       `
       UPDATE User
       SET pending_email = ?,
-          email_change_otp = ?,
+          email_change_otp = NULL,
+          email_change_otp_token = ?,
           email_change_expires = ?,
+          email_change_requested_at = NOW(),
           updated_at = NOW()
       WHERE id = ?
     `,
-      [newEmail, otpCode, expiresAt, userId],
+      [newEmail, otpToken, expiresAt, userId],
     );
 
     await sendEmailChangeOtpEmail({
@@ -944,6 +979,7 @@ export const userRequestEmailChangeOtp = async (req, res) => {
       message: "Đã gửi OTP xác minh đến email mới.",
       pendingEmail: newEmail,
       expiresInSeconds: EMAIL_CHANGE_OTP_TTL_MINUTES * 60,
+      resendCooldownSeconds: EMAIL_CHANGE_OTP_RESEND_COOLDOWN_SECONDS,
     });
   } catch (error) {
     console.error("Error in userRequestEmailChangeOtp:", error);
@@ -966,7 +1002,7 @@ export const userConfirmEmailChangeOtp = async (req, res) => {
 
     const [[user]] = await db.query(
       `
-      SELECT id, full_name, email, pending_email, email_change_otp, email_change_expires, phone, birthday, sex, avatar, point, status
+      SELECT id, full_name, email, pending_email, email_change_otp_token, email_change_expires, phone, birthday, sex, avatar, point, status
       FROM User
       WHERE id = ?
       LIMIT 1
@@ -978,7 +1014,7 @@ export const userConfirmEmailChangeOtp = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy tài khoản." });
     }
 
-    if (!user.pending_email || !user.email_change_otp || !user.email_change_expires) {
+    if (!user.pending_email || !user.email_change_otp_token || !user.email_change_expires) {
       return res.status(400).json({ message: "Không có yêu cầu đổi email đang chờ xác minh." });
     }
 
@@ -986,7 +1022,12 @@ export const userConfirmEmailChangeOtp = async (req, res) => {
       return res.status(400).json({ message: "Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại OTP." });
     }
 
-    if (String(user.email_change_otp) !== otpCode) {
+    const expectedToken = makeEmailOtpToken(userId, otpCode);
+    const savedToken = String(user.email_change_otp_token || '');
+    const tokenMatches =
+      savedToken.length === expectedToken.length &&
+      crypto.timingSafeEqual(Buffer.from(savedToken), Buffer.from(expectedToken));
+    if (!tokenMatches) {
       return res.status(400).json({ message: "Mã OTP không đúng." });
     }
 
@@ -1005,7 +1046,9 @@ export const userConfirmEmailChangeOtp = async (req, res) => {
       SET email = ?,
           pending_email = NULL,
           email_change_otp = NULL,
+          email_change_otp_token = NULL,
           email_change_expires = NULL,
+          email_change_requested_at = NULL,
           email_verified = 1,
           email_verified_at = NOW(),
           updated_at = NOW()
@@ -1032,6 +1075,7 @@ export const userConfirmEmailChangeOtp = async (req, res) => {
         id: user.id,
         name: user.full_name,
         email: pendingEmail,
+        email_verified: true,
         phone: user.phone || "",
         birthday: user.birthday,
         sex: user.sex,

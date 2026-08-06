@@ -356,13 +356,15 @@ export const adminSeatService = {
 };
 
 // ─── Employees ────────────────────────────────────────────────────────────────
-const buildEmployeeFormData = (data = {}, avatarFile) => {
+const buildEmployeeFormData = (data = {}, files = {}) => {
   const formData = new FormData();
   Object.entries(data).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
     formData.append(key, Array.isArray(value) ? value.join(",") : String(value));
   });
-  if (avatarFile) formData.append("avatar", avatarFile);
+  if (files.avatarFile) formData.append("avatar", files.avatarFile);
+  if (files.idCardFrontFile) formData.append("idCardFront", files.idCardFrontFile);
+  if (files.idCardBackFile) formData.append("idCardBack", files.idCardBackFile);
   return formData;
 };
 
@@ -376,10 +378,10 @@ export const adminEmployeeService = {
     return apiFetch(`/admin/employees${q ? `?${q}` : ""}`);
   },
   getById: (id) => apiFetch(`/admin/employees/${id}`),
-  create: (data, avatarFile) =>
-    uploadFetch("/admin/employees", { method: "POST", body: buildEmployeeFormData(data, avatarFile) }),
-  update: (id, data, avatarFile) =>
-    uploadFetch(`/admin/employees/${id}`, { method: "PUT", body: buildEmployeeFormData(data, avatarFile) }),
+  create: (data, files) =>
+    uploadFetch("/admin/employees", { method: "POST", body: buildEmployeeFormData(data, files) }),
+  update: (id, data, files) =>
+    uploadFetch(`/admin/employees/${id}`, { method: "PUT", body: buildEmployeeFormData(data, files) }),
   delete: (id) =>
     apiFetch(`/admin/employees/${id}`, { method: "DELETE" }),
 };

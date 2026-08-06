@@ -3,6 +3,7 @@
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 let emailVerificationSchemaReady = null;
 let passwordResetSchemaReady = null;
+let userNameSchemaReady = null;
 
 const normalizePositionText = (text) =>
   String(text || '')
@@ -48,6 +49,32 @@ const hasColumn = async (databaseName, columnName) => {
   return Number(row?.total || 0) > 0;
 };
 
+export const ensureUserNameSchema = async () => {
+  if (userNameSchemaReady) {
+    await userNameSchemaReady;
+    return;
+  }
+
+  userNameSchemaReady = (async () => {
+    const databaseName = await getCurrentDatabaseName();
+    if (!(await hasColumn(databaseName, 'user_name'))) {
+      await db.query('ALTER TABLE User ADD COLUMN user_name VARCHAR(50) NULL AFTER full_name');
+    }
+
+    const [indexes] = await db.query("SHOW INDEX FROM User WHERE Column_name = 'user_name' AND Non_unique = 0");
+    if (!indexes.length) {
+      await db.query('CREATE UNIQUE INDEX uq_user_user_name ON User (user_name)');
+    }
+  })();
+
+  try {
+    await userNameSchemaReady;
+  } catch (error) {
+    userNameSchemaReady = null;
+    throw error;
+  }
+};
+
 export const ensureEmailVerificationSchema = async () => {
   if (emailVerificationSchemaReady) {
     await emailVerificationSchemaReady;
@@ -55,6 +82,7 @@ export const ensureEmailVerificationSchema = async () => {
   }
 
   emailVerificationSchemaReady = (async () => {
+    await ensureUserNameSchema();
     const databaseName = await getCurrentDatabaseName();
 
     if (!(await hasColumn(databaseName, 'email_verified'))) {
@@ -115,9 +143,9 @@ export const findUserWithRoleByEmail = async (email) => {
      FROM User u
      LEFT JOIN Roles r ON r.role_id = u.role_id
      LEFT JOIN Employees e ON e.user_id = u.id
-     WHERE LOWER(u.email) = ?
+     WHERE LOWER(u.email) = ? OR u.phone = ? OR LOWER(u.user_name) = ?
      LIMIT 1`,
-    [normalizedEmail]
+    [normalizedEmail, String(email || '').trim(), normalizedEmail]
   );
   if (!user) return null;
   const role = deriveRoleFromEmployee(user);
@@ -136,6 +164,14 @@ export const emailExists = async (email) => {
   const [[existing]] = await db.query(
     'SELECT id FROM User WHERE email = ? LIMIT 1',
     [email]
+  );
+  return Boolean(existing);
+};
+
+export const userNameExists = async (userName) => {
+  const [[existing]] = await db.query(
+    'SELECT id FROM User WHERE LOWER(user_name) = ? LIMIT 1',
+    [normalizeEmail(userName)]
   );
   return Boolean(existing);
 };
@@ -159,13 +195,13 @@ export const ensureRoleExists = async (roleName, description = '', connection = 
 };
 
 export const createUser = async (
-  { roleId, full_name, email, password, phone, birthday, sex },
+  { roleId, full_name, user_name, email, password, phone, birthday, sex },
   connection = db,
 ) => {
   const [result] = await connection.query(
-    `INSERT INTO User (role_id, full_name, email, password, phone, birthday, sex, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
-    [roleId, full_name, email, password, phone || null, birthday || null, sex || null]
+    `INSERT INTO User (role_id, full_name, user_name, email, password, phone, birthday, sex, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+    [roleId, full_name, user_name || null, email, password, phone || null, birthday || null, sex || null]
   );
   return result.insertId;
 };

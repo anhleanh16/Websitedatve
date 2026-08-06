@@ -49,6 +49,7 @@ export default function Navbar() {
   const [cinemas,      setCinemas]      = useState([])
   const [cinemaError,  setCinemaError]  = useState('')
   const [bellOpen,     setBellOpen]     = useState(false)
+  const [emailAlertDismissed, setEmailAlertDismissed] = useState(false)
 
   const dropdownRef = useRef(null)
   const searchRef   = useRef(null)
@@ -62,6 +63,10 @@ export default function Navbar() {
     window.addEventListener('scroll', fn, { passive: true })
     return () => window.removeEventListener('scroll', fn)
   }, [])
+
+  useEffect(() => {
+    setEmailAlertDismissed(false)
+  }, [profile?.id, profile?.email, profile?.email_verified])
 
   /* close panels on outside click */
   useEffect(() => {
@@ -148,6 +153,9 @@ export default function Navbar() {
   const userName    = profile?.name || 'Tài khoản'
   const userId = profile?.id
   const displayCinema = selectedCinema?.city || 'Khu vực'
+  const emailUnlinked = Boolean(profile && !profile.email)
+  const emailNeedsVerification = Boolean(profile?.email) && profile?.email_verified === false
+  const guestNeedsAuthentication = !profile
 
   const normalizeNotifications = (items = []) =>
     items.map((n) => ({
@@ -245,6 +253,27 @@ export default function Navbar() {
 
       {/* Right side */}
       <div className='nav-right'>
+
+        {(guestNeedsAuthentication || emailUnlinked || emailNeedsVerification) && !emailAlertDismissed && (
+          <div className='email-link-alert' role='alert'>
+            <span>⚠</span>
+            <span>{guestNeedsAuthentication ? 'Bạn chưa đăng nhập hoặc đăng kí. Vui lòng đăng nhập để đặt vé và dùng các tính năng khác.' : emailNeedsVerification ? 'Email đăng kí chưa được xác minh. Vui lòng xác minh để đặt vé và dùng các tính năng khác.' : 'Tài khoản chưa liên kết email. Vui lòng liên kết để đặt vé và dùng các tính năng khác.'}</span>
+            {guestNeedsAuthentication ? (
+              <>
+                <button type='button' className='email-link-alert-action' onClick={() => navigate('/Logins/Login')}>Đăng nhập</button>
+                <span>hoặc</span>
+                <button type='button' className='email-link-alert-action' onClick={() => navigate('/Registers/Register')}>Đăng kí</button>
+              </>
+            ) : (
+              <button type='button' className='email-link-alert-action' onClick={() => navigate('/profile?tab=edit')}>
+                {emailNeedsVerification ? 'Xác minh' : 'Liên kết'}
+              </button>
+            )}
+            <button type='button' className='email-link-alert-close' onClick={() => setEmailAlertDismissed(true)} aria-label='Đóng thông báo email'>
+              <FaTimes />
+            </button>
+          </div>
+        )}
 
         {/* Nút Quản trị — hiện khi là admin hoặc nhân viên admin panel */}
         {isAdminPanelUser && (
@@ -479,7 +508,7 @@ export default function Navbar() {
                     <span className='submenu-avatar'>{userInitial}</span>
                     <div>
                       <div className='submenu-name'>{profile.name}</div>
-                      <div className='submenu-email'>{profile.email}</div>
+                      <div className='submenu-email'>{profile.email || 'Chưa liên kết email'}</div>
                     </div>
                   </li>
                   <li className='submenu-divider' />

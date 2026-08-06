@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   FaUser, FaEdit, FaLock, FaCamera, FaTicketAlt,
   FaHistory, FaBell, FaCrown, FaHeadset, FaRobot,
   FaChevronRight, FaEye, FaEyeSlash, FaSave, FaTimes,
   FaStar, FaMapMarkerAlt, FaClock, FaCheck, FaQrcode, FaSpinner,
-  FaDownload
+  FaDownload, FaCheckCircle, FaTimesCircle
 } from 'react-icons/fa'
 import './profile.css'
 import { setUser } from '../../../redux/slices/userSlice'
@@ -96,6 +96,7 @@ export default function Profile() {
   const tokenFromStore = useSelector((s) => s.user.token)
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [tab,        setTab]        = useState('profile')
   const [avatarSrc,  setAvatarSrc]  = useState('')
@@ -111,10 +112,12 @@ export default function Profile() {
   const [avatarMsg, setAvatarMsg] = useState('')
   const [avatarLoading, setAvatarLoading] = useState(false)
   const [currentEmail, setCurrentEmail] = useState(profile?.email || '')
+  const [emailVerified, setEmailVerified] = useState(Boolean(profile?.email && profile?.email_verified))
   const [emailChange, setEmailChange] = useState({
     pendingEmail: '',
     otpCode: '',
     expiresAt: null,
+    resendAvailableAt: null,
     loading: false,
     verifyLoading: false,
     message: '',
@@ -149,6 +152,10 @@ export default function Profile() {
   const fileRef = useRef(null)
 
   useEffect(() => {
+    if (new URLSearchParams(location.search).get('tab') === 'edit') setTab('edit')
+  }, [location.search])
+
+  useEffect(() => {
     const mapSexToGender = (sex) => {
       if (sex === 'Nam') return 'male'
       if (sex === 'Nu') return 'female'
@@ -173,10 +180,14 @@ export default function Profile() {
           gender: mapSexToGender(user.sex),
         })
         setCurrentEmail(user.email || '')
+        setEmailVerified(Boolean(user.email && user.email_verified))
         setEmailChange((prev) => ({
           ...prev,
           pendingEmail: user.pending_email || '',
           expiresAt: user.email_change_expires ? new Date(user.email_change_expires).getTime() : null,
+          resendAvailableAt: user.email_change_requested_at
+            ? new Date(user.email_change_requested_at).getTime() + 30000
+            : null,
         }))
         setAvatarSrc(user.avatar || '')
 
@@ -185,6 +196,7 @@ export default function Profile() {
           id: user.id,
           name: user.name,
           email: user.email,
+          email_verified: Boolean(user.email && user.email_verified),
           phone: user.phone,
           avatar: user.avatar,
           point: user.point,
@@ -291,6 +303,23 @@ export default function Profile() {
 
   const handleEditChange = (e) => setEditForm(p => ({ ...p, [e.target.name]: e.target.value }))
 
+  const handleLinkEmail = async () => {
+    const newEmail = String(editForm.email || '').trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+      setEmailChange((prev) => ({ ...prev, error: 'Vui lòng nhập email hợp lệ để liên kết.', message: '' }))
+      return
+    }
+    try {
+      setEmailChange((prev) => ({ ...prev, loading: true, error: '', message: '' }))
+      const response = await userProfileService.requestEmailChangeOtp(profile.id, { newEmail })
+      const ttlSeconds = Number(response?.expiresInSeconds || 300)
+      const cooldownSeconds = Number(response?.resendCooldownSeconds || 30)
+      setEmailChange((prev) => ({ ...prev, pendingEmail: response?.pendingEmail || newEmail, expiresAt: Date.now() + ttlSeconds * 1000, resendAvailableAt: Date.now() + cooldownSeconds * 1000, otpCode: '', loading: false, message: response?.message || 'Đã gửi mã OTP 6 số đến email của bạn.', error: '' }))
+    } catch (error) {
+      setEmailChange((prev) => ({ ...prev, loading: false, error: error.message || 'Không thể gửi mã OTP.', message: '' }))
+    }
+  }
+
   const handleSaveEdit = async (e) => {
     e.preventDefault()
     if (!profile?.id) return
@@ -339,6 +368,7 @@ export default function Profile() {
           ...prev,
           pendingEmail: otpResponse?.pendingEmail || normalizedNewEmail,
           expiresAt: ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : null,
+          resendAvailableAt: Date.now() + Number(otpResponse?.resendCooldownSeconds || 30) * 1000,
           loading: false,
           verifyLoading: false,
           otpCode: '',
@@ -360,7 +390,7 @@ export default function Profile() {
   }
 
   const handleConfirmEmailOtp = async (e) => {
-    e.preventDefault()
+    e?.preventDefault()
     if (!profile?.id) return
     const code = String(emailChange.otpCode || '').trim()
     if (!/^\d{6}$/.test(code)) {
@@ -374,12 +404,14 @@ export default function Profile() {
       const updated = response?.user
       if (updated) {
         setCurrentEmail(updated.email || '')
+        setEmailVerified(Boolean(updated.email && updated.email_verified))
         setEditForm((prev) => ({ ...prev, email: updated.email || prev.email }))
         const nextUser = {
           ...(profile || {}),
           id: updated.id,
           name: updated.name,
           email: updated.email,
+          email_verified: Boolean(updated.email && updated.email_verified),
           phone: updated.phone,
           avatar: updated.avatar,
           point: updated.point,
@@ -392,6 +424,7 @@ export default function Profile() {
         ...prev,
         pendingEmail: '',
         expiresAt: null,
+        resendAvailableAt: null,
         otpCode: '',
         verifyLoading: false,
         message: response?.message || 'Đổi email thành công.',
@@ -509,13 +542,18 @@ export default function Profile() {
   }
 
   const userName  = editForm.name || profile?.name || 'Người dùng'
-  const userEmail = editForm.email || profile?.email || ''
+  const userEmail = editForm.email || profile?.email || 'Chưa liên kết email'
   const userInitial = userName?.[0]?.toUpperCase() || 'U'
   const totalPoints = pointsSummary?.user?.points ?? 0
   const tierName = getMembershipTierName(totalPoints)
   const emailOtpRemainingSeconds = emailChange.expiresAt
     ? Math.max(0, Math.floor((emailChange.expiresAt - nowTs) / 1000))
     : 0
+  const resendCooldownRemainingSeconds = emailChange.resendAvailableAt
+    ? Math.max(0, Math.ceil((emailChange.resendAvailableAt - nowTs) / 1000))
+    : 0
+  const hasActiveEmailOtp = Boolean(emailChange.pendingEmail && emailOtpRemainingSeconds > 0)
+  const isEmailVerified = Boolean(currentEmail && emailVerified && !emailChange.pendingEmail)
 
   /* Thống kê từ bookings thực */
   const totalBookings   = bookings.length
@@ -674,11 +712,35 @@ export default function Profile() {
                 </div>
                 <div className='ef-field'>
                   <label>Email</label>
-                  <input name='email' type='email' value={editForm.email} onChange={handleEditChange} placeholder='Email' />
-                  {emailChange.pendingEmail && (
-                    <small style={{ color: '#b45309', marginTop: 6, display: 'block' }}>
-                      Đang chờ xác minh OTP cho email mới: {emailChange.pendingEmail}
-                    </small>
+                  <div className='email-input-wrap'>
+                    <input name='email' type='email' value={editForm.email} onChange={handleEditChange} placeholder={currentEmail ? 'Email' : 'Chưa liên kết email'} />
+                    {!isEmailVerified && !emailChange.pendingEmail && (
+                      <button type='button' className='email-inline-action' onClick={handleLinkEmail} disabled={emailChange.loading}>
+                        {emailChange.loading ? 'Đang gửi...' : 'Xác minh email'}
+                      </button>
+                    )}
+                    {emailChange.pendingEmail && emailOtpRemainingSeconds > 0 && (
+                      <button type='button' className='email-inline-action' onClick={handleLinkEmail} disabled={emailChange.loading || resendCooldownRemainingSeconds > 0}>
+                        {emailChange.loading ? 'Đang gửi...' : resendCooldownRemainingSeconds > 0 ? `Gửi lại sau ${resendCooldownRemainingSeconds}s` : 'Gửi lại OTP'}
+                      </button>
+                    )}
+                    {emailChange.pendingEmail && emailOtpRemainingSeconds === 0 && (
+                      <button type='button' className='email-inline-action' onClick={handleLinkEmail} disabled={emailChange.loading}>
+                        {emailChange.loading ? 'Đang gửi...' : 'Xác minh email'}
+                      </button>
+                    )}
+                  </div>
+                  <div className={`email-verification-status ${isEmailVerified ? 'verified' : 'unverified'}`}>
+                    {isEmailVerified ? <FaCheckCircle /> : <FaTimesCircle />}
+                    <span>{isEmailVerified ? 'Đã xác minh' : 'Chưa xác minh'}</span>
+                  </div>
+                  {!currentEmail && !emailChange.pendingEmail && <small className='email-unlinked-note'>Chưa liên kết email</small>}
+                  {!emailChange.pendingEmail && emailChange.error && <div className='pwd-msg is-error' style={{ marginTop: 8 }}>⚠️ {emailChange.error}</div>}
+                  {hasActiveEmailOtp && (
+                    <div style={{ color: '#b45309', marginTop: 6, lineHeight: 1.5, fontSize: 13 }}>
+                      <div>Đã gửi mã OTP 6 số tới: {emailChange.pendingEmail}.</div>
+                      <div>Thời gian còn lại: <strong>{String(Math.floor(emailOtpRemainingSeconds / 60)).padStart(2, '0')}:{String(emailOtpRemainingSeconds % 60).padStart(2, '0')}</strong></div>
+                    </div>
                   )}
                 </div>
                 <div className='ef-field'>
@@ -698,34 +760,36 @@ export default function Profile() {
                   </select>
                 </div>
               </div>
-              {saveError && <div className='pwd-msg error'>⚠️ {saveError}</div>}
+              {saveError && <div className='pwd-msg is-error'>⚠️ {saveError}</div>}
               {saveMessage && <div className='pwd-msg success'>✅ {saveMessage}</div>}
               <button type='submit' className={`save-btn${saved ? ' saved' : ''}`}>
                 {saved ? <><FaCheck /> Đã lưu!</> : <><FaSave /> Lưu thay đổi</>}
               </button>
 
-              {emailChange.pendingEmail && (
-                <div style={{ marginTop: 18, border: '1px solid #fcd34d', borderRadius: 12, padding: 16, background: '#fff7ed' }}>
-                  <h4 style={{ marginTop: 0, marginBottom: 8 }}>Xác minh đổi email bằng OTP</h4>
-                  <p style={{ marginTop: 0, marginBottom: 10, color: '#92400e' }}>
+              {hasActiveEmailOtp && (
+                <div className='email-otp-panel'>
+                  <h4>Xác minh đổi email bằng OTP</h4>
+                  <p>
                     Chúng tôi đã gửi OTP đến email mới. Nhập mã để hoàn tất đổi email.
-                    {emailOtpRemainingSeconds > 0 ? ` Còn ${emailOtpRemainingSeconds}s.` : ' OTP có thể đã hết hạn, bạn hãy lưu lại để gửi OTP mới.'}
+                    {emailOtpRemainingSeconds > 0 ? ` Còn ${String(Math.floor(emailOtpRemainingSeconds / 60)).padStart(2, '0')}:${String(emailOtpRemainingSeconds % 60).padStart(2, '0')}.` : ' OTP có thể đã hết hạn, bạn hãy gửi lại OTP mới.'}
                   </p>
 
-                  <form onSubmit={handleConfirmEmailOtp} style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <div className='email-otp-actions'>
                     <input
+                      className='email-otp-input'
                       type='text'
                       value={emailChange.otpCode}
                       onChange={(e) => setEmailChange((prev) => ({ ...prev, otpCode: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
                       placeholder='Nhập OTP 6 số'
-                      style={{ minWidth: 180, padding: '10px 12px', borderRadius: 8, border: '1px solid #f59e0b' }}
+                      inputMode='numeric'
+                      autoComplete='one-time-code'
                     />
-                    <button type='submit' className='save-btn' disabled={emailChange.verifyLoading}>
+                    <button type='button' className='save-btn' onClick={handleConfirmEmailOtp} disabled={emailChange.verifyLoading}>
                       <FaCheck /> {emailChange.verifyLoading ? 'Đang xác minh...' : 'Xác minh OTP'}
                     </button>
-                  </form>
+                  </div>
 
-                  {emailChange.error && <div className='pwd-msg error' style={{ marginTop: 10 }}>⚠️ {emailChange.error}</div>}
+                  {emailChange.error && <div className='pwd-msg is-error' style={{ marginTop: 10 }}>⚠️ {emailChange.error}</div>}
                   {emailChange.message && <div className='pwd-msg success' style={{ marginTop: 10 }}>✅ {emailChange.message}</div>}
                 </div>
               )}
@@ -765,7 +829,7 @@ export default function Profile() {
               ))}
 
               {pwdMsg && (
-                <div className={`pwd-msg ${pwdMsg === 'success' ? 'success' : 'error'}`}>
+                <div className={`pwd-msg ${pwdMsg === 'success' ? 'success' : 'is-error'}`}>
                   {pwdMsg === 'success' ? '✅ Đổi mật khẩu thành công!' : `⚠️ ${pwdMsg}`}
                 </div>
               )}
@@ -811,7 +875,7 @@ export default function Profile() {
                   </button>
                 )}
                 {avatarMsg && (
-                  <div className={`pwd-msg ${avatarMsg.includes('thành công') ? 'success' : 'error'}`}>
+                  <div className={`pwd-msg ${avatarMsg.includes('thành công') ? 'success' : 'is-error'}`}>
                     {avatarMsg.includes('thành công') ? '✅ ' : '⚠️ '}{avatarMsg}
                   </div>
                 )}

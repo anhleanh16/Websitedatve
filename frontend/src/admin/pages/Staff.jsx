@@ -192,6 +192,7 @@ const fmtSalary   = (type, n) => type === "part_time" ? `${n.toLocaleString()} �
 const EMPTY_STAFF = {
   userId: "", name: "", code: "", email: "", phone: "",
   dob: "", sex: "Nam", address: "",
+  citizenId: "", idCardFront: "", idCardBack: "",
   cinemaId: "", departmentId: "",
   role: "staff", type: "full_time",
   salary: "", baseSalary: "",
@@ -225,6 +226,9 @@ const mapEmployeeToStaff = (employee, localFallback = null) => ({
   dob: employee.dob || "",
   sex: employee.sex || "Nam",
   address: employee.address || "",
+  citizenId: employee.citizenId || "",
+  idCardFront: employee.idCardFrontUrl || "",
+  idCardBack: employee.idCardBackUrl || "",
   avatar: employee.avatarUrl || employee.avatar || "",
   cinemaId: employee.cinemaId ?? "",
   departmentId: mapDepartmentId(employee.department) || "",
@@ -273,6 +277,8 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
   const [form, setForm] = useState(staff ? { ...staff } : { ...EMPTY_STAFF });
   const [errors, setErrors] = useState({});
   const [avatarFile, setAvatarFile] = useState(null);
+  const [idCardFrontFile, setIdCardFrontFile] = useState(null);
+  const [idCardBackFile, setIdCardBackFile] = useState(null);
 
   const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: undefined })); };
 
@@ -287,6 +293,12 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
   const removeAvatar = () => {
     setAvatarFile(null);
     set("avatar", "");
+  };
+  const handleIdCardFile = (side, file) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    if (side === "front") setIdCardFrontFile(file);
+    else setIdCardBackFile(file);
+    set(side === "front" ? "idCardFront" : "idCardBack", URL.createObjectURL(file));
   };
 
   const selectCustomerAccount = (userId) => {
@@ -320,6 +332,7 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
     if (!form.salary || form.salary <= 0) e.salary = "Nhập mức lương.";
     if (!form.hireDate)        e.hireDate = "Chọn ngày vào làm.";
     if (form.dob && !isValidBirthDate(form.dob)) e.dob = BIRTH_DATE_ERROR;
+    if (form.citizenId && !/^\d{12}$/.test(String(form.citizenId))) e.citizenId = "CCCD phải gồm đúng 12 chữ số.";
     if (form.shifts.length === 0) e.shifts = "Chọn ít nhất một ca.";
     return e;
   };
@@ -331,6 +344,8 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
     if (avatarFile) {
       data.avatarFile = avatarFile;
     }
+    if (idCardFrontFile) data.idCardFrontFile = idCardFrontFile;
+    if (idCardBackFile) data.idCardBackFile = idCardBackFile;
     onSave(data);
   };
 
@@ -345,7 +360,8 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
           <div className="sf-form-grid">
             {/* Col 1 */}
             <div className="sf-form-col">
-              <div className="sf-field">
+              <div className="sf-form-section-title">Thông tin cá nhân & hồ sơ</div>
+              <div className="sf-field sf-account-field">
                 <label>Tài khoản người dùng *</label>
                 <select
                   className={errors.userId ? "error" : ""}
@@ -419,6 +435,12 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
               </div>
 
               <div className="sf-field">
+                <label>Số CCCD</label>
+                <input className={errors.citizenId ? "error" : ""} value={form.citizenId} maxLength={12} inputMode="numeric" onChange={e => set("citizenId", e.target.value.replace(/\D/g, ""))} placeholder="12 chữ số" />
+                {errors.citizenId && <span className="sf-error">{errors.citizenId}</span>}
+              </div>
+
+              <div className="sf-field">
                 <label>Ảnh đại diện</label>
                 <div
                   className="sf-avatar-upload-zone"
@@ -450,6 +472,19 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
               </div>
 
               <div className="sf-field">
+                <label>Ảnh CCCD (mặt trước / mặt sau)</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {[['front', 'Mặt trước', form.idCardFront], ['back', 'Mặt sau', form.idCardBack]].map(([side, label, image]) => (
+                    <label key={side} className="sf-avatar-upload-zone" style={{ minHeight: 112, cursor: "pointer" }}>
+                      {image ? <img src={image} alt={`CCCD ${label}`} style={{ width: "100%", height: 108, objectFit: "cover", borderRadius: 9 }} /> : <div className="sf-avatar-placeholder"><span className="sf-avatar-icon">📇</span><span>{label}</span></div>}
+                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => handleIdCardFile(side, e.target.files?.[0])} />
+                    </label>
+                  ))}
+                </div>
+                <small className="sf-account-hint">Ảnh dùng để đối chiếu hồ sơ nhân viên.</small>
+              </div>
+
+              <div className="sf-field sf-shifts-field">
                 <label>Ca làm việc *</label>
                 {errors.shifts && <span className="sf-error">{errors.shifts}</span>}
                 <div className="sf-shift-check-group">
@@ -466,6 +501,7 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
 
             {/* Col 2 */}
             <div className="sf-form-col">
+              <div className="sf-form-section-title">Thông tin công việc</div>
               <div className="sf-field-row">
                 <div className="sf-field">
                   <label>Rạp phụ trách *</label>
@@ -771,6 +807,7 @@ function StaffDetail({ staff, onClose, onEdit, onTask, onAttend }) {
               <div className="sf-detail-row"><span>Điện thoại</span><strong>{staff.phone}</strong></div>
               <div className="sf-detail-row"><span>Ngày sinh</span><strong>{staff.dob || "—"}</strong></div>
               <div className="sf-detail-row"><span>Giới tính</span><strong>{staff.sex}</strong></div>
+              <div className="sf-detail-row"><span>Số CCCD</span><strong>{staff.citizenId || "—"}</strong></div>
               <div className="sf-detail-row"><span>Địa chỉ</span><strong>{staff.address || "—"}</strong></div>
             </div>
             <div className="sf-detail-card">
@@ -790,6 +827,15 @@ function StaffDetail({ staff, onClose, onEdit, onTask, onAttend }) {
               </div>
             </div>
           </div>
+          {(staff.idCardFront || staff.idCardBack) && (
+            <div className="sf-detail-card" style={{ marginTop: 14 }}>
+              <h4>Ảnh CCCD</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                {staff.idCardFront && <a href={staff.idCardFront} target="_blank" rel="noreferrer"><img src={staff.idCardFront} alt="CCCD mặt trước" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 10 }} /></a>}
+                {staff.idCardBack && <a href={staff.idCardBack} target="_blank" rel="noreferrer"><img src={staff.idCardBack} alt="CCCD mặt sau" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 10 }} /></a>}
+              </div>
+            </div>
+          )}
 
           {/* Activity stats */}
           <div className="sf-activity-row">
@@ -1128,7 +1174,7 @@ export default function AdminStaff() {
 
   const handleSave = async (data) => {
     try {
-      const { id, avatarFile, ...rest } = data;
+      const { id, avatarFile, idCardFrontFile, idCardBackFile, ...rest } = data;
       let payload = { ...rest };
 
       if (data.avatar) {
@@ -1157,10 +1203,10 @@ export default function AdminStaff() {
       payload.address = payload.address || "";
 
       if (id && String(id).length < 12) {
-        await adminEmployeeService.update(id, payload, avatarFile);
+        await adminEmployeeService.update(id, payload, { avatarFile, idCardFrontFile, idCardBackFile });
         showToast(`Đã cập nhật nhân viên "${payload.name}".`);
       } else {
-        const created = await adminEmployeeService.create(payload, avatarFile);
+        const created = await adminEmployeeService.create(payload, { avatarFile, idCardFrontFile, idCardBackFile });
         if (created?.employee?.id) {
           payload.id = created.employee.id;
         }

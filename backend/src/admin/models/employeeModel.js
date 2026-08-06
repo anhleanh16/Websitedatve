@@ -23,6 +23,9 @@ export const ensureEmployeeSchema = async () => {
   await add("sex",          "sex VARCHAR(10) NULL");
   await add("dob",          "dob DATE NULL");
   await add("avatar_url",   "avatar_url VARCHAR(255) NULL");
+  await add("citizen_id",   "citizen_id VARCHAR(20) NULL");
+  await add("id_card_front_url", "id_card_front_url VARCHAR(255) NULL");
+  await add("id_card_back_url",  "id_card_back_url VARCHAR(255) NULL");
   await add("cinema_id",    "cinema_id INT NULL");
   schemaMigrated = true;
 };
@@ -59,6 +62,9 @@ const fmt = (row) => ({
   dob:          formatDateInput(row.dob),
   address:      row.address       || "",
   avatarUrl:    row.avatar_url    || "",
+  citizenId:    row.citizen_id    || "",
+  idCardFrontUrl: row.id_card_front_url || "",
+  idCardBackUrl:  row.id_card_back_url  || "",
   cinemaId:     row.cinema_id     ? Number(row.cinema_id) : null,
   cinemaName:   row.cinema_name   || "",
   createdAt:    row.created_at    || null,
@@ -204,8 +210,8 @@ export const EmployeeModel = {
       const [result] = await connection.query(
         `INSERT INTO Employees
            (user_id, employee_code, position, department, type, hire_date, salary,
-            status, shifts, address, sex, dob, avatar_url, cinema_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            status, shifts, address, sex, dob, avatar_url, citizen_id, id_card_front_url, id_card_back_url, cinema_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           userId || null,
           "",
@@ -220,6 +226,9 @@ export const EmployeeModel = {
           data.sex          || "",
           normalizeDateForDb(data.dob),
           data.avatarUrl    || "",
+          data.citizenId    || "",
+          data.idCardFrontUrl || "",
+          data.idCardBackUrl  || "",
           data.cinemaId     || null,
         ],
       );
@@ -261,6 +270,9 @@ export const EmployeeModel = {
       if (data.sex        !== undefined) set("sex",           data.sex);
       if (data.dob        !== undefined) set("dob",           normalizeDateForDb(data.dob));
       if (data.avatarUrl  !== undefined) set("avatar_url",    data.avatarUrl);
+      if (data.citizenId  !== undefined) set("citizen_id",    data.citizenId);
+      if (data.idCardFrontUrl !== undefined) set("id_card_front_url", data.idCardFrontUrl);
+      if (data.idCardBackUrl  !== undefined) set("id_card_back_url",  data.idCardBackUrl);
       if (data.cinemaId   !== undefined) set("cinema_id",     data.cinemaId || null);
 
       if (data.name !== undefined || data.email !== undefined || data.phone !== undefined || data.userId !== undefined) {

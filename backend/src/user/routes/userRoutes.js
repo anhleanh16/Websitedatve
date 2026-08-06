@@ -31,6 +31,7 @@ import {
 } from '../controllers/userController.js';
 import { authMiddleware, selfOrAdminOnly } from '../../admin/middleware/authMiddleware.js';
 import { uploadStaffAvatar } from '../../../config/upload.js';
+import { requireVerifiedEmail } from '../middleware/requireVerifiedEmail.js';
 
 const router = express.Router();
 
@@ -65,7 +66,7 @@ router.get('/:userId/promotions', authMiddleware, selfOrAdminOnly, userGetPromot
 // Bookings
 router.get('/:userId/bookings', authMiddleware, selfOrAdminOnly, userGetBookings);
 router.get('/:userId/bookings/:orderId', authMiddleware, selfOrAdminOnly, userGetBookingDetail);
-router.post('/:userId/bookings', authMiddleware, selfOrAdminOnly, userCreateBooking);
-router.post('/:userId/bookings/:orderId/confirm-card', authMiddleware, selfOrAdminOnly, userConfirmCardPayment);
+router.post('/:userId/bookings', authMiddleware, selfOrAdminOnly, requireVerifiedEmail, userCreateBooking);
+router.post('/:userId/bookings/:orderId/confirm-card', authMiddleware, selfOrAdminOnly, requireVerifiedEmail, userConfirmCardPayment);
 
 export default router;

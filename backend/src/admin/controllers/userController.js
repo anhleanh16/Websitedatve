@@ -5,12 +5,17 @@ import { UserModel } from "../models/userModel.js";
 import {
   createUser,
   emailExists,
+  ensureEmailVerificationSchema,
   ensureRoleExists,
+  ensureUserNameSchema,
+  userNameExists,
 } from "../models/authModel.js";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const getAdminUsers = async (req, res) => {
   try {
+    await ensureEmailVerificationSchema();
+    await ensureUserNameSchema();
     const users = await UserModel.findAdminUsers();
 
     // Thêm một cờ để cho frontend biết tài khoản nào không thể khóa
@@ -31,6 +36,7 @@ export const createAdminUser = async (req, res) => {
   try {
     const {
       full_name,
+      user_name,
       email,
       password,
       phone,
@@ -38,11 +44,20 @@ export const createAdminUser = async (req, res) => {
       sex,
       status = "active",
     } = req.body || {};
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedPhone = String(phone || "").trim();
+    const normalizedUserName = String(user_name || "").trim().toLowerCase();
+    await ensureEmailVerificationSchema();
+    await ensureUserNameSchema();
 
-    if (!full_name || !email || !password) {
+    if (!full_name || !normalizedUserName || !password) {
       return res
         .status(400)
-        .json({ message: "Vui lòng nhập đầy đủ họ tên, email và mật khẩu." });
+        .json({ message: "Vui lòng nhập đầy đủ họ tên, tên người dùng và mật khẩu." });
+    }
+
+    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUserName)) {
+      return res.status(400).json({ message: "Tên người dùng gồm 3–30 ký tự: chữ, số, dấu chấm, gạch dưới hoặc gạch ngang." });
     }
 
     if (password.length < 6) {
@@ -55,11 +70,11 @@ export const createAdminUser = async (req, res) => {
       return res.status(400).json({ message: BIRTH_DATE_ERROR });
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return res.status(400).json({ message: "Email không hợp lệ." });
     }
 
-    if (await emailExists(email)) {
+    if (normalizedEmail && await emailExists(normalizedEmail)) {
       return res.status(409).json({ message: "Email đã được sử dụng." });
     }
 
@@ -67,15 +82,25 @@ export const createAdminUser = async (req, res) => {
     // Employee assignment is the only workflow that promotes the role to staff.
     const roleId = await ensureRoleExists("user", "Khách hàng");
 
+    if (!normalizedEmail && !normalizedPhone) {
+      return res.status(400).json({ message: "Cần nhập số điện thoại khi chưa liên kết email để người dùng có thể đăng nhập." });
+    }
+
+    if (await userNameExists(normalizedUserName)) {
+      return res.status(409).json({ message: "Tên người dùng đã được sử dụng." });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
+    const storedEmail = normalizedEmail || `unlinked-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@unlinked.local`;
     const sexMap = { male: "Nam", female: "Nu", other: "Khac" };
     const mappedSex = sexMap[sex] || sex || null;
     const userId = await createUser({
       roleId,
       full_name,
-      email,
+      user_name: normalizedUserName,
+      email: storedEmail,
       password: hashedPassword,
-      phone: phone || null,
+      phone: normalizedPhone || null,
       birthday: birthday || null,
       sex: mappedSex,
     });
@@ -83,6 +108,14 @@ export const createAdminUser = async (req, res) => {
     if (status !== "active") {
       await UserModel.updateUserStatus(userId, status);
     }
+
+    await db.query(
+      `UPDATE User
+       SET email_verified = ?,
+           email_verified_at = CASE WHEN ? = 1 THEN NOW() ELSE NULL END
+       WHERE id = ?`,
+      [status === "active" ? 1 : 0, status === "active" ? 1 : 0, userId],
+    );
 
     res
       .status(201)

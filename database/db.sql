@@ -12,6 +12,7 @@ CREATE TABLE User (
     id INT AUTO_INCREMENT PRIMARY KEY,
     role_id INT,
     full_name VARCHAR(100) NOT NULL,
+    user_name VARCHAR(50) UNIQUE,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     phone VARCHAR(20),

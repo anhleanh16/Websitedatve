@@ -37,7 +37,7 @@ export default function AdminLogin() {
 
     if (!trimmedEmail || !trimmedPassword) {
       setMessageType('info')
-      setMessage('Vui lòng nhập email và mật khẩu hợp lệ.')
+      setMessage('Vui lòng nhập tên người dùng, email hoặc số điện thoại và mật khẩu.')
       setLoading(false)
       return
     }
@@ -136,16 +136,16 @@ export default function AdminLogin() {
 
           <form onSubmit={handleSubmit} className='admin-auth-form'>
             <div className='form-group'>
-              <label>Email</label>
+              <label>Tên người dùng, email hoặc số điện thoại</label>
               <div className='input-wrapper'>
                 <FaEnvelope className='input-icon' />
                 <input
-                  type='email'
-                  placeholder='admin@email.com'
+                  type='text'
+                  placeholder='Tên người dùng, email hoặc số điện thoại'
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  autoComplete='email'
+                  autoComplete='username'
                 />
               </div>
             </div>
