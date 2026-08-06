@@ -10,6 +10,7 @@ import authRoutes from './src/admin/routes/authRoutes.js';
 import blogRoutes from './src/admin/routes/blogRoutes.js';
 import reviewRoutes from './src/admin/routes/reviewRoutes.js';
 import pointsRoutes from './src/admin/routes/pointsRoutes.js';
+import aiRoutes from './src/user/routes/aiRoutes.js';
 
 dotenv.config();
 
@@ -60,6 +61,9 @@ app.use('/api', blogRoutes);
 
 // Points routes
 app.use('/api', pointsRoutes);
+
+// AI Assistant routes
+app.use('/api/ai', aiRoutes);
 
 // User routes
 app.use('/api/user', userRoutes);

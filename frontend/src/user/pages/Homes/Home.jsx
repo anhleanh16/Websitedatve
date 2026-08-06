@@ -743,6 +743,7 @@ export default function Home() {
       {/* AI Float */}
       <button
         type='button'
+        hidden
         className={`ai-float-btn${isAiOpen ? ' is-open' : ''}`}
         onClick={toggleAiPanel}
         aria-label='Mở AI Assistant mini'
@@ -753,7 +754,7 @@ export default function Home() {
         <span className='ai-float-label'>AI Assistant</span>
       </button>
 
-      {isAiOpen && (
+      {false && isAiOpen && (
         <section className='ai-mini-chat' id='ai-mini-chat' role='dialog' aria-label='AI Assistant mini'>
           <header className='ai-mini-header'>
             <div className='ai-mini-title'>

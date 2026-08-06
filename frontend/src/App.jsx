@@ -1,5 +1,6 @@
 import './App.css'
 import AppRoutes from './routes/AppRoutes'
+import GlobalAiButton from './components/GlobalAiButton'
 import { setUser } from './redux/slices/userSlice'
 import store from './redux/store'
 import { clearStoredSession, getValidStoredToken, parseJwt } from './utils/auth'
@@ -23,7 +24,7 @@ if (token) {
 }
 
 function App() {
-  return <AppRoutes />
+  return <><AppRoutes /><GlobalAiButton /></>
 }
 
 export default App

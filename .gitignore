@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Local environment files may contain API keys, passwords and payment secrets.
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
