@@ -17,6 +17,7 @@ import Login from "../pages/Logins/Login";
 import ForgotPassword from "../pages/Logins/ForgotPassword";
 import ResetPassword from "../pages/Logins/ResetPassword";
 import Register from "../pages/Registers/Register";
+import InitialPassword from "../pages/InitialPassword/InitialPassword";
 import Membership from "../pages/Membership/Membership";
 import UserLayout from "../Layouts/UserLayout";
 
@@ -49,6 +50,7 @@ export function UserRoutes() {
         <Route path="/Logins/ResetPassword" element={<ResetPassword />} />
         <Route path="/register" element={<Register />} />
         <Route path="/Registers/Register" element={<Register />} />
+        <Route path="/create-password" element={<InitialPassword />} />
         <Route path="/Membership" element={<Membership />} />
         <Route path="*" element={<h1>404 Not Found</h1>} />
       </Route>

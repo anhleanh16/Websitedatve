@@ -15,6 +15,7 @@ CREATE TABLE User (
     user_name VARCHAR(50) UNIQUE,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
+    must_change_password TINYINT(1) NOT NULL DEFAULT 0,
     phone VARCHAR(20),
     birthday DATE,
     sex ENUM('Nam','Nu','Khac'),

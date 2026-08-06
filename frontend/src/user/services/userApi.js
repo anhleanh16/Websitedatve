@@ -86,6 +86,11 @@ export const userProfileService = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
+  setInitialPassword: (userId, payload) =>
+    apiFetch(`/user/${encodeURIComponent(userId)}/initial-password`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
   updateAvatar: (userId, file) => {
     const formData = new FormData();
     formData.append("avatar", file);

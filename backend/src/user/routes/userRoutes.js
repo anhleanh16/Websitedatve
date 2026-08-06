@@ -23,6 +23,7 @@ import {
   userGetNews,
   userGetNewsBySlug,
   userChangePassword,
+  userSetInitialPassword,
   userUpdateAvatar,
   userRemoveAvatar,
   userRequestEmailChangeOtp,
@@ -54,6 +55,7 @@ router.post('/:userId/profile/email-change/request-otp', authMiddleware, selfOrA
 router.post('/:userId/profile/email-change/confirm-otp', authMiddleware, selfOrAdminOnly, userConfirmEmailChangeOtp);
 router.get('/:userId/profile/audit-logs', authMiddleware, selfOrAdminOnly, userGetProfileAuditLogs);
 router.put('/:userId/change-password', authMiddleware, selfOrAdminOnly, userChangePassword);
+router.put('/:userId/initial-password', authMiddleware, selfOrAdminOnly, userSetInitialPassword);
 router.post('/:userId/avatar', authMiddleware, selfOrAdminOnly, uploadStaffAvatar.single('avatar'), userUpdateAvatar);
 router.delete('/:userId/avatar', authMiddleware, selfOrAdminOnly, userRemoveAvatar);
 router.get('/:userId/notifications', authMiddleware, selfOrAdminOnly, userGetNotifications);

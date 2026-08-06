@@ -100,6 +100,10 @@ export const ensureEmailVerificationSchema = async () => {
     if (!(await hasColumn(databaseName, 'email_verified_at'))) {
       await db.query('ALTER TABLE User ADD COLUMN email_verified_at DATETIME NULL AFTER email_verify_expires');
     }
+
+    if (!(await hasColumn(databaseName, 'must_change_password'))) {
+      await db.query('ALTER TABLE User ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER password');
+    }
   })();
 
   try {

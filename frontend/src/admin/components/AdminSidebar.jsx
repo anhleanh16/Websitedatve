@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { to: "/admin/movies",        label: "Phim",             icon: "🎬", roles: ["admin","manager","technician"] },
   { to: "/admin/showtimes",     label: "Lịch chiếu",       icon: "🕐", roles: ["admin","manager","technician"] },
   { to: "/admin/cinemas",       label: "Rạp chiếu",        icon: "🎭", roles: ["admin","manager","technician"] },
-  { to: "/admin/bookings",      label: "Đặt vé",           icon: "🎟", roles: ["admin","manager","staff"] },
+  { to: "/admin/bookings",      label: "Đặt vé nhanh",     icon: "🎟", roles: ["admin","manager","staff","technician"] },
   { to: "/admin/statistics",     label: "Thống kê",          icon: "📊", roles: ["admin","manager","staff"] },
   { to: "/admin/combos",        label: "Combo",            icon: "🍿", roles: ["admin","manager","technician"] },
   { to: "/admin/promotions",    label: "Khuyến mãi",       icon: "🏷", roles: ["admin","manager","technician"] },

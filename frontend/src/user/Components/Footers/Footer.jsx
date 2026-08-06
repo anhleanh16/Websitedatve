@@ -85,7 +85,7 @@ export default function Footer() {
             <FaEnvelope className='contact-icon' />
             <div>
               <span className='contact-label'>Email hỗ trợ</span>
-              <a href='mailto:sweetstarmovie@gmail.com' className='contact-value'>sweetstarmovie@gmail.com</a>
+              <a href='mailto:sweetstarcinema@gmail.com' className='contact-value'>sweetstarcinema@gmail.com</a>
             </div>
           </div>
         </div>

@@ -112,6 +112,7 @@ export const createAdminUser = async (req, res) => {
     await db.query(
       `UPDATE User
        SET email_verified = ?,
+           must_change_password = 1,
            email_verified_at = CASE WHEN ? = 1 THEN NOW() ELSE NULL END
        WHERE id = ?`,
       [status === "active" ? 1 : 0, status === "active" ? 1 : 0, userId],

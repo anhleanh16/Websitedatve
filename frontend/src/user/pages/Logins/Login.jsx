@@ -133,6 +133,11 @@ export default function Login() {
       // Dispatch vào Redux
       dispatch(setUser({ token: data.token, user: normalizedUser }))
 
+      if (normalizedUser.must_change_password === true) {
+        navigate('/create-password', { replace: true })
+        return
+      }
+
       // Điều hướng theo ngữ cảnh trước đó nếu có
       navigate(returnTo, { replace: true, state: returnState })
     } catch {

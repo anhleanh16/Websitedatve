@@ -143,6 +143,7 @@ const loginWithAudience = async (req, res, { customersOnly = false } = {}) => {
         name: user.full_name,
         email: emailUnlinked ? '' : user.email,
         email_verified: !emailUnlinked && Number(user.email_verified || 0) === 1,
+        must_change_password: Number(user.must_change_password || 0) === 1,
         phone: user.phone,
         avatar: user.avatar,
         point: user.point,

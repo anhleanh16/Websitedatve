@@ -1140,6 +1140,7 @@
   gap: 14px;
 }
 
+
 @media (max-width: 1024px) {
   .stats-grid,
   .dashboard-overview,

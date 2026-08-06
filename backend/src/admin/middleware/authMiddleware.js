@@ -36,7 +36,7 @@ export const adminManagerOnly = (req, res, next) => {
 };
 
 export const staffBasicOnly = (req, res, next) => {
-  if (!hasRole(req, ['admin', 'manager', 'staff']))
+  if (!hasRole(req, ['admin', 'manager', 'staff', 'technician']))
     return res.status(403).json({ message: 'Không có quyền truy cập.' });
   next();
 };

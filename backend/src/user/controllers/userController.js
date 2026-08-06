@@ -804,6 +804,52 @@ export const userChangePassword = async (req, res) => {
   }
 };
 
+// Mật khẩu tạm do quản trị viên đặt chỉ được dùng để đăng nhập lần đầu.
+// Sau khi đăng nhập, khách hàng tạo mật khẩu cá nhân tại màn hình bắt buộc này.
+export const userSetInitialPassword = async (req, res) => {
+  try {
+    await ensureUserProfileSchema();
+    const userId = Number(req.params.userId || 0);
+    const newPassword = String(req.body?.newPassword || '');
+
+    if (!userId) {
+      return res.status(400).json({ message: 'ID người dùng không hợp lệ.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Mật khẩu mới phải có ít nhất 6 ký tự.' });
+    }
+
+    const [[user]] = await db.query(
+      'SELECT id, must_change_password FROM User WHERE id = ? LIMIT 1',
+      [userId],
+    );
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản.' });
+    }
+    if (Number(user.must_change_password || 0) !== 1) {
+      return res.status(400).json({ message: 'Tài khoản này không yêu cầu tạo mật khẩu mới.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await db.query(
+      'UPDATE User SET password = ?, must_change_password = 0, updated_at = NOW() WHERE id = ?',
+      [hashedPassword, userId],
+    );
+
+    await logProfileAudit(req, {
+      userId,
+      changedBy: req.userId,
+      action: 'initial_password_created',
+      changes: { password: { before: '***', after: '***' } },
+    });
+
+    return res.json({ message: 'Tạo mật khẩu mới thành công.', must_change_password: false });
+  } catch (error) {
+    console.error('Error in userSetInitialPassword:', error);
+    return res.status(500).json({ message: 'Không thể tạo mật khẩu mới lúc này.' });
+  }
+};
+
 export const userUpdateAvatar = async (req, res) => {
   try {
     await ensureUserProfileSchema();

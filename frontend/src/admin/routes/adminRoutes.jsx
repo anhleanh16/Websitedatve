@@ -42,6 +42,7 @@ export function AdminRoutes() {
     <Route key="movies" path="movies" element={<AdminLayout><Movies /></AdminLayout>} />,
     <Route key="showtimes" path="showtimes" element={<AdminLayout><Showtimes /></AdminLayout>} />,
     <Route key="cinemas" path="cinemas" element={<AdminLayout><Cinemas /></AdminLayout>} />,
+    <Route key="bookings" path="bookings" element={<AdminLayout><Bookings /></AdminLayout>} />,
     <Route key="combos" path="combos" element={<AdminLayout><Combos /></AdminLayout>} />,
     <Route key="promotions" path="promotions" element={<AdminLayout><Promotions /></AdminLayout>} />,
     <Route key="points" path="points" element={<AdminLayout><PointsManagement /></AdminLayout>} />,

@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import './staff.css';
 import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
 import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../utils/birthDate.js";
-import BookingWizard from "./Bookings/BookingWizard.jsx";
 import {
   adminBookingService,
   adminUserService,
@@ -1185,7 +1184,6 @@ export default function AdminStaff() {
       payload.name = (payload.name || "").trim();
       payload.email = (payload.email || "").trim();
       payload.phone = (payload.phone || "").trim();
-      // The selected role is authoritative; do not retain the employee's old position.
       payload.position = payload.role === "manager"
         ? "Quản lý"
         : payload.role === "technician"
@@ -1261,7 +1259,6 @@ export default function AdminStaff() {
 
   const TABS = [
     { key: "list",       label: "Danh sách nhân viên"  },
-    { key: "booking",    label: "Đặt vé nhanh"        },
     { key: "attendance", label: "Theo dõi chấm công"   },
     { key: "tasks",      label: "Tổng quan công việc"  },
   ];
@@ -1294,7 +1291,6 @@ export default function AdminStaff() {
       </div>
 
       {activeTab === "list"       && <StaffList staffList={staffList} staff={staffList} onView={setViewStaff} onEdit={openEdit} onTask={openTask} onAttend={openAtt} onDelete={setDeleteTarget} />}
-      {activeTab === "booking"    && <BookingWizard onToast={showToast} />}
       {activeTab === "attendance" && <AttendanceOverview staff={staffList} />}
       {activeTab === "tasks"      && <TaskOverview staff={staffList} />}
 

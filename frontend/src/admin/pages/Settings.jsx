@@ -154,11 +154,6 @@ export default function Settings() {
     setActivePanel("");
   };
 
-  const clearCache = () => {
-    localStorage.removeItem("adminStaffList");
-    notify("Đã xóa cache dữ liệu quản trị trên trình duyệt.");
-  };
-
   return (
     <div className="admin-settings">
       <section className="banner-management">
@@ -297,14 +292,6 @@ export default function Settings() {
           <h3>Bảo mật</h3>
           <p>Kích hoạt xác thực hai yếu tố và chính sách mật khẩu.</p>
           <button type="button" onClick={() => setActivePanel("security")}>Kiểm tra bảo mật</button>
-        </div>
-        <div className="setting-card">
-          <h3>Hành động nhanh</h3>
-          <div className="quick-actions">
-            <button type="button" className="quick-action" onClick={clearCache}>Xóa cache</button>
-            <button type="button" className="quick-action" onClick={() => { setActivePanel("notification"); }}>Gửi thông báo</button>
-            <button type="button" className="quick-action" onClick={() => window.location.reload()}>Đồng bộ DB</button>
-          </div>
         </div>
       </div>
 
