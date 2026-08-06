@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { adminNewsService } from "../services/adminApi";
+import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
 import { toAbsoluteAssetUrl } from "../../utils/api";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
@@ -554,6 +555,7 @@ export default function NewsManagement() {
       return matchesSearch && matchesStatus && matchesCategory;
     });
   }, [categoryFilter, newsList, search, statusFilter]);
+  const { page, setPage, totalPages, pageItems } = useAdminPagination(filteredNews);
 
   const stats = useMemo(
     () => [
@@ -761,7 +763,7 @@ export default function NewsManagement() {
                 </td>
               </tr>
             ) : (
-              filteredNews.map((item) => {
+              pageItems.map((item) => {
                 const status = getStatusMeta(item.status);
                 return (
                   <tr key={item.news_id}>
@@ -811,6 +813,7 @@ export default function NewsManagement() {
         </table>
       </div>
 
+      <AdminPagination page={page} totalPages={totalPages} totalItems={filteredNews.length} pageSize={10} onPageChange={setPage} />
       <div className="nm-footer-count">
         Hiển thị <strong>{filteredNews.length}</strong> / {newsList.length} bài viết
       </div>

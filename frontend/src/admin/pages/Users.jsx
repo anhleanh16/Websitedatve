@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { adminUserService } from "../services/adminApi.js";
+import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
 import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../utils/birthDate.js";
 import "./users.css";
 
@@ -227,6 +228,7 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
     const matchR = filterRole === "all" || u.role === filterRole;
     return matchQ && matchS && matchR;
   });
+  const { page, setPage, totalPages, pageItems } = useAdminPagination(filtered);
 
   return (
     <div className="us-section">
@@ -286,7 +288,7 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
                 </td>
               </tr>
             ) : (
-              filtered.map((u) => {
+              pageItems.map((u) => {
                 const st = STATUS_MAP[u.status] || STATUS_MAP.inactive;
                 const rl = ROLE_MAP[u.role] || ROLE_MAP.user;
                 const roleLabel = rl.label;
@@ -379,6 +381,7 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
           </tbody>
         </table>
       </div>
+      <AdminPagination page={page} totalPages={totalPages} totalItems={filtered.length} pageSize={10} onPageChange={setPage} />
       <div className="us-footer-count">
         Hiển thị <strong>{filtered.length}</strong> / {users.length} người dùng
       </div>

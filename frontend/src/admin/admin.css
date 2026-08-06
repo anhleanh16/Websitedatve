@@ -4325,3 +4325,11 @@
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.3);
 }
+/* Shared admin pagination */
+.admin-pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 2px 4px; color: #9db0dd; font-size: 13px; }
+.admin-pagination-controls { display: flex; align-items: center; gap: 6px; }
+.admin-pagination-controls button { min-width: 34px; height: 34px; padding: 0 9px; border: 1px solid rgba(139, 117, 255, .28); border-radius: 9px; background: rgba(23, 29, 60, .78); color: #dce5ff; cursor: pointer; transition: .18s ease; }
+.admin-pagination-controls button:hover:not(:disabled), .admin-pagination-controls button.active { border-color: #8768ff; background: linear-gradient(135deg, #7757ed, #563bc9); color: #fff; box-shadow: 0 6px 16px rgba(91, 61, 211, .28); }
+.admin-pagination-controls button:disabled { opacity: .38; cursor: not-allowed; }
+.admin-pagination-ellipsis { padding: 0 2px; }
+@media (max-width: 600px) { .admin-pagination { align-items: flex-start; flex-direction: column; } }

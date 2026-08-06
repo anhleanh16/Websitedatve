@@ -30,6 +30,13 @@ const formatTime = (dateStr) => {
   if (isNaN(d)) return ''
   return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
+const getMembershipTierName = (points) => {
+  const total = Number(points || 0);
+  if (total < 500) return 'Đồng';
+  if (total < 1500) return 'Bạc';
+  if (total < 3000) return 'Vàng';
+  return 'Kim Cương';
+};
 const formatMoney = (amount) => {
   if (amount == null) return '—'
   return Number(amount).toLocaleString('vi-VN') + 'đ'
@@ -505,7 +512,7 @@ export default function Profile() {
   const userEmail = editForm.email || profile?.email || ''
   const userInitial = userName?.[0]?.toUpperCase() || 'U'
   const totalPoints = pointsSummary?.user?.points ?? 0
-  const tierName = pointsSummary?.user?.tier?.name || 'Silver'
+  const tierName = getMembershipTierName(totalPoints)
   const emailOtpRemainingSeconds = emailChange.expiresAt
     ? Math.max(0, Math.floor((emailChange.expiresAt - nowTs) / 1000))
     : 0

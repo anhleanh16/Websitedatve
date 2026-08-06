@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { adminComboService } from "../services/adminApi";
+import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
 import "./combos.css";
 
 const CATEGORY_LABELS = {
@@ -317,6 +318,7 @@ export default function AdminCombos() {
       return matchesSearch && matchesStatus && matchesCategory;
     });
   }, [categoryFilter, combos, search, statusFilter]);
+  const { page, setPage, totalPages, pageItems } = useAdminPagination(filteredCombos);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -463,7 +465,7 @@ export default function AdminCombos() {
                 </td>
               </tr>
             ) : (
-              filteredCombos.map((combo) => {
+              pageItems.map((combo) => {
                 const statusMeta = combo.is_active ? STATUS_LABELS.active : STATUS_LABELS.inactive;
                 return (
                   <tr key={combo.combo_id}>
@@ -507,6 +509,7 @@ export default function AdminCombos() {
           </tbody>
         </table>
       </div>
+      <AdminPagination page={page} totalPages={totalPages} totalItems={filteredCombos.length} pageSize={10} onPageChange={setPage} />
 
       {editingCombo && (
         <ComboFormModal

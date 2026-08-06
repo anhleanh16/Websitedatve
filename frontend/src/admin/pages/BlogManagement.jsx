@@ -3,6 +3,7 @@ import { FaPlus, FaEdit, FaTrash, FaCheck, FaTimes } from 'react-icons/fa'
 import { CKEditor } from '@ckeditor/ckeditor5-react'
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic'
 import { blogService } from '../../user/services/blogService'
+import AdminPagination, { useAdminPagination } from '../components/AdminPagination.jsx'
 import './blog-management.css'
 
 const slugify = (value = '') =>
@@ -77,6 +78,7 @@ const attachImagePasteHandler = (editor) => {
 
 export default function BlogManagement() {
   const [blogs, setBlogs] = useState([])
+  const { page, setPage, totalPages, pageItems } = useAdminPagination(blogs)
   const [categories, setCategories] = useState([])
   const [editingId, setEditingId] = useState(null)
   const [editingCategoryId, setEditingCategoryId] = useState(null)
@@ -514,7 +516,7 @@ export default function BlogManagement() {
               </tr>
             </thead>
             <tbody>
-              {blogs.map(blog => (
+              {pageItems.map(blog => (
                 <tr key={blog.blog_id}>
                   <td className='blog-title'>{blog.title}</td>
                   <td>{getCategoryLabel(blog.category)}</td>
@@ -539,6 +541,7 @@ export default function BlogManagement() {
             </tbody>
           </table>
         )}
+        <AdminPagination page={page} totalPages={totalPages} totalItems={blogs.length} pageSize={10} onPageChange={setPage} />
       </div>
     </div>
   )

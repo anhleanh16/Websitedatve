@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import './bookings.css';
 import BookingWizard from "./BookingWizard.jsx";
 import { adminBookingService } from "../../services/adminApi";
+import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const STATUS_MAP = {
@@ -73,6 +74,7 @@ function BookingList({ bookings, onView, onCheck }) {
     const matchStatus = filterStatus === "all" || b.status === filterStatus;
     return matchSearch && matchStatus;
   });
+  const { page, setPage, totalPages, pageItems } = useAdminPagination(filtered);
 
   return (
     <div className="bk-section">
@@ -120,7 +122,7 @@ function BookingList({ bookings, onView, onCheck }) {
                 </td>
               </tr>
             ) : (
-              filtered.map((b) => {
+              pageItems.map((b) => {
                 const st = STATUS_MAP[b.status] || { label: b.status, cls: "pending" };
                 const py = PAYMENT_MAP[b.paymentStatus] || { label: b.paymentStatus, cls: "pay-pending" };
                 return (
@@ -163,6 +165,7 @@ function BookingList({ bookings, onView, onCheck }) {
           </tbody>
         </table>
       </div>
+      <AdminPagination page={page} totalPages={totalPages} totalItems={filtered.length} pageSize={10} onPageChange={setPage} />
 
       <div className="bk-footer-count">
         Hiển thị <strong>{filtered.length}</strong> / {bookings.length} vé

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { adminMovieService, adminCategoryService } from '../../services/adminApi.js';
+import AdminPagination, { useAdminPagination } from '../../components/AdminPagination.jsx';
 import './movies.css';
 
 // ─── Helpers chuyển đổi dữ liệu camelCase ↔ snake_case ───────────────────────────────
@@ -157,6 +158,7 @@ function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, on
     const matchCat = filterCat === "all" || m.categories.some((cat) => cat.id === Number(filterCat));
     return matchSearch && matchStatus && matchCat;
   });
+  const { page, setPage, totalPages, pageItems } = useAdminPagination(filtered, 12);
 
   return (
     <div className="mv-section">
@@ -187,7 +189,7 @@ function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, on
         {filtered.length === 0 ? (
           <div className="mv-empty">Không tìm thấy phim nào.</div>
         ) : (
-          filtered.map((m) => {
+          pageItems.map((m) => {
             const st = statusInfo(m.status);
             const cats = m.categories.map((cat) => cat.name).filter(Boolean);
             return (
@@ -238,6 +240,7 @@ function MovieList({ movies, categories, onView, onEdit, onDelete, onRestore, on
         )}
       </div>
 
+      <AdminPagination page={page} totalPages={totalPages} totalItems={filtered.length} pageSize={12} onPageChange={setPage} />
       <div className="mv-footer-count">Hiển thị <strong>{filtered.length}</strong> / {movies.length} phim</div>
     </div>
   );

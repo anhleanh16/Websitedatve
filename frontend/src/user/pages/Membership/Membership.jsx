@@ -14,14 +14,14 @@ const MOCK_BENEFITS = [
   { icon: '🎂', title: 'Quà sinh nhật', desc: 'Voucher 100K và 1 vé miễn phí vào ngày sinh nhật' },
   { icon: '⭐', title: 'Điểm nhân đôi', desc: 'Tích điểm x2 vào mỗi thứ 3 hàng tuần' },
   { icon: '🎬', title: 'Suất chiếu sớm', desc: 'Xem phim trước công chiếu 1-2 ngày' },
-  { icon: '🅿️', title: 'Bãi đậu xe miễn phí', desc: 'Miễn phí 2 giờ cho thành viên Gold trở lên' },
+  { icon: '🅿️', title: 'Bãi đậu xe miễn phí', desc: 'Miễn phí 2 giờ cho thành viên Vàng trở lên' },
 ]
 
 const TIERS = [
-  { name: 'Silver', min: 0, max: 499, color: '#94a3b8', icon: '🥈' },
-  { name: 'Gold', min: 500, max: 1499, color: '#f59e0b', icon: '🥇' },
-  { name: 'Platinum', min: 1500, max: 2999, color: '#0ea5e9', icon: '💎' },
-  { name: 'Diamond', min: 3000, max: Infinity, color: '#7c3aed', icon: '👑' },
+  { name: 'Đồng', min: 0, max: 499, color: '#cd7f32', icon: '🥉' },
+  { name: 'Bạc', min: 500, max: 1499, color: '#94a3b8', icon: '🥈' },
+  { name: 'Vàng', min: 1500, max: 2999, color: '#f59e0b', icon: '🥇' },
+  { name: 'Kim Cương', min: 3000, max: Infinity, color: '#60a5fa', icon: '👑' },
 ]
 
 const FAQ = [
@@ -39,7 +39,7 @@ const FAQ = [
   },
   {
     q: 'Lên hạng thành viên như thế nào?',
-    a: 'Hạng được tính theo tổng điểm tích lũy: Silver (0–499), Gold (500–1499), Platinum (1500–2999), Diamond (3000+). Hạng cập nhật tự động.'
+    a: 'Hạng được tính theo tổng điểm tích lũy: Đồng (0–499), Bạc (500–1499), Vàng (1500–2999), Kim Cương (3000+). Hạng cập nhật tự động.'
   },
   {
     q: 'Mã thành viên dùng để làm gì?',

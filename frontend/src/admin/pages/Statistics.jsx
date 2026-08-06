@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { adminStatisticsService } from "../services/adminApi";
+import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
 import "./statistics.css";
+
+const EMPTY_ITEMS = [];
 
 function formatCurrency(amount) {
   const num = Number(amount) || 0;
@@ -25,6 +28,8 @@ export default function Statistics() {
     endDate: "",
     cinemaId: "",
   });
+  const topMovies = stats?.topMovies || EMPTY_ITEMS;
+  const { page: topMoviesPage, setPage: setTopMoviesPage, totalPages: topMoviesTotalPages, pageItems: pagedTopMovies } = useAdminPagination(topMovies, 5);
 
   const loadStatistics = async () => {
     try {
@@ -414,7 +419,7 @@ export default function Statistics() {
             </div>
           </div>
           <div className="table-container">
-            {stats?.topMovies?.length > 0 ? (
+            {topMovies.length > 0 ? (
               <table>
                 <thead>
                   <tr>
@@ -425,9 +430,9 @@ export default function Statistics() {
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.topMovies.map((movie, index) => (
+                  {pagedTopMovies.map((movie, index) => (
                     <tr key={movie.movie_id}>
-                      <td>{index + 1}</td>
+                      <td>{(topMoviesPage - 1) * 5 + index + 1}</td>
                       <td>
                         <div className="movie-info">
                           {movie.poster && (
@@ -453,6 +458,7 @@ export default function Statistics() {
               <div className="no-data">Không có dữ liệu</div>
             )}
           </div>
+          <AdminPagination page={topMoviesPage} totalPages={topMoviesTotalPages} totalItems={topMovies.length} pageSize={5} onPageChange={setTopMoviesPage} />
         </section>
 
         <section className="data-table-card">

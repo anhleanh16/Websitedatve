@@ -81,6 +81,32 @@ const ensurePointsSchema = async () => {
         `);
       }
 
+      // Migrate the original English defaults once so user and admin tiers use
+      // the same Vietnamese ladder. Custom membership levels are left intact.
+      const [legacyLevels] = await db.query(`
+        SELECT level_id, level_name, min_points, max_points
+        FROM Membership_Levels
+        WHERE level_name IN ('Silver', 'Gold', 'Platinum', 'Diamond')
+      `);
+      const isLegacyDefault = legacyLevels.length === 4 && legacyLevels.every((level) =>
+        ({ Silver: [0, 499], Gold: [500, 1499], Platinum: [1500, 2999], Diamond: [3000, 999999] })[level.level_name]
+          ?.every((value, index) => Number([level.min_points, level.max_points][index]) === value),
+      );
+      if (isLegacyDefault) {
+        const replacements = [
+          ['Đồng', 0, 499, 'Silver'],
+          ['Bạc', 500, 1499, 'Gold'],
+          ['Vàng', 1500, 2999, 'Platinum'],
+          ['Kim Cương', 3000, 999999, 'Diamond'],
+        ];
+        for (const [name, minPoints, maxPoints, oldName] of replacements) {
+          await db.query(
+            `UPDATE Membership_Levels SET level_name = ?, min_points = ?, max_points = ? WHERE level_name = ?`,
+            [name, minPoints, maxPoints, oldName],
+          );
+        }
+      }
+
       const [ruleRows] = await db.query(`SELECT COUNT(*) AS count FROM Point_Rules`);
       if (!Number(ruleRows[0].count || 0)) {
         await db.query(`

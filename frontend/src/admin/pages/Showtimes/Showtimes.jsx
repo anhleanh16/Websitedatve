@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { adminShowtimeService, adminMovieService } from "../../services/adminApi";
+import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 import './showtimes.css';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -120,6 +121,7 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete }
     }
     return new Date(a.startTime) - new Date(b.startTime);
   });
+  const { page, setPage, totalPages, pageItems } = useAdminPagination(filtered);
 
   return (
     <div className="sh-section">
@@ -155,7 +157,7 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete }
           <tbody>
             {filtered.length === 0 ? (
               <tr><td colSpan={9} style={{ textAlign: "center", color: "#8fa6ff", padding: 32 }}>Không có suất chiếu nào.</td></tr>
-            ) : filtered.map(s => {
+            ) : pageItems.map(s => {
               const movie  = movies.find(m => m.id === s.movieId);
               const room   = rooms.find(r => r.id === s.roomId);
               const cinema = cinemas.find(c => c.id === s.cinemaId);
@@ -202,6 +204,7 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete }
           </tbody>
         </table>
       </div>
+      <AdminPagination page={page} totalPages={totalPages} totalItems={filtered.length} pageSize={10} onPageChange={setPage} />
       <div className="sh-footer-count">Hiển thị <strong>{filtered.length}</strong> / {showtimes.length} suất chiếu</div>
     </div>
   );

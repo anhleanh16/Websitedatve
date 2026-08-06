@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import './staff.css';
+import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
 import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../utils/birthDate.js";
 import BookingWizard from "./Bookings/BookingWizard.jsx";
 import {
@@ -856,6 +857,7 @@ function StaffList({ staff, onView, onEdit, onTask, onAttend, onDelete }) {
     const matchD = filterDept   === "all" || String(s.departmentId) === filterDept;
     return matchQ && matchC && matchT && matchS && matchD;
   });
+  const { page, setPage, totalPages, pageItems } = useAdminPagination(filtered);
 
   return (
     <div className="sf-section">
@@ -899,7 +901,7 @@ function StaffList({ staff, onView, onEdit, onTask, onAttend, onDelete }) {
           <tbody>
             {filtered.length === 0 ? (
               <tr><td colSpan={8} style={{ textAlign: "center", color: "#8fa6ff", padding: 32 }}>Không tìm thấy nhân viên nào.</td></tr>
-            ) : filtered.map(s => {
+            ) : pageItems.map(s => {
               const st  = STATUS_MAP[s.status] || STATUS_MAP.active;
               const rl  = ROLE_MAP[s.role]     || ROLE_MAP.staff;
               const tp  = TYPE_MAP[s.type]     || TYPE_MAP.full_time;
@@ -951,6 +953,7 @@ function StaffList({ staff, onView, onEdit, onTask, onAttend, onDelete }) {
           </tbody>
         </table>
       </div>
+      <AdminPagination page={page} totalPages={totalPages} totalItems={filtered.length} pageSize={10} onPageChange={setPage} />
       <div className="sf-footer-count">Hiển thị <strong>{filtered.length}</strong> / {staff.length} nhân viên</div>
     </div>
   );
