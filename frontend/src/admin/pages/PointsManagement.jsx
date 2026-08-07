@@ -328,7 +328,7 @@ export default function PointsManagement() {
               <label>Tên phần thưởng<input value={rewardForm.rewardName} onChange={(e) => setRewardForm({ ...rewardForm, rewardName: e.target.value })} /></label>
               <label>Điểm cần<input type="number" value={rewardForm.requiredPoints} onChange={(e) => setRewardForm({ ...rewardForm, requiredPoints: Number(e.target.value) })} /></label>
               <label>Loại phần thưởng<select value={rewardForm.rewardType} onChange={(e) => setRewardForm({ ...rewardForm, rewardType: e.target.value })}><option value="voucher">Voucher</option><option value="coupon">Coupon</option><option value="gift">Quà tặng</option></select></label>
-              <label>Giá trị<input value={rewardForm.rewardValue} onChange={(e) => setRewardForm({ ...rewardForm, rewardValue: e.target.value })} /></label>
+              <label title="Ví dụ: 20K, 20%, COMBOFREE hoặc TICKET2D">Giá trị<input placeholder="VD: 20K, 20%, COMBOFREE" value={rewardForm.rewardValue} onChange={(e) => setRewardForm({ ...rewardForm, rewardValue: e.target.value })} /></label>
               <label className="checkbox-row"><input type="checkbox" checked={rewardForm.status} onChange={(e) => setRewardForm({ ...rewardForm, status: e.target.checked })} /> Kích hoạt</label>
               <button type="submit" disabled={saving}>{saving ? 'Đang lưu...' : editingRewardId ? 'Cập nhật quà' : 'Thêm quà'}</button>
             </form>

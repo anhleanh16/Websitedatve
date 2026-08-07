@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { FaMicrophone, FaPaperPlane, FaRobot, FaStop, FaTimes } from 'react-icons/fa'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
 export default function GlobalAiButton() {
+  const location = useLocation()
+  const isAdminRoute = location.pathname.startsWith('/admin')
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -119,6 +122,8 @@ export default function GlobalAiButton() {
     setIsListening(false)
     setIsOpen(false)
   }
+
+  if (isAdminRoute) return null
 
   return (
     <>

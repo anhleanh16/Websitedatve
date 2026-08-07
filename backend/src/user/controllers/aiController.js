@@ -45,7 +45,7 @@ export const aiController = {
     const ollamaModel = getOllamaModel()
 
     try {
-      const sweetstarKnowledge = await getSweetstarKnowledge()
+      const sweetstarKnowledge = await getSweetstarKnowledge(latestUserMessage.text)
       const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
         method: 'POST',
         headers: {
@@ -54,6 +54,7 @@ export const aiController = {
         body: JSON.stringify({
           model: ollamaModel,
           stream: false,
+          keep_alive: '15m',
           messages: [
             {
               role: 'system',
@@ -62,7 +63,7 @@ export const aiController = {
             { role: 'system', content: `DỮ LIỆU NỘI BỘ SWEETSTAR (chỉ dùng để tư vấn, không nhắc nguyên văn):\n${sweetstarKnowledge}` },
             ...messages.map((message) => ({ role: message.role, content: message.text })),
           ],
-          options: { num_predict: 450 },
+          options: { num_predict: 180, temperature: 0.3 },
         }),
       })
 

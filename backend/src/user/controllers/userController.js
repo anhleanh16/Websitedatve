@@ -1205,7 +1205,7 @@ export const userGetBookingDetail = async (req, res) => {
 export const userCreateBooking = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { showtimeId, seatUnits, foodItems, paymentMethod } = req.body;
+    const { showtimeId, seatUnits, foodItems, promoCode, paymentMethod } = req.body;
 
     const normalizedUserId = Number(userId || 0);
     if (!normalizedUserId) {
@@ -1222,6 +1222,7 @@ export const userCreateBooking = async (req, res) => {
       showtimeId,
       seatUnits,
       foodItems,
+      promoCode,
       paymentMethod,
     });
 
@@ -1386,7 +1387,7 @@ export const userGetTodayPromotions = async (req, res) => {
 
 export const validatePromoCode = async (req, res) => {
   try {
-    const { code, orderAmount = 0, userId } = req.body || {};
+    const { code, orderAmount = 0, seatAmount = 0, comboAmount = 0, userId } = req.body || {};
     const trimmedCode = String(code || "").trim().toUpperCase();
 
     if (!trimmedCode) {
@@ -1437,9 +1438,21 @@ export const validatePromoCode = async (req, res) => {
     }
 
     // Tính discount
+    const applicableTo = ['combo', 'ticket'].includes(String(promo.applicable_to || '').toLowerCase())
+      ? String(promo.applicable_to).toLowerCase()
+      : 'all';
+    const amount = applicableTo === 'combo'
+      ? Number(comboAmount || 0)
+      : applicableTo === 'ticket'
+        ? Number(seatAmount || 0)
+        : Number(orderAmount || 0);
+    if (amount <= 0) {
+      const target = applicableTo === 'combo' ? 'combo/bắp nước' : 'vé xem phim';
+      return res.status(400).json({ valid: false, message: `Mã này chỉ áp dụng cho ${target}.` });
+    }
+
     const discountType = promo.discount_type || "percent";
     const discountValue = Number(promo.discount_value || 0);
-    const amount = Number(orderAmount || 0);
     let discountAmount = 0;
 
     if (discountType === "percent") {
@@ -1464,6 +1477,7 @@ export const validatePromoCode = async (req, res) => {
         discountValue,
         discountAmount,
         maxDiscount,
+        applicableTo,
         description: promo.description || "",
       },
     });

@@ -66,6 +66,7 @@ const ZaloPayLogo = () => (
   </svg>
 )
 const BANK_INFO = { accountNumber: '0328959755', accountName: 'CÔNG TY SWEETSTAR', prefix: 'SWEETSTAR' }
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
 const fmt = (v) => `${Number(v || 0).toLocaleString('vi-VN')}đ`
 const foodLabel = (item) => [`${item.quantity}x ${item.name}`, item.popcornType, item.drinkType].filter(Boolean).join(' • ')
 
@@ -87,6 +88,8 @@ export default function Payment() {
   const [promoErr, setPromoErr] = useState('')
   const [promoData, setPromoData] = useState(null)
   const [promoLoading, setPromoLoading] = useState(false)
+  const [membershipTier, setMembershipTier] = useState(null)
+  const [membershipReady, setMembershipReady] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -115,9 +118,15 @@ export default function Payment() {
       })
       .join('; ')
   }, [foods])
-  const disc = promoOk && promoData ? promoData.discountAmount : 0
-  const fee = 5000
-  const total2 = base + fee - disc
+  const membershipPercent = Number(membershipTier?.discount || 0)
+  const memberDisc = Math.round(base * membershipPercent / 100)
+  const amountAfterMember = Math.max(0, base - memberDisc)
+  const seatAmountAfterMember = Math.max(0, Math.round(seatTot * (1 - membershipPercent / 100)))
+  const comboAmountAfterMember = Math.max(0, amountAfterMember - seatAmountAfterMember)
+  const disc = promoOk && promoData ? Math.min(Number(promoData.discountAmount || 0), amountAfterMember) : 0
+  const amountAfterDiscounts = Math.max(0, amountAfterMember - disc)
+  const fee = Math.round(amountAfterDiscounts * 0.08)
+  const total2 = amountAfterDiscounts + fee
   // Hàm loại bỏ dấu tiếng Việt và ký tự đặc biệt để tạo nội dung chuyển tiền
   const toTransferSlug = (str) =>
     String(str || '')
@@ -152,7 +161,12 @@ export default function Payment() {
     if (!promo.trim()) { setPromoErr('Vui lòng nhập mã ưu đãi.'); return }
     setPromoLoading(true); setPromoErr('')
     try {
-      const r = await userPromotionService.validateCode(promo.trim(), { orderAmount: base, userId: currentUser?.id })
+      const r = await userPromotionService.validateCode(promo.trim(), {
+        orderAmount: amountAfterMember,
+        seatAmount: seatAmountAfterMember,
+        comboAmount: comboAmountAfterMember,
+        userId: currentUser?.id,
+      })
       if (r?.valid) { setPromoOk(true); setPromoData(r.promo) }
       else { setPromoErr(r?.message || 'Mã không hợp lệ.'); setPromoOk(false); setPromoData(null) }
     } catch (e) { setPromoErr(e.message || 'Mã không hợp lệ.'); setPromoOk(false); setPromoData(null) }
@@ -169,6 +183,7 @@ export default function Payment() {
     }
     if (!showtimeId) { setErr('Không xác định được suất chiếu.'); return }
     if (!selectedSeatUnits?.length) { setErr('Bạn chưa chọn ghế hợp lệ.'); return }
+    if (!membershipReady) { setErr('Đang tải ưu đãi thành viên. Vui lòng thử lại sau giây lát.'); return }
     setBusy(true); setErr('')
     try {
       // ZaloPay / Visa / Master / JCB — tạo ZaloPay order TRƯỚC, booking tạo sau khi callback
@@ -183,6 +198,7 @@ export default function Payment() {
           showtimeId,
           seatUnits: selectedSeatUnits,
           foodItems: foods,
+          promoCode: promoOk ? (promoData?.code || promo.trim()) : '',
           paymentMethod: method,
         })
         // Lưu context vào sessionStorage để hiển thị khi redirect về
@@ -195,15 +211,15 @@ export default function Payment() {
           method,
         }))
         // Mở ZaloPay trong tab mới — tab app vẫn còn để detect khi user quay lại
-        window.open(zlp.orderUrl, '_blank', 'noopener')
+        if (!zlp.orderUrl) throw new Error('Không nhận được đường dẫn thanh toán từ ZaloPay.')
+        window.location.assign(zlp.orderUrl)
         // Chuyển sang trang chờ xác nhận
-        navigate('/payment/result', { replace: true })
         return
       }
 
       // Chuyển khoản ngân hàng — tạo booking ngay (pending, không lock ghế theo ZaloPay)
       const pm = method === 'banking' && bank ? `${method}:${bank}` : method
-      const res = await userBookingService.create(currentUser.id, { movieId, showtimeId, seatUnits: selectedSeatUnits, foodItems: foods, paymentMethod: pm })
+      const res = await userBookingService.create(currentUser.id, { movieId, showtimeId, seatUnits: selectedSeatUnits, foodItems: foods, promoCode: promoOk ? (promoData?.code || promo.trim()) : '', paymentMethod: pm })
       const booking = res?.booking || null
       navigate('/payment/pending', { replace: true, state: { createdBooking: booking, movieTitle, cinema, day, time, displaySeats: seats, groupedFoodItems: foods, finalTotal: total2, paymentLink: '', paymentQrUrl: qrOnly, vietQROnlyUrl: qrOnly, bankTransferNote: note, method, selectedBank: BANKS.find(b=>b.id===bank)?.label || bank, accountNumber: BANK_INFO.accountNumber, accountName: BANK_INFO.accountName, pointsAwarded: booking?.pointsAwarded??0, pointsBalance: booking?.pointsBalance??0, currentUserId: currentUser.id } })
     } catch (e) { setErr(e.message || 'Không thể lưu đơn thanh toán.') }
@@ -211,6 +227,31 @@ export default function Payment() {
   }
 
   useEffect(() => { if (err && errRef.current) errRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, [err])
+
+  useEffect(() => {
+    if (!currentUser?.id) {
+      setMembershipTier(null)
+      setMembershipReady(false)
+      return
+    }
+
+    let active = true
+    setMembershipReady(false)
+    fetch(`${API_BASE}/points/user/${currentUser.id}`, {
+      headers: { Authorization: `Bearer ${getValidStoredToken() || ''}` },
+    })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (active) setMembershipTier(data?.user?.tier || null)
+      })
+      .catch(() => {
+        if (active) setMembershipTier(null)
+      })
+      .finally(() => {
+        if (active) setMembershipReady(true)
+      })
+    return () => { active = false }
+  }, [currentUser?.id])
 
   useEffect(() => {
     if (!currentUser?.id && !storedToken) {
@@ -453,7 +494,8 @@ export default function Payment() {
               <div className="pay-price-row"><span>Vé ({seats.length} ghế)</span><span>{fmt(seatTot)}</span></div>
               {snackTot > 0 && <div className="pay-price-row"><span>Bắp &amp; Nước</span><span>{fmt(snackTot)}</span></div>}
               {comboTot > 0 && <div className="pay-price-row"><span>Combo</span><span>{fmt(comboTot)}</span></div>}
-              <div className="pay-price-row"><span>Phí dịch vụ</span><span>{fmt(fee)}</span></div>
+              {memberDisc > 0 && <div className="pay-price-row green"><span>Ưu đãi thành viên {membershipTier?.name ? `(${membershipTier.name} ${membershipPercent}%)` : ''}</span><span>-{fmt(memberDisc)}</span></div>}
+              <div className="pay-price-row"><span>Phí dịch vụ (8%)</span><span>{fmt(fee)}</span></div>
               {promoOk && <div className="pay-price-row green"><span>Giảm giá</span><span>-{fmt(disc)}</span></div>}
             </div>
             <div className="pay-total-row"><span>Tổng cộng</span><strong>{fmt(total2)}</strong></div>

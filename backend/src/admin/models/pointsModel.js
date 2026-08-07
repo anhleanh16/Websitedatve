@@ -1,4 +1,6 @@
 import { db } from '../../../config/db.js';
+import crypto from 'crypto';
+import { ensurePromotionSchema } from './promotionModel.js';
 
 let ensurePointsSchemaPromise;
 
@@ -145,6 +147,42 @@ const normalizeStatus = (value) => {
   }
   return 1;
 };
+
+const getRewardDiscount = (reward) => {
+  const value = String(reward.reward_value || '').trim()
+  const normalizedValue = value.toUpperCase()
+
+  // Các phần thưởng mẫu phải được cấu hình thành voucher có giá trị thật.
+  if (normalizedValue.includes('COMBOFREE')) {
+    return { discountType: 'percent', discountValue: 100, maxDiscount: 100000, applicableTo: 'combo' }
+  }
+  if (normalizedValue.includes('TICKET2D')) {
+    return { discountType: 'fixed', discountValue: 80000, maxDiscount: 80000, applicableTo: 'ticket' }
+  }
+  const percentMatch = value.match(/(\d+(?:[.,]\d+)?)\s*%/)
+  if (percentMatch) {
+    return { discountType: 'percent', discountValue: Number(percentMatch[1].replace(',', '.')), maxDiscount: 0, applicableTo: 'all' }
+  }
+
+  const thousandsMatch = value.match(/(\d+(?:[.,]\d+)?)\s*(?:k|nghìn)/i)
+  if (thousandsMatch) {
+    return { discountType: 'fixed', discountValue: Math.round(Number(thousandsMatch[1].replace(',', '.')) * 1000), maxDiscount: 0, applicableTo: 'all' }
+  }
+
+  const currencyMatch = value.match(/(\d[\d.,]*)\s*(?:đ|vnd)/i)
+  if (currencyMatch) {
+    return { discountType: 'fixed', discountValue: Number(currencyMatch[1].replace(/[.,]/g, '')), maxDiscount: 0, applicableTo: 'all' }
+  }
+
+  // Phần thưởng voucher mặc định trong hệ thống dùng mã GIAM20K.
+  if (/gi[aả]m\s*20k/i.test(value)) {
+    return { discountType: 'fixed', discountValue: 20000, maxDiscount: 0, applicableTo: 'all' }
+  }
+
+  return { discountType: 'fixed', discountValue: 0, maxDiscount: 0, applicableTo: 'all' }
+};
+
+const createRewardVoucherCode = (rewardId) => `SS${Number(rewardId)}${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
 const formatLevel = (row) => ({
   id: row.level_id,
@@ -397,39 +435,82 @@ export const PointsModel = {
 
   async redeemReward(userId, rewardId) {
     await ensurePointsSchema();
+    await ensurePromotionSchema();
     const parsedUserId = Number(userId);
     const parsedRewardId = Number(rewardId);
-
-    const [rewardRows] = await db.query(`
-      SELECT reward_id, reward_name, required_points, reward_type, reward_value
-      FROM Reward_Rules
-      WHERE reward_id = ? AND status = TRUE
-    `, [parsedRewardId]);
-
-    if (!rewardRows.length) {
-      throw new Error('Không tìm thấy phần thưởng này.');
+    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0 || !Number.isInteger(parsedRewardId) || parsedRewardId <= 0) {
+      throw new Error('Thông tin đổi thưởng không hợp lệ.');
     }
 
-    const reward = rewardRows[0];
-    const [userRows] = await db.query(`SELECT id, point FROM User WHERE id = ?`, [parsedUserId]);
-    if (!userRows.length) {
-      throw new Error('Không tìm thấy người dùng.');
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [rewardRows] = await connection.query(`
+        SELECT reward_id, reward_name, required_points, reward_type, reward_value
+        FROM Reward_Rules
+        WHERE reward_id = ? AND status = TRUE
+        FOR UPDATE
+      `, [parsedRewardId]);
+      if (!rewardRows.length) throw new Error('Không tìm thấy phần thưởng này.');
+
+      const reward = rewardRows[0];
+      const [userRows] = await connection.query(`SELECT id, point FROM User WHERE id = ? FOR UPDATE`, [parsedUserId]);
+      if (!userRows.length) throw new Error('Không tìm thấy người dùng.');
+
+      const currentPoints = Number(userRows[0].point || 0);
+      const requiredPoints = Number(reward.required_points || 0);
+      if (currentPoints < requiredPoints) throw new Error('Bạn không đủ điểm để đổi phần thưởng này.');
+
+      const { discountType, discountValue, maxDiscount, applicableTo } = getRewardDiscount(reward);
+      if (discountValue <= 0) {
+        throw new Error('Phần thưởng này chưa được cấu hình giá trị giảm. Vui lòng liên hệ quản trị viên.');
+      }
+
+      const voucherCode = createRewardVoucherCode(reward.reward_id);
+      const voucherTitle = reward.reward_name;
+      const voucherDescription = `Đổi từ ${requiredPoints.toLocaleString('vi-VN')} điểm${reward.reward_value ? ` · ${reward.reward_value}` : ''}`;
+      const [promotionResult] = await connection.query(`
+        INSERT INTO Promotions (
+          code, title, description, promotion_type, discount_type, discount_value,
+          min_order, max_discount, start_date, end_date, usage_limit, used_count,
+          applicable_to, status, created_by, updated_at
+        )
+        VALUES (?, ?, ?, 'voucher', ?, ?, 0, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 90 DAY), 1, 0, ?, 'active', NULL, NOW())
+      `, [voucherCode, voucherTitle, voucherDescription, discountType, discountValue, maxDiscount, applicableTo]);
+
+      await connection.query(`
+        INSERT INTO User_Promotions (promotion_id, user_id, status, issued_at, used_at)
+        VALUES (?, ?, 'active', NOW(), NULL)
+      `, [promotionResult.insertId, parsedUserId]);
+
+      const nextPoints = currentPoints - requiredPoints;
+      await connection.query(`UPDATE User SET point = ? WHERE id = ?`, [nextPoints, parsedUserId]);
+      await connection.query(`
+        INSERT INTO Point_History (user_id, points_change, description, expires_at)
+        VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 12 MONTH))
+      `, [parsedUserId, -requiredPoints, `Đổi quà: ${reward.reward_name} (${voucherCode})`]);
+
+      await connection.commit();
+      return {
+        points: nextPoints,
+        reward,
+        voucher: {
+          id: promotionResult.insertId,
+          code: voucherCode,
+          title: voucherTitle,
+          discountType,
+          discountValue,
+          applicableTo,
+          expiresInDays: 90,
+        },
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
-
-    const currentPoints = Number(userRows[0].point || 0);
-    const requiredPoints = Number(reward.required_points || 0);
-    if (currentPoints < requiredPoints) {
-      throw new Error('Bạn không đủ điểm để đổi phần thưởng này.');
-    }
-
-    const nextPoints = currentPoints - requiredPoints;
-    await db.query(`UPDATE User SET point = ? WHERE id = ?`, [nextPoints, parsedUserId]);
-    await db.query(`
-      INSERT INTO Point_History (user_id, points_change, description, expires_at)
-      VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 12 MONTH))
-    `, [parsedUserId, -requiredPoints, `Đổi quà: ${reward.reward_name}`]);
-
-    return { points: nextPoints, reward };
   },
 
   async listMembershipLevels() {

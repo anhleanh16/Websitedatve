@@ -4,7 +4,7 @@
  * User bấm "Tôi đã thanh toán" → app verify với ZaloPay server → tạo booking.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, Link, useNavigate } from 'react-router-dom'
 import { FaCheckCircle, FaTimesCircle, FaSpinner, FaHome, FaUser } from 'react-icons/fa'
 import { userBookingService } from '../../services/userApi'
@@ -14,12 +14,16 @@ export default function PaymentResult() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const [status, setStatus]           = useState('verifying') // verifying | success | fail
+  const [status, setStatus]           = useState('verifying') // verifying | waiting | success | fail
   const [pending, setPending]         = useState(null)
   const [booking, setBooking]         = useState(null)
   const [pointsAwarded, setPointsAwarded] = useState(0)
   const [checking, setChecking] = useState(false)
   const [checkMessage, setCheckMessage] = useState('')
+  const hasStartedVerification = useRef(false)
+  const params = new URLSearchParams(location.search)
+  const returnedAppTransId = params.get('apptransid') || params.get('app_trans_id') || ''
+  const amountRaw = params.get('amount')
 
   const verifyPayment = async (appTransId, { showLoading = false } = {}) => {
     if (!appTransId) return
@@ -38,23 +42,49 @@ export default function PaymentResult() {
         return
       }
 
-      setStatus('fail')
-      setCheckMessage('Giao dịch chưa hoàn tất. Vui lòng thanh toán trên ZaloPay rồi bấm kiểm tra lại.')
+      setStatus('waiting')
+      setCheckMessage('ZaloPay đã xác nhận thanh toán. Hệ thống đang hoàn tất tạo vé, vui lòng đợi hoặc kiểm tra lại.')
     } catch {
-      setStatus('fail')
-      setCheckMessage('Chưa xác nhận được giao dịch. Bạn có thể bấm kiểm tra lại sau vài giây.')
+      setStatus('waiting')
+      setCheckMessage('ZaloPay đã xác nhận thanh toán. Hệ thống đang đồng bộ giao dịch, vui lòng kiểm tra lại sau vài giây.')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const checkPaymentStatus = async (appTransId) => {
+    if (!appTransId) return
+    setChecking(true)
+    setCheckMessage('')
+    try {
+      const result = await userBookingService.queryZaloPayOrder(appTransId)
+      if (Number(result?.return_code) === 1) {
+        await verifyPayment(appTransId, { showLoading: true })
+        return
+      }
+      setStatus(Number(result?.return_code) === 2 ? 'waiting' : 'fail')
+      setCheckMessage(result?.return_message || 'ZaloPay chưa xác nhận giao dịch.')
+    } catch {
+      setStatus('waiting')
+      setCheckMessage('Chưa thể kiểm tra ZaloPay. Vui lòng thử lại sau ít phút.')
     } finally {
       setChecking(false)
     }
   }
 
   useEffect(() => {
+    if (hasStartedVerification.current) return
+    hasStartedVerification.current = true
+
     // Đọc pending data từ sessionStorage
     let savedPending = null
     try {
       const raw = sessionStorage.getItem('zlp_pending')
       if (raw) {
         savedPending = JSON.parse(raw)
+        setPending(savedPending)
+      } else if (returnedAppTransId) {
+        savedPending = { appTransId: returnedAppTransId, finalTotal: Number(amountRaw || 0) }
         setPending(savedPending)
       } else {
         navigate('/', { replace: true })
@@ -66,17 +96,16 @@ export default function PaymentResult() {
     }
 
     // Demo: tự động confirm luôn khi vào trang
-    if (savedPending?.appTransId) {
-      verifyPayment(savedPending.appTransId, { showLoading: true })
+    const appTransId = returnedAppTransId || savedPending?.appTransId
+    if (appTransId) {
+      checkPaymentStatus(appTransId)
     }
   }, [navigate])
 
-  const params = new URLSearchParams(location.search)
-  const amountRaw = params.get('amount')
   const finalTotal = pending?.finalTotal || Number(amountRaw || 0)
 
   // --- Loading / Verifying ---
-  if (status === 'waiting' || status === 'verifying') {
+  if (status === 'verifying') {
     return (
       <div className="pr-page">
         <div className="pr-loading">
@@ -94,19 +123,23 @@ export default function PaymentResult() {
         <div className={`pr-icon-ring ${status}`}>
           {status === 'success'
             ? <FaCheckCircle className="pr-icon success" />
-            : <FaTimesCircle className="pr-icon fail" />
+            : status === 'waiting'
+              ? <FaSpinner className="pr-icon pr-spinner" />
+              : <FaTimesCircle className="pr-icon fail" />
           }
         </div>
         <h1 className="pr-title">
-          {status === 'success' ? 'Thanh toán thành công!' : 'Thanh toán không thành công'}
+          {status === 'success' ? 'Thanh toán thành công!' : status === 'waiting' ? 'Đang chờ thanh toán' : 'Thanh toán không thành công'}
         </h1>
         <p className="pr-sub">
           {status === 'success'
             ? 'Đơn đặt vé của bạn đã được xác nhận. Vé điện tử sẽ gửi qua email.'
-            : 'Giao dịch bị huỷ hoặc thất bại. Bạn có thể thử lại.'}
+            : status === 'waiting'
+              ? 'Hãy hoàn tất thanh toán trên ZaloPay, sau đó kiểm tra lại.'
+              : 'Giao dịch bị huỷ hoặc thất bại. Bạn có thể thử lại.'}
         </p>
 
-        {status === 'fail' && checkMessage && (
+        {status !== 'success' && checkMessage && (
           <div className="pr-error-msg">{checkMessage}</div>
         )}
 
@@ -142,7 +175,7 @@ export default function PaymentResult() {
             <>
               <button
                 className={`pr-btn primary${checking ? ' disabled' : ''}`}
-                onClick={() => verifyPayment(pending?.appTransId, { showLoading: true })}
+                onClick={() => checkPaymentStatus(pending?.appTransId)}
                 disabled={checking || !pending?.appTransId}
               >
                 {checking ? <><FaSpinner className="pr-spin-sm" /> Đang kiểm tra...</> : 'Kiểm tra thanh toán'}

@@ -425,6 +425,8 @@ export const PromotionModel = {
       JOIN Promotions p ON p.promotion_id = up.promotion_id
       WHERE up.user_id = ?
         AND p.promotion_type = 'voucher'
+        AND up.status = 'active'
+        AND p.status = 'active'
       ORDER BY up.issued_at DESC, p.promotion_id DESC
     `,
       [userId],

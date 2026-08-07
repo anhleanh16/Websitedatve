@@ -136,6 +136,10 @@ export default function Membership() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.message || 'Không thể đổi quà.')
+      const promotionData = await userPromotionService.getAll(profile.id)
+      setVouchers(Array.isArray(promotionData?.vouchers) ? promotionData.vouchers : [])
+      setCoupons(Array.isArray(promotionData?.coupons) ? promotionData.coupons : [])
+      setPromotionError('')
       const res2 = await fetch(`${API_BASE}/points/user/${profile.id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
       })
@@ -145,8 +149,10 @@ export default function Membership() {
         setRewards(Array.isArray(pointData?.rewards) ? pointData.rewards : [])
         setHistory(Array.isArray(pointData?.history) ? pointData.history : [])
       }
+      return data
     } catch (err) {
       setPromotionError(err.message || 'Không thể đổi quà.')
+      return null
     } finally {
       setRedeemingId(null)
     }
@@ -159,9 +165,12 @@ export default function Membership() {
 
   const confirmRedeem = async () => {
     if (!pendingReward) return
-    await handleRedeem(pendingReward.id)
-    setShowRedeemConfirm(false)
-    setPendingReward(null)
+    const result = await handleRedeem(pendingReward.id)
+    if (result?.voucher) {
+      setShowRedeemConfirm(false)
+      setPendingReward(null)
+      setActiveTab('vouchers')
+    }
   }
 
   const TABS = [

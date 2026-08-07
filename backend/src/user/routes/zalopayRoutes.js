@@ -108,6 +108,7 @@ const ensurePendingPaymentsTable = async () => {
       showtime_id    INT NOT NULL,
       seat_units     LONGTEXT NOT NULL,
       food_items     LONGTEXT NOT NULL,
+      promo_code     VARCHAR(100) NULL,
       payment_method VARCHAR(50) NOT NULL DEFAULT 'zalopay',
       amount         DECIMAL(12,2) NOT NULL,
       description    TEXT,
@@ -115,6 +116,19 @@ const ensurePendingPaymentsTable = async () => {
       expires_at     DATETIME NOT NULL
     )
   `);
+  const [columns] = await db.query(
+    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Pending_Payments'",
+  );
+  if (!columns.some((column) => column.COLUMN_NAME === 'promo_code')) {
+    await db.query('ALTER TABLE Pending_Payments ADD COLUMN promo_code VARCHAR(100) NULL AFTER food_items');
+  }
+  const [orderColumns] = await db.query(
+    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Orders'",
+  );
+  if (!orderColumns.some((column) => column.COLUMN_NAME === 'zalopay_trans_id')) {
+    await db.query('ALTER TABLE Orders ADD COLUMN zalopay_trans_id VARCHAR(100) NULL');
+    await db.query('CREATE INDEX idx_orders_zalopay_trans_id ON Orders (zalopay_trans_id)');
+  }
   pendingPaymentsReady = true;
 };
 
@@ -141,6 +155,22 @@ function buildGatewayUrl(appId, zpTransToken) {
   return `${gatewayBase}?order=${orderB64}`;
 }
 
+const queryZaloPayTransaction = async (appTransId) => {
+  const appId = process.env.ZALOPAY_APP_ID || '553';
+  const key1 = process.env.ZALOPAY_KEY1 || '9phuAOYhan4urywHTh0ndEXiV3pKHr5Q';
+  const endpoint = process.env.ZALOPAY_QUERY_ENDPOINT || 'https://sb-openapi.zalopay.vn/v2/query';
+  const mac = createHmac('sha256', key1)
+    .update(`${appId}|${appTransId}|${key1}`)
+    .digest('hex');
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ app_id: Number(appId), app_trans_id: appTransId, mac }),
+  });
+  return response.json().catch(() => null);
+};
+
 // ── POST /:userId/payments/zalopay — Tạo đơn hàng ZaloPay ────────────────────
 // KHÔNG tạo booking ngay — chỉ lưu pending data, tạo ZaloPay order
 // Booking thật được tạo trong callback khi thanh toán thành công
@@ -151,7 +181,7 @@ router.post('/:userId/payments/zalopay', authMiddleware, selfOrAdminOnly, requir
     const {
       amount, description, preferredMethod,
       // booking data — lưu tạm để tạo booking khi callback
-      movieId, showtimeId, seatUnits, foodItems, paymentMethod: pm,
+      movieId, showtimeId, seatUnits, foodItems, promoCode, paymentMethod: pm,
     } = req.body;
 
     const userId = Number(req.params.userId || req.user?.id || 0);
@@ -188,8 +218,8 @@ router.post('/:userId/payments/zalopay', authMiddleware, selfOrAdminOnly, requir
     // Lưu booking data vào Pending_Payments (hết hạn sau 15 phút)
     await db.query(
       `INSERT INTO Pending_Payments
-         (app_trans_id, user_id, movie_id, showtime_id, seat_units, food_items, payment_method, amount, description, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 15 MINUTE))`,
+         (app_trans_id, user_id, movie_id, showtime_id, seat_units, food_items, promo_code, payment_method, amount, description, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 15 MINUTE))`,
       [
         appTransId,
         userId,
@@ -197,6 +227,7 @@ router.post('/:userId/payments/zalopay', authMiddleware, selfOrAdminOnly, requir
         Number(showtimeId),
         JSON.stringify(Array.isArray(seatUnits) ? seatUnits : []),
         JSON.stringify(Array.isArray(foodItems) ? foodItems : []),
+        String(promoCode || '').trim().toUpperCase() || null,
         String(pm || preferredMethod || 'zalopay'),
         parsedAmount,
         note,
@@ -274,20 +305,7 @@ router.get('/payments/zalopay/query', async (req, res) => {
       return res.status(400).json({ message: 'Thiếu app_trans_id.' });
     }
 
-    const appId    = process.env.ZALOPAY_APP_ID     || '553';
-    const key1     = process.env.ZALOPAY_KEY1       || '9phuAOYhan4urywHTh0ndEXiV3pKHr5Q';
-    const endpoint = process.env.ZALOPAY_QUERY_ENDPOINT || 'https://sb-openapi.zalopay.vn/v2/query';
-
-    const macData = `${appId}|${app_trans_id}|${key1}`;
-    const mac = createHmac('sha256', key1).update(macData).digest('hex');
-
-    const response = await fetch(endpoint, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ app_id: Number(appId), app_trans_id, mac }),
-    });
-
-    const result = await response.json().catch(() => null);
+    const result = await queryZaloPayTransaction(String(app_trans_id));
 
     // Kèm theo booking nếu đã được tạo (callback đã xử lý)
     let booking = null;
@@ -308,7 +326,7 @@ router.get('/payments/zalopay/query', async (req, res) => {
 });
 
 // ── POST /payments/zalopay/confirm — Tạo booking sau thanh toán ZaloPay (demo) ─
-router.post('/payments/zalopay/confirm', async (req, res) => {
+router.post('/payments/zalopay/confirm', authMiddleware, async (req, res) => {
   try {
     await ensurePendingPaymentsTable();
 
@@ -329,11 +347,25 @@ router.post('/payments/zalopay/confirm', async (req, res) => {
 
     // Lấy pending data
     const [[pending]] = await db.query(
-      `SELECT * FROM Pending_Payments WHERE app_trans_id = ?`,
+      `SELECT * FROM Pending_Payments WHERE app_trans_id = ? AND expires_at > NOW()`,
       [String(app_trans_id)],
     );
     if (!pending) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy thông tin đặt vé.' });
+    }
+
+    if (Number(req.userId || 0) !== Number(pending.user_id)) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xác nhận giao dịch này.' });
+    }
+
+    // Only create a booking after ZaloPay has confirmed a successful payment.
+    const paymentResult = await queryZaloPayTransaction(String(app_trans_id));
+    if (Number(paymentResult?.return_code) !== 1) {
+      return res.status(409).json({
+        success: false,
+        pending: Number(paymentResult?.return_code) === 2,
+        message: paymentResult?.return_message || 'ZaloPay chưa xác nhận giao dịch thành công.',
+      });
     }
 
     const isCustomer = await ensureCustomerRoleByUserId(Number(pending.user_id));
@@ -351,7 +383,13 @@ router.post('/payments/zalopay/confirm', async (req, res) => {
       showtimeId:    Number(pending.showtime_id),
       seatUnits,
       foodItems,
+      promoCode:     pending.promo_code,
       paymentMethod: 'zalopay',
+    });
+
+    await BookingModel.confirmCardPayment({
+      orderId: booking.booking_id,
+      userId: Number(pending.user_id),
     });
 
     // Mark paid + lưu app_trans_id
@@ -362,14 +400,6 @@ router.post('/payments/zalopay/confirm', async (req, res) => {
     );
 
     // Cộng điểm
-    try {
-      await BookingModel.confirmCardPayment({
-        orderId: booking.booking_id,
-        userId:  Number(pending.user_id),
-      });
-    } catch (pointsErr) {
-      console.warn('[ZaloPay] Points award failed (non-critical):', pointsErr.message);
-    }
 
     // Xóa pending data
     await db.query(`DELETE FROM Pending_Payments WHERE app_trans_id = ?`, [String(app_trans_id)]).catch(() => {});
@@ -417,7 +447,7 @@ router.post('/payments/zalopay/callback', async (req, res) => {
   try {
     await ensurePendingPaymentsTable();
 
-    const key2 = process.env.ZALOPAY_KEY2 || 'A53q3asfJ9qQMEVDUuruW86nIloLoAUq';
+    const key2 = process.env.ZALOPAY_KEY2 || 'Iyz2habzyr7AG8SgvoBCbKwKi3UzlLi3';
     const { data: dataStr, mac: receivedMac } = req.body;
 
     // Verify MAC
@@ -468,7 +498,13 @@ router.post('/payments/zalopay/callback', async (req, res) => {
       showtimeId:    Number(pending.showtime_id),
       seatUnits,
       foodItems,
+      promoCode:     pending.promo_code,
       paymentMethod: 'zalopay',
+    });
+
+    await BookingModel.confirmCardPayment({
+      orderId: booking.booking_id,
+      userId: Number(pending.user_id),
     });
 
     // Đánh dấu paid ngay + lưu app_trans_id
@@ -481,14 +517,6 @@ router.post('/payments/zalopay/callback', async (req, res) => {
 
     // Cộng điểm (vì createUserBooking chỉ cộng khi cash/cashier)
     // Gọi confirmCardPayment tái dụng logic cộng điểm
-    try {
-      await BookingModel.confirmCardPayment({
-        orderId: booking.booking_id,
-        userId:  Number(pending.user_id),
-      });
-    } catch (pointsErr) {
-      console.warn('[ZaloPay] Points award failed (non-critical):', pointsErr.message);
-    }
 
     // Xóa pending data
     await db.query(`DELETE FROM Pending_Payments WHERE app_trans_id = ?`, [String(app_trans_id)]).catch(() => {});

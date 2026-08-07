@@ -1,11 +1,13 @@
 import { db } from "../../../config/db.js";
 import { PointsModel } from "./pointsModel.js";
+import { ensurePromotionSchema } from './promotionModel.js';
 
 const UNIT_PRICE_BY_TYPE = {
   regular: 80000,
   vip: 100000,
   couple: 120000,
 };
+const SERVICE_FEE_RATE = 0.08;
 
 let bookingSchemaPromise = null;
 let showtimePriceColumnsCache = null;
@@ -132,6 +134,122 @@ const shouldMarkAsPaidImmediately = (paymentMethod = "") => {
   return normalizedPaymentMethod === "cash" || normalizedPaymentMethod === "cashier";
 };
 
+const resolveMembershipDiscount = async (connection, userId, subtotal) => {
+  const [[membership]] = await connection.query(
+    `
+    SELECT ml.level_name, COALESCE(ml.discount_percent, 0) AS discount_percent
+    FROM User u
+    LEFT JOIN Membership_Levels ml
+      ON u.point >= ml.min_points AND u.point <= ml.max_points
+    WHERE u.id = ?
+    ORDER BY ml.min_points DESC
+    LIMIT 1
+    `,
+    [Number(userId)],
+  );
+
+  const discountPercent = Math.max(0, Math.min(100, Number(membership?.discount_percent || 0)));
+  return {
+    levelName: membership?.level_name || '',
+    discountPercent,
+    discountAmount: Math.round(Number(subtotal || 0) * discountPercent / 100),
+  };
+};
+
+const resolvePromotionDiscount = async (connection, { promoCode, userId, amount, seatAmount = 0, comboAmount = 0 }) => {
+  const code = String(promoCode || '').trim().toUpperCase();
+  if (!code) return { promotionId: null, discountAmount: 0 };
+
+  const [rows] = await connection.query(
+    `
+    SELECT * FROM Promotions
+    WHERE UPPER(code) = ?
+      AND status = 'active'
+      AND (start_date IS NULL OR start_date <= CURDATE())
+      AND (end_date IS NULL OR end_date >= CURDATE())
+    LIMIT 1
+    FOR UPDATE
+    `,
+    [code],
+  );
+  if (!rows.length) throw buildBookingError('Mã ưu đãi không hợp lệ hoặc đã hết hạn.');
+
+  const promotion = rows[0];
+  const applicableTo = ['combo', 'ticket'].includes(String(promotion.applicable_to || '').toLowerCase())
+    ? String(promotion.applicable_to).toLowerCase()
+    : 'all';
+  const eligibleAmount = applicableTo === 'combo'
+    ? Number(comboAmount || 0)
+    : applicableTo === 'ticket'
+      ? Number(seatAmount || 0)
+      : Number(amount || 0);
+  if (Number(promotion.usage_limit || 0) > 0 && Number(promotion.used_count || 0) >= Number(promotion.usage_limit || 0)) {
+    throw buildBookingError('Mã ưu đãi đã hết lượt sử dụng.');
+  }
+
+  if (Number(promotion.min_order || 0) > Number(amount || 0)) {
+    throw buildBookingError(`Đơn hàng tối thiểu ${Number(promotion.min_order).toLocaleString('vi-VN')}đ để dùng mã này.`);
+  }
+
+  if (eligibleAmount <= 0) {
+    const target = applicableTo === 'combo' ? 'combo/bắp nước' : 'vé xem phim';
+    throw buildBookingError(`Mã ưu đãi này chỉ áp dụng cho ${target}.`);
+  }
+
+  if (promotion.promotion_type === 'voucher') {
+    const [assignments] = await connection.query(
+      `SELECT id FROM User_Promotions WHERE promotion_id = ? AND user_id = ? AND status = 'active' LIMIT 1 FOR UPDATE`,
+      [promotion.promotion_id, Number(userId)],
+    );
+    if (!assignments.length) throw buildBookingError('Voucher này không dành cho tài khoản của bạn hoặc đã được sử dụng.');
+  }
+
+  let discountAmount = promotion.discount_type === 'percent'
+    ? Math.round(eligibleAmount * Number(promotion.discount_value || 0) / 100)
+    : Number(promotion.discount_value || 0);
+  if (Number(promotion.max_discount || 0) > 0) {
+    discountAmount = Math.min(discountAmount, Number(promotion.max_discount));
+  }
+
+  return {
+    promotionId: Number(promotion.promotion_id),
+    applicableTo,
+    discountAmount: Math.max(0, Math.min(Math.round(discountAmount), eligibleAmount)),
+  };
+};
+
+const consumePromotionForOrder = async (connection, { promotionId, userId }) => {
+  if (!promotionId) return;
+
+  const [rows] = await connection.query(
+    `SELECT * FROM Promotions WHERE promotion_id = ? FOR UPDATE`,
+    [Number(promotionId)],
+  );
+  if (!rows.length) throw buildBookingError('Mã ưu đãi không còn tồn tại.');
+
+  const promotion = rows[0];
+  if (promotion.status !== 'active' || (Number(promotion.usage_limit || 0) > 0 && Number(promotion.used_count || 0) >= Number(promotion.usage_limit || 0))) {
+    throw buildBookingError('Mã ưu đãi đã được sử dụng hoặc không còn hiệu lực.');
+  }
+
+  if (promotion.promotion_type === 'voucher') {
+    const [assignments] = await connection.query(
+      `SELECT id FROM User_Promotions WHERE promotion_id = ? AND user_id = ? AND status = 'active' LIMIT 1 FOR UPDATE`,
+      [promotion.promotion_id, Number(userId)],
+    );
+    if (!assignments.length) throw buildBookingError('Voucher này đã được sử dụng.');
+    await connection.query(
+      `UPDATE User_Promotions SET status = 'used', used_at = NOW() WHERE id = ?`,
+      [assignments[0].id],
+    );
+  }
+
+  await connection.query(
+    `UPDATE Promotions SET used_count = used_count + 1 WHERE promotion_id = ?`,
+    [promotion.promotion_id],
+  );
+};
+
 const awardBookingPoints = async (connection, userId, orderId, totalAmount, seatUnits = [], foodItems = []) => {
   await PointsModel.ensureSchema();
 
@@ -232,11 +350,20 @@ const ensureBookingSchema = async () => {
       await db.query(statement);
     }
 
+    const [orderColumns] = await db.query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Orders'",
+    );
+    const orderColumnSet = new Set(orderColumns.map((column) => column.COLUMN_NAME));
+    if (!orderColumnSet.has('promotion_id')) {
+      await db.query('ALTER TABLE Orders ADD COLUMN promotion_id INT NULL AFTER user_id');
+    }
+
     return {
       orderCombos: {
         hasSelectedPopcornType: true,
         hasSelectedDrinkType: true,
       },
+      orders: { hasPromotionId: true },
     };
   })();
 
@@ -608,9 +735,12 @@ export const BookingModel = {
     showtimeId,
     seatUnits = [],
     foodItems = [],
+    promoCode = '',
     paymentMethod = "zalopay",
   }) {
     await ensureBookingSchema();
+    await PointsModel.ensureSchema();
+    await ensurePromotionSchema();
 
     const normalizedUserId = Number(userId || 0);
     const normalizedShowtimeId = Number(showtimeId || 0);
@@ -769,7 +899,21 @@ export const BookingModel = {
         (sum, item) => sum + Number(comboById.get(item.comboId) || 0) * item.quantity,
         0,
       );
-      const totalAmount = seatTotal + foodTotal;
+      const subtotalAmount = seatTotal + foodTotal;
+      const membership = await resolveMembershipDiscount(connection, normalizedUserId, subtotalAmount);
+      const amountAfterMembership = Math.max(0, subtotalAmount - membership.discountAmount);
+      const seatAmountAfterMembership = Math.max(0, Math.round(seatTotal * (1 - membership.discountPercent / 100)));
+      const comboAmountAfterMembership = Math.max(0, amountAfterMembership - seatAmountAfterMembership);
+      const promotion = await resolvePromotionDiscount(connection, {
+        promoCode,
+        userId: normalizedUserId,
+        amount: amountAfterMembership,
+        seatAmount: seatAmountAfterMembership,
+        comboAmount: comboAmountAfterMembership,
+      });
+      const amountAfterDiscounts = Math.max(0, amountAfterMembership - promotion.discountAmount);
+      const serviceFee = Math.round(amountAfterDiscounts * SERVICE_FEE_RATE);
+      const totalAmount = amountAfterDiscounts + serviceFee;
 
       let bookingCode = generateBookingCode();
       for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -785,6 +929,7 @@ export const BookingModel = {
         `
         INSERT INTO Orders (
           user_id,
+          promotion_id,
           total_amount,
           payment_method,
           payment_status,
@@ -792,9 +937,9 @@ export const BookingModel = {
           booking_code,
           status
         )
-        VALUES (?, ?, ?, ?, NOW(), ?, ?)
+        VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
       `,
-        [normalizedUserId, totalAmount, String(paymentMethod || "zalopay").trim(), initialPaymentStatus, bookingCode, initialOrderStatus],
+        [normalizedUserId, promotion.promotionId, totalAmount, String(paymentMethod || "zalopay").trim(), initialPaymentStatus, bookingCode, initialOrderStatus],
       );
 
       const orderId = Number(orderResult.insertId);
@@ -859,6 +1004,7 @@ export const BookingModel = {
       // Chỉ cộng điểm ngay nếu đơn được xác nhận paid tức thì (cash/cashier)
       let pointsResult = { earnedPoints: 0, newPoints: 0 };
       if (initialPaymentStatus === 'paid') {
+        await consumePromotionForOrder(connection, { promotionId: promotion.promotionId, userId: normalizedUserId });
         pointsResult = await awardBookingPoints(connection, normalizedUserId, orderId, totalAmount, normalizedSeatUnits, normalizedFoodItems);
       }
 
@@ -866,6 +1012,15 @@ export const BookingModel = {
       const booking = await this.findById(orderId);
       return {
         ...booking,
+        pricing: {
+          subtotalAmount,
+          membershipDiscount: membership.discountAmount,
+          membershipDiscountPercent: membership.discountPercent,
+          membershipLevel: membership.levelName,
+          promotionDiscount: promotion.discountAmount,
+          serviceFee,
+          totalAmount,
+        },
         pointsAwarded: Number(pointsResult?.earnedPoints || 0),
         pointsBalance: Number(pointsResult?.newPoints || 0),
       };
@@ -900,7 +1055,7 @@ export const BookingModel = {
 
       // Lấy thông tin order
       const [[order]] = await connection.query(
-        `SELECT order_id, user_id, total_amount, payment_status, status
+        `SELECT order_id, user_id, promotion_id, total_amount, payment_status, status
          FROM Orders WHERE order_id = ? FOR UPDATE`,
         [normalizedOrderId],
       );
@@ -908,6 +1063,8 @@ export const BookingModel = {
       if (!order) throw buildBookingError("Đơn hàng không tồn tại.", 404);
       if (Number(order.user_id) !== normalizedUserId) throw buildBookingError("Không có quyền truy cập đơn hàng này.", 403);
       if (order.payment_status === 'paid') throw buildBookingError("Đơn hàng đã được thanh toán trước đó.");
+
+      await consumePromotionForOrder(connection, { promotionId: order.promotion_id, userId: normalizedUserId });
 
       // Mark paid
       await connection.query(
