@@ -8,7 +8,46 @@
   max-width: 100%;
 }
 
+/* Decorative Spider-Man web layer. It never captures taps or clicks. */
+.site-web-decoration {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.site-web {
+  position: absolute;
+  width: 270px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: .09;
+  background:
+    repeating-radial-gradient(circle, transparent 0 20px, rgba(219, 234, 254, .85) 21px 22px),
+    repeating-conic-gradient(from 0deg, rgba(219, 234, 254, .9) 0 1deg, transparent 1deg 20deg);
+  filter: drop-shadow(0 0 5px rgba(96, 165, 250, .2));
+  animation: siteWebBreathe 6s ease-in-out infinite;
+}
+
+.site-web-top-left { top: -165px; left: -150px; }
+.site-web-top-right { top: -190px; right: -135px; width: 320px; animation-delay: -2s; }
+.site-web-bottom-right { right: -175px; bottom: -165px; width: 340px; animation-delay: -4s; }
+
+@keyframes siteWebBreathe {
+  0%, 100% { opacity: .07; transform: scale(.98) rotate(-2deg); }
+  50% { opacity: .13; transform: scale(1.035) rotate(2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-web { animation: none; }
+}
+
 @media (max-width: 640px) {
+  .site-web { width: 210px; opacity: .08; }
+  .site-web-top-left { top: -135px; left: -125px; }
+  .site-web-top-right { top: -145px; right: -115px; width: 235px; }
+  .site-web-bottom-right { right: -135px; bottom: -125px; width: 250px; }
   .user-layout {
     width: 100%;
     overflow-x: clip;
@@ -103,6 +142,59 @@
   .user-layout .newsletter-form,
   .user-layout .global-ai-chat-form {
     width: 100%;
+  }
+
+  /* Compact, consistent page navigation on phones. */
+  .user-layout .blog-user-page { padding: 12px; }
+  .user-layout .blog-detail-page,
+  .user-layout .news-detail-page { padding: 14px 12px 40px; }
+
+  .user-layout .blog-user-page .blog-breadcrumb,
+  .user-layout .news-page .news-breadcrumb,
+  .user-layout .film-page > .breadcrumb,
+  .user-layout .cinema-page > .breadcrumb {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    margin: 0 auto 14px;
+    padding: 6px 8px;
+    gap: 8px;
+    border: 1px solid rgba(148, 163, 184, .1);
+    border-radius: 11px;
+    background: rgba(15, 23, 42, .55);
+    font-size: 13px;
+    flex-wrap: nowrap;
+  }
+
+  .user-layout :is(.blog-breadcrumb, .news-breadcrumb, .film-page > .breadcrumb, .cinema-page > .breadcrumb) .back-btn {
+    flex: 0 0 auto;
+    min-height: 32px !important;
+    padding: 5px 9px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .user-layout :is(.blog-breadcrumb, .news-breadcrumb, .film-page > .breadcrumb, .cinema-page > .breadcrumb) .breadcrumb-items {
+    min-width: 0;
+    gap: 6px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .user-layout :is(.blog-breadcrumb, .news-breadcrumb, .film-page > .breadcrumb, .cinema-page > .breadcrumb) .current {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .user-layout .blog-detail-breadcrumb,
+  .user-layout .news-detail-breadcrumb {
+    gap: 6px;
+    margin-bottom: 14px;
+    padding: 0 2px;
+    font-size: 12px;
+    line-height: 1.4;
   }
 }
 

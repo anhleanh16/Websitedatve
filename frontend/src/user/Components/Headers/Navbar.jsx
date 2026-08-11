@@ -231,6 +231,21 @@ export default function Navbar() {
   return (
     <header className={`navbar-container${scrolled ? ' scrolled' : ''}${(guestNeedsAuthentication || emailUnlinked || emailNeedsVerification) && !emailAlertDismissed ? ' has-email-alert' : ''}`}>
 
+      <div className='header-spider-scene' aria-hidden='true'>
+        <span className='header-spider-thread'>
+          <span className='header-falling-spider'>🕷️</span>
+        </span>
+      </div>
+
+      <div className='header-spiderman-swing' aria-hidden='true'>
+        <span className='header-spiderman-rope' />
+        <span className='header-spiderman-hero'>
+          <span className='header-spiderman-mask' />
+          <span className='header-spiderman-body' />
+          <span className='header-spiderman-legs' />
+        </span>
+      </div>
+
       {/* Logo */}
       <Link to='/' className='nav-logo'>
         <img src='/sweetstar.png' alt='Sweetstar Cinema' />

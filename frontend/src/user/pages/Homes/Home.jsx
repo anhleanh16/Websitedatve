@@ -497,6 +497,9 @@ export default function Home() {
   }, [selectedCinemaId, showtimeTab])
 
   const featuredMovies = movieTab === 'soon' ? comingSoon : nowShowing
+  const spiderManMovie = [...nowShowing, ...comingSoon].find((movie) =>
+    /spider[\s-]?man|người nhện/i.test(String(movie.title || '')),
+  )
   const heroSlides = useMemo(
     () => buildHeroSlides([...nowShowing, ...comingSoon]),
     [nowShowing, comingSoon],
@@ -961,6 +964,24 @@ export default function Home() {
             </div>
             <div className='hero-counter'>{slide + 1} / {heroSlides.length}</div>
           </div>
+
+          {/* Spider-Man event */}
+          <Link
+            className='spiderman-event'
+            to={spiderManMovie ? `/movie/${spiderManMovie.id}` : '/Films/Film'}
+            aria-label='Khám phá sự kiện Spider-Man: Khởi Đầu Mới'
+          >
+            <span className='spiderman-web web-left' aria-hidden='true' />
+            <span className='spiderman-web web-right' aria-hidden='true' />
+            <span className='spiderman-swing-line' aria-hidden='true'>🕷️</span>
+            <span className='spiderman-event-sweep' aria-hidden='true' />
+            <div className='spiderman-event-content'>
+              <span className='spiderman-event-kicker'>SỰ KIỆN ĐẶC BIỆT</span>
+              <h2>SPIDER-MAN: KHỞI ĐẦU MỚI</h2>
+              <p>Khám phá hành trình mới, lịch chiếu và trải nghiệm điện ảnh đầy kịch tính.</p>
+            </div>
+            <span className='spiderman-event-cta'>Khám phá ngay <span>→</span></span>
+          </Link>
 
           {/* Phim nổi bật */}
           <div className='movies-block'>

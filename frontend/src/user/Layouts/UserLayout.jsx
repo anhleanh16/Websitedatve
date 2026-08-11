@@ -14,6 +14,11 @@ export default function UserLayout() {
 
   return (
     <div className='user-layout'>
+      <div className='site-web-decoration' aria-hidden='true'>
+        <span className='site-web site-web-top-left' />
+        <span className='site-web site-web-top-right' />
+        <span className='site-web site-web-bottom-right' />
+      </div>
       <Navbar />
       <main className='main-content'>
         <Outlet />
