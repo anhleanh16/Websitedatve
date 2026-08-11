@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { saveBannerImage } from "../../utils/bannerImageStore";
+import { saveBannerImage } from "../../../utils/bannerImageStore";
 
 const initialBanners = [
   {

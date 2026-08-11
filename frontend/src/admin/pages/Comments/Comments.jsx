@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { reviewService } from '../../services/reviewService'
+import { reviewService } from '../../../services/reviewService'
 import './comment-management.css'
 
 export default function Comments() {

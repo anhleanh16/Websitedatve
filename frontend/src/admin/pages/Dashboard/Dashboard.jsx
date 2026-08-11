@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { adminDashboardService, adminStatisticsService } from "../services/adminApi";
-import "../admin.css";
+import { adminDashboardService, adminStatisticsService } from "../../services/adminApi";
+import "../../admin.css";
 
 function formatCurrency(amount) {
   const num = Number(amount) || 0;

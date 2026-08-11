@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { adminNewsService } from "../services/adminApi";
-import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
-import { toAbsoluteAssetUrl } from "../../utils/api";
+import { adminNewsService } from "../../services/adminApi";
+import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import { toAbsoluteAssetUrl } from "../../../utils/api";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import "./news-management.css";

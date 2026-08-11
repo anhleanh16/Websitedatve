@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { adminNotificationService } from "../services/adminApi";
+import { adminNotificationService } from "../../services/adminApi";
 import { useSelector } from "react-redux";
 
 const TYPE_OPTIONS = [

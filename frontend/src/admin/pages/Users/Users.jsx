@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { adminUserService } from "../services/adminApi.js";
-import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
-import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../utils/birthDate.js";
+import { adminUserService } from "../../services/adminApi.js";
+import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../../utils/birthDate.js";
 import "./users.css";
 
 const MEMBERSHIP_LEVELS = [

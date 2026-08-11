@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import './staff.css';
-import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
-import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../utils/birthDate.js";
+import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../../utils/birthDate.js";
 import {
   adminBookingService,
   adminUserService,
@@ -11,7 +11,7 @@ import {
   adminSeatService,
   adminComboService,
   adminEmployeeService,
-} from "../services/adminApi.js";
+} from "../../services/adminApi.js";
 
 const API_ORIGIN = (() => {
   const base = import.meta.env.VITE_API_URL || "/api";

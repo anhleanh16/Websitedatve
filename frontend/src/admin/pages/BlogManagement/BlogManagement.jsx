@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { FaPlus, FaEdit, FaTrash, FaCheck, FaTimes } from 'react-icons/fa'
 import { CKEditor } from '@ckeditor/ckeditor5-react'
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic'
-import { blogService } from '../../user/services/blogService'
-import AdminPagination, { useAdminPagination } from '../components/AdminPagination.jsx'
+import { blogService } from '../../../user/services/blogService'
+import AdminPagination, { useAdminPagination } from '../../components/AdminPagination.jsx'
 import './blog-management.css'
 
 const slugify = (value = '') =>

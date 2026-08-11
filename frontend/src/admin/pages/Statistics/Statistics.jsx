@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { adminStatisticsService } from "../services/adminApi";
-import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
+import { adminStatisticsService } from "../../services/adminApi";
+import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 import "./statistics.css";
 
 const EMPTY_ITEMS = [];

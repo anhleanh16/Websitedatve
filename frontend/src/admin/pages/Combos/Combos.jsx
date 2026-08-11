@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { adminComboService } from "../services/adminApi";
-import AdminPagination, { useAdminPagination } from "../components/AdminPagination.jsx";
+import { adminComboService } from "../../services/adminApi";
+import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 import "./combos.css";
 
 const CATEGORY_LABELS = {

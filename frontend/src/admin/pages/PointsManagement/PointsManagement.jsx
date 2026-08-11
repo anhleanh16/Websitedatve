@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { pointsService } from '../services/pointsService';
+import { pointsService } from '../../services/pointsService';
 import './points-management.css';
 
 const defaultLevelForm = { levelName: '', minPoints: 0, maxPoints: 999999, benefits: '', discountPercent: 0 };

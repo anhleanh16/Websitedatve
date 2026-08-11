@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { adminCinemaService, adminRoomService, adminSeatService } from "../services/adminApi";
+import { adminCinemaService, adminRoomService, adminSeatService } from "../../services/adminApi";
 
 function parseSeatCode(code) {
   const m = String(code || "").trim().match(/^([A-Za-z]+)(\d+)$/);
