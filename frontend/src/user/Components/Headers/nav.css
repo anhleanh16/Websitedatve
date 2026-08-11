@@ -1266,6 +1266,39 @@
 }
 
 /* ── Rich Search Dropdown ── */
+/* Keep this after the desktop bell rules so mobile positioning wins the
+   cascade and the panel always remains inside the viewport. */
+@media (max-width: 768px) {
+  .bell-dropdown {
+    position: fixed;
+    top: 74px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100svh - 86px);
+    border-radius: 16px;
+    transform-origin: top center;
+  }
+
+  .bell-list {
+    max-height: calc(100svh - 190px);
+  }
+}
+
+@media (max-width: 480px) {
+  .bell-dropdown {
+    top: 68px;
+    right: 8px;
+    left: 8px;
+    max-height: calc(100svh - 76px);
+  }
+
+  .bell-list {
+    max-height: calc(100svh - 182px);
+  }
+}
+
 .search-results-rich {
   min-width: 340px;
   max-height: 480px;
