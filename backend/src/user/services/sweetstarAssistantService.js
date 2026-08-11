@@ -42,21 +42,21 @@ export const getSweetstarKnowledge = async (question = '') => {
   }
 
   const [movies, cinemas, showtimes, combos, promotions] = await Promise.all([
-    safeQuery(`
+    (wantsMovies || wantsShowtimes || isGeneralQuestion) ? safeQuery(`
       SELECT title, status, duration, age_limit, language
       FROM Movies
       WHERE status IN ('now_showing', 'coming_soon')
       ORDER BY FIELD(status, 'now_showing', 'coming_soon'), release_date ASC, movie_id DESC
       LIMIT 8
-    `),
-    safeQuery(`
+    `) : Promise.resolve([]),
+    (wantsCinemas || wantsShowtimes) ? safeQuery(`
       SELECT cinema_name, address, city, phone
       FROM Cinemas
       WHERE status = 'active'
       ORDER BY cinema_name ASC
       LIMIT 6
-    `),
-    safeQuery(`
+    `) : Promise.resolve([]),
+    (wantsShowtimes || isGeneralQuestion) ? safeQuery(`
       SELECT m.title AS movie_title, c.cinema_name, r.room_name, r.room_type,
              s.start_time, s.available_seats, s.price AS price
       FROM Showtimes s
@@ -66,15 +66,15 @@ export const getSweetstarKnowledge = async (question = '') => {
       WHERE s.status = 'active' AND s.start_time >= NOW()
       ORDER BY s.start_time ASC
       LIMIT 12
-    `),
-    safeQuery(`
+    `) : Promise.resolve([]),
+    wantsCombos ? safeQuery(`
       SELECT combo_name, description, price
       FROM Combos
       WHERE is_active = 1
       ORDER BY sort_order ASC, combo_id ASC
       LIMIT 6
-    `),
-    safeQuery(`
+    `) : Promise.resolve([]),
+    (wantsPromotions || wantsCombos) ? safeQuery(`
       SELECT code, title, description, discount_type, discount_value, min_order, end_date
       FROM Promotions
       WHERE status = 'active'
@@ -82,7 +82,7 @@ export const getSweetstarKnowledge = async (question = '') => {
         AND (end_date IS NULL OR end_date >= CURDATE())
       ORDER BY end_date ASC
       LIMIT 6
-    `),
+    `) : Promise.resolve([]),
   ])
 
   const timestamp = `THỜI ĐIỂM DỮ LIỆU: ${new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'full', timeStyle: 'short' }).format(new Date())}.`

@@ -190,3 +190,68 @@
   animation: pr-spin 1s linear infinite;
   margin-right: 6px;
 }
+
+@media (max-width: 640px) {
+  html:has(.pr-page),
+  body:has(.pr-page),
+  #root:has(.pr-page),
+  .user-layout:has(.pr-page),
+  .main-content:has(.pr-page) {
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .user-layout .pr-page,
+  .user-layout .pr-page * {
+    box-sizing: border-box;
+  }
+
+  .user-layout .pr-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 20px 12px 48px;
+    overflow-x: clip;
+  }
+
+  .user-layout .pr-card,
+  .user-layout .pr-ticket {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .user-layout .pr-card {
+    padding: 1.4rem 1rem;
+    border-radius: 18px;
+  }
+
+  .user-layout .pr-row {
+    display: grid;
+    grid-template-columns: minmax(82px, auto) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .user-layout .pr-row span {
+    white-space: normal;
+  }
+
+  .user-layout .pr-row strong {
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .user-layout .pr-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .user-layout .pr-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+}

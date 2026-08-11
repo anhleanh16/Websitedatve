@@ -546,6 +546,205 @@
   .pay-bank-grid-full { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* Final phone layout: prevent the stepper and long booking values from
+   defining a width wider than the viewport. */
+@media (max-width: 640px) {
+  html:has(.pay-page),
+  body:has(.pay-page),
+  #root:has(.pay-page),
+  .user-layout:has(.pay-page),
+  .main-content:has(.pay-page) {
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .user-layout .pay-page,
+  .user-layout .pay-page * {
+    box-sizing: border-box;
+  }
+
+  .user-layout .pay-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 16px 12px 48px;
+    overflow-x: clip;
+  }
+
+  .user-layout .pay-layout,
+  .user-layout .pay-left,
+  .user-layout .pay-right,
+  .user-layout .pay-card,
+  .user-layout .pay-summary {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .user-layout .pay-breadcrumb {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px 12px;
+    min-width: 0;
+    line-height: 1.4;
+  }
+
+  .user-layout .pay-breadcrumb button {
+    min-height: 40px;
+    padding: 6px 10px;
+  }
+
+  .user-layout .pay-stepper {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+    width: 100%;
+    margin: 4px 0 20px;
+  }
+
+  .user-layout .pay-step {
+    min-width: 0;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 5px;
+    text-align: center;
+    font-size: 0.72rem;
+    line-height: 1.25;
+  }
+
+  .user-layout .pay-step-line {
+    display: none;
+  }
+
+  .user-layout .pay-step-dot {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+  }
+
+  .user-layout .pay-summary,
+  .user-layout .pay-card {
+    padding: 15px;
+    border-radius: 15px;
+  }
+
+  .user-layout .pay-movie-row {
+    align-items: flex-start;
+  }
+
+  .user-layout .pay-movie-row > div:last-child {
+    min-width: 0;
+  }
+
+  .user-layout .pay-movie-name {
+    font-size: 0.88rem;
+    overflow-wrap: anywhere;
+  }
+
+  .user-layout .pay-info-row {
+    display: grid;
+    grid-template-columns: minmax(80px, auto) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .user-layout .pay-info-row span {
+    white-space: normal;
+  }
+
+  .user-layout .pay-info-row b {
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .user-layout .pay-food-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px 0;
+  }
+
+  .user-layout .pay-food-row span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .user-layout .pay-price-row,
+  .user-layout .pay-total-row {
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .user-layout .pay-price-row strong,
+  .user-layout .pay-total-row strong {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .user-layout .pay-total-row strong {
+    font-size: 1.15rem;
+  }
+
+  .user-layout .pay-method-item {
+    display: grid;
+    grid-template-columns: 18px 38px minmax(0, 1fr);
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+  }
+
+  .user-layout .pay-method-body {
+    min-width: 0;
+  }
+
+  .user-layout .pay-method-sub {
+    overflow-wrap: anywhere;
+  }
+
+  .user-layout .pay-method-tag,
+  .user-layout .pay-method-badges {
+    grid-column: 2 / -1;
+    justify-self: start;
+    white-space: normal;
+    flex-wrap: wrap;
+  }
+
+  .user-layout .pay-promo-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .user-layout .pay-promo-row input {
+    width: auto;
+    min-width: 0;
+  }
+
+  .user-layout .zlp-amount-row,
+  .user-layout .pay-bank-selected-row {
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .user-layout .zlp-amount-row strong,
+  .user-layout .pay-bank-selected-row b {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .user-layout .pay-bank-grid,
+  .user-layout .pay-bank-grid-full {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 /* Individual bank item */
 .pay-bank-item {
   display: flex;

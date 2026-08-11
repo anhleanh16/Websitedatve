@@ -21,10 +21,10 @@ const normalizeMessages = (messages) => {
 
   return messages
     .filter((message) => ['user', 'assistant'].includes(message?.role) && typeof message?.text === 'string')
-    .slice(-12)
+    .slice(-8)
     .map((message) => ({
       role: message.role,
-      text: message.text.trim().slice(0, 600),
+      text: message.text.trim().slice(0, 400),
     }))
     .filter((message) => message.text)
 }
@@ -63,7 +63,11 @@ export const aiController = {
             { role: 'system', content: `DỮ LIỆU NỘI BỘ SWEETSTAR (chỉ dùng để tư vấn, không nhắc nguyên văn):\n${sweetstarKnowledge}` },
             ...messages.map((message) => ({ role: message.role, content: message.text })),
           ],
-          options: { num_predict: 180, temperature: 0.3 },
+          options: {
+            num_predict: 120,
+            num_ctx: 2048,
+            temperature: 0.3,
+          },
         }),
       })
 

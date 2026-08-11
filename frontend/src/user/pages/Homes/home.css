@@ -1945,3 +1945,63 @@
     border-color: rgba(124, 97, 255, 0.18);
   }
 }
+
+@media (max-width: 640px) {
+  html:has(.home-page),
+  body:has(.home-page),
+  #root:has(.home-page),
+  .user-layout:has(.home-page),
+  .main-content:has(.home-page) {
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .user-layout .home-page,
+  .user-layout .home-page * {
+    box-sizing: border-box;
+  }
+
+  .user-layout .home-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .user-layout .home-page .main-layout,
+  .user-layout .home-page .col-left,
+  .user-layout .home-page .col-right,
+  .user-layout .home-page .hero-slider,
+  .user-layout .home-page .movies-block,
+  .user-layout .home-page .movies-grid,
+  .user-layout .home-page .showtime-card,
+  .user-layout .home-page .news-block,
+  .user-layout .home-page .home-blog-block,
+  .user-layout .home-page .quick-book,
+  .user-layout .home-page .deals-card,
+  .user-layout .home-page .ad-mini-banner {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .user-layout .home-page .sec-header,
+  .user-layout .home-page .sec-tabs,
+  .user-layout .home-page .movie-card,
+  .user-layout .home-page .movie-info,
+  .user-layout .home-page .showtime-format-tabs,
+  .user-layout .home-page .news-card,
+  .user-layout .home-page .quick-book-step {
+    min-width: 0;
+  }
+
+  .user-layout .home-page .hero-blob {
+    max-width: none;
+  }
+
+  .user-layout .home-page .ai-mini-chat {
+    max-width: calc(100vw - 0.96rem);
+  }
+}
