@@ -130,7 +130,7 @@ const SIDEBAR_ITEMS = [
   { key: 'notifs',    label: 'Thông báo',           icon: <FaBell /> },
   { key: 'member',    label: 'Thành viên',          icon: <FaCrown />, link: '/Membership' },
   { key: 'support',   label: 'Hỗ trợ',             icon: <FaHeadset /> },
-  { key: 'ai',        label: 'Chatbox AI',          icon: <FaRobot />, link: '/?chatbox=1' },
+  { key: 'ai',        label: 'Chatbox AI',          icon: <FaRobot />, link: '/ai-assistant' },
 ]
 
 export default function Profile() {

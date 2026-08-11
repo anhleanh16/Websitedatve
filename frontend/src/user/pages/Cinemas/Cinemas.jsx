@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./Cinemas.css";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import QuickBookWidget from "../Components/QuickBookWidget/QuickBookWidget";
-import { userCinemaService } from "../services/userApi";
-import { getActiveHomeBanners, hydrateHomeBannerImages } from "../utils/homeBanners";
+import QuickBookWidget from "../../Components/QuickBookWidget/QuickBookWidget";
+import { userCinemaService } from "../../services/userApi";
+import { getActiveHomeBanners, hydrateHomeBannerImages } from "../../utils/homeBanners";
 
 const FALLBACK_BANNER = "/uploads/banners/banner1.jpg";
 

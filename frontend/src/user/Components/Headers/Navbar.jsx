@@ -233,8 +233,15 @@ export default function Navbar() {
 
       <div className='header-spider-scene' aria-hidden='true'>
         <span className='header-spider-thread'>
-          <span className='header-falling-spider'>🕷️</span>
+          <span className='header-falling-spider'>
+            <img
+              className='header-falling-spider-image'
+              src='/assets/effects/realistic-spider-alive-v2.webp'
+              alt=''
+            />
+          </span>
         </span>
+        <span className='header-spider-impact' />
       </div>
 
       <div className='header-spiderman-swing' aria-hidden='true'>

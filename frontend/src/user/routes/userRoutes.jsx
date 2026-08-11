@@ -10,7 +10,7 @@ import News from "../pages/News/News";
 import NewsDetail from "../pages/News/NewsDetail";
 import Blog from "../pages/Blog/Blog";
 import BlogDetail from "../pages/Blog/BlogDetail";
-import Cinemas from "../pages/Cinemas";
+import Cinemas from "../pages/Cinemas/Cinemas";
 import Notifications from "../pages/Notifications/Notifications";
 import Profile from "../pages/Profiles/Profile";
 import Login from "../pages/Logins/Login";
@@ -19,11 +19,19 @@ import ResetPassword from "../pages/Logins/ResetPassword";
 import Register from "../pages/Registers/Register";
 import InitialPassword from "../pages/InitialPassword/InitialPassword";
 import Membership from "../pages/Membership/Membership";
+import MobileAiChatPage from "../pages/AiChat/MobileAiChatPage";
 import UserLayout from "../Layouts/UserLayout";
+
+function AiAssistantEntry() {
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  return <Navigate to={isMobile ? '/ai-chat' : '/?chatbox=1'} replace />;
+}
 
 export function UserRoutes() {
   return (
     <Routes>
+      <Route path="/ai-chat" element={<MobileAiChatPage />} />
+      <Route path="/ai-assistant" element={<AiAssistantEntry />} />
       <Route element={<UserLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/Moviedetails/MovieDetail" caseSensitive={false} element={<MovieDetail />} />
@@ -39,7 +47,6 @@ export function UserRoutes() {
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
         <Route path="/cinemas" element={<Cinemas />} />
-        <Route path="/ai-assistant" element={<Navigate to='/?chatbox=1' replace />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/login" element={<Login />} />

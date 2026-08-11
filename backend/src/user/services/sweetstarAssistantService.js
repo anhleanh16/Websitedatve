@@ -3,6 +3,12 @@ import { db } from '../../../config/db.js'
 const KNOWLEDGE_CACHE_MS = 60 * 1000
 const knowledgeCache = new Map()
 
+const MOVIE_CARD_INTENT = /phim|xem gi|goi y|de xuat|tu van|lich chieu|suat chieu|dat ve|dien vien|dao dien|the loai|hoat hinh|hanh dong|kinh di|tinh cam|hai|gia dinh/
+const SEARCH_STOP_WORDS = new Set([
+  'phim', 'xem', 'gi', 'nao', 'hay', 'cho', 'toi', 'minh', 'ban', 'co', 'khong', 'mot', 'nhung',
+  'dang', 'sap', 'chieu', 'goi', 'y', 'de', 'xuat', 'tu', 'van', 've', 'lich', 'suat', 'the', 'loai',
+])
+
 const clean = (value, max = 150) => String(value ?? '')
   .replace(/\s+/g, ' ')
   .trim()
@@ -24,6 +30,97 @@ const safeQuery = async (sql, params = []) => {
     console.warn('Sweetstar AI data query skipped:', error?.code || error?.message)
     return []
   }
+}
+
+const normalizeSearchText = (value) => clean(value, 500)
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd')
+  .replace(/[^a-z0-9]+/gi, ' ')
+  .trim()
+  .toLowerCase()
+
+export const getMovieRecommendations = async (question = '') => {
+  const normalizedQuestion = normalizeSearchText(question)
+  if (!MOVIE_CARD_INTENT.test(normalizedQuestion)) return []
+
+  const movies = await safeQuery(`
+    SELECT
+      m.movie_id,
+      m.title,
+      m.poster,
+      m.description,
+      m.duration,
+      m.age_limit,
+      m.status,
+      m.release_date,
+      COALESCE(
+        GROUP_CONCAT(DISTINCT mc.category_name ORDER BY mc.category_name SEPARATOR ', '),
+        ''
+      ) AS categories,
+      COALESCE(ROUND(AVG(r.rating), 1), 0) AS rating,
+      COUNT(DISTINCT r.review_id) AS review_count
+    FROM Movies m
+    LEFT JOIN Movie_Category_Detail mcd ON m.movie_id = mcd.movie_id
+    LEFT JOIN Movie_Categories mc ON mc.category_id = mcd.category_id
+    LEFT JOIN Reviews r ON r.movie_id = m.movie_id
+    WHERE m.is_deleted = 0
+      AND m.is_hidden = 0
+      AND m.status IN ('now_showing', 'coming_soon')
+    GROUP BY
+      m.movie_id, m.title, m.poster, m.description, m.duration, m.age_limit,
+      m.status, m.release_date
+    ORDER BY
+      FIELD(m.status, 'now_showing', 'coming_soon'),
+      rating DESC,
+      m.release_date DESC,
+      m.movie_id DESC
+    LIMIT 36
+  `)
+
+  if (!movies.length) return []
+
+  const queryTokens = normalizedQuestion
+    .split(' ')
+    .filter((token) => token.length > 1 && !SEARCH_STOP_WORDS.has(token))
+  const wantsComingSoon = /sap chieu|chua chieu|coming soon/.test(normalizedQuestion)
+  const wantsNowShowing = /dang chieu|hom nay|dat ve|lich chieu|suat chieu/.test(normalizedQuestion)
+
+  const rankedMovies = movies.map((movie, index) => {
+    const title = normalizeSearchText(movie.title)
+    const categories = normalizeSearchText(movie.categories)
+    const description = normalizeSearchText(movie.description)
+    let score = Number(movie.rating || 0) + Math.max(0, 4 - index * 0.08)
+
+    queryTokens.forEach((token) => {
+      if (title.includes(token)) score += 8
+      if (categories.includes(token)) score += 5
+      if (description.includes(token)) score += 1
+    })
+
+    if (wantsComingSoon && movie.status === 'coming_soon') score += 10
+    if (wantsNowShowing && movie.status === 'now_showing') score += 10
+
+    return { movie, score }
+  })
+
+  return rankedMovies
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 4)
+    .map(({ movie }) => ({
+      id: Number(movie.movie_id),
+      title: clean(movie.title, 180),
+      poster: clean(movie.poster, 500),
+      duration: Number(movie.duration || 0),
+      ageLimit: clean(movie.age_limit, 20),
+      status: movie.status,
+      categories: clean(movie.categories, 160)
+        .split(',')
+        .map((category) => category.trim())
+        .filter(Boolean),
+      rating: Number(movie.review_count || 0) > 0 ? Number(movie.rating || 0) : null,
+      reviewCount: Number(movie.review_count || 0),
+    }))
 }
 
 export const getSweetstarKnowledge = async (question = '') => {

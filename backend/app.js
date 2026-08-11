@@ -12,10 +12,11 @@ import reviewRoutes from './src/admin/routes/reviewRoutes.js';
 import pointsRoutes from './src/admin/routes/pointsRoutes.js';
 import aiRoutes from './src/user/routes/aiRoutes.js';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Always load the backend environment file, regardless of the process working directory.
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 

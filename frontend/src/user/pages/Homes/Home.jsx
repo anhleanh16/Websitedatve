@@ -916,7 +916,7 @@ export default function Home() {
           )}
 
           <div className='ai-mini-footer'>
-            <Link to='/?chatbox=1' className='ai-mini-full-link'>Mở chatbox ở trang chủ</Link>
+            <Link to='/ai-assistant' className='ai-mini-full-link'>Mở AI Assistant</Link>
           </div>
         </section>
       )}

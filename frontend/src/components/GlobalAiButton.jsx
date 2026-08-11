@@ -1,76 +1,74 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
-import { FaMicrophone, FaPaperPlane, FaRobot, FaStop, FaTimes } from 'react-icons/fa'
-
-const API_BASE = import.meta.env.VITE_API_URL || '/api'
+import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  FaMicrophone,
+  FaPaperPlane,
+  FaRobot,
+  FaStop,
+  FaTimes,
+  FaVolumeUp,
+} from 'react-icons/fa'
+import AiMovieCards from './ai/AiMovieCards'
+import useAiAssistant from './ai/useAiAssistant'
 
 export default function GlobalAiButton() {
   const location = useLocation()
   const isAdminRoute = location.pathname.startsWith('/admin')
-  const [isOpen, setIsOpen] = useState(false)
-  const [input, setInput] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
-  const [isListening, setIsListening] = useState(false)
-  const [voiceStatus, setVoiceStatus] = useState('')
-  const [messages, setMessages] = useState([
-    { id: 'welcome', role: 'assistant', text: 'Xin chào, mình có thể hỗ trợ gì cho bạn?' },
-  ])
-  const speechRecognitionRef = useRef(null)
-  const messagesEndRef = useRef(null)
+  const isMobileChatRoute = location.pathname === '/ai-chat'
 
-  useEffect(() => () => {
-    speechRecognitionRef.current?.abort?.()
-    window.speechSynthesis?.cancel?.()
-  }, [])
+  if (isAdminRoute || isMobileChatRoute) return null
+  return <GlobalAiWidget autoOpen={new URLSearchParams(location.search).get('chatbox') === '1'} />
+}
+
+function GlobalAiWidget({ autoOpen = false }) {
+  const navigate = useNavigate()
+  const [isOpen, setIsOpen] = useState(false)
+  const messagesEndRef = useRef(null)
+  const {
+    input,
+    setInput,
+    messages,
+    isTyping,
+    isListening,
+    speakingMessageId,
+    voiceStatus,
+    sendMessage,
+    speakReply,
+    stopSpeaking,
+    toggleVoiceChat,
+    stopVoiceInput,
+  } = useAiAssistant()
 
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [isOpen, messages, isTyping])
 
-  const speakReply = (text) => {
-    if (!window.speechSynthesis) return
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'vi-VN'
-    utterance.rate = 1
-    window.speechSynthesis.cancel()
-    window.speechSynthesis.speak(utterance)
+  useEffect(() => {
+    if (autoOpen && !window.matchMedia('(max-width: 768px)').matches) setIsOpen(true)
+  }, [autoOpen])
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 768px)')
+    const closeDesktopPopupOnMobile = (event) => {
+      if (event.matches) setIsOpen(false)
+    }
+    mediaQuery.addEventListener?.('change', closeDesktopPopupOnMobile)
+    return () => mediaQuery.removeEventListener?.('change', closeDesktopPopupOnMobile)
+  }, [])
+
+  const openAssistant = () => {
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      setIsOpen(false)
+      navigate('/ai-chat')
+      return
+    }
+    setIsOpen((current) => !current)
   }
 
-  const sendMessage = (rawMessage, readReply = false) => {
-    const message = String(rawMessage || '').trim()
-    if (!message || isTyping) return
-
-    setMessages((current) => [...current, { id: `user-${Date.now()}`, role: 'user', text: message }])
-    setInput('')
-    setIsTyping(true)
-
-    const history = [...messages, { role: 'user', text: message }]
-    const token = localStorage.getItem('token')
-
-    fetch(`${API_BASE}/ai/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ messages: history }),
-    })
-      .then(async (response) => {
-        const data = await response.json().catch(() => null)
-        if (!response.ok) throw new Error(data?.message || 'AI Assistant đang tạm thời không phản hồi.')
-        return data?.message
-      })
-      .then((reply) => {
-        setMessages((current) => [...current, { id: `assistant-${Date.now()}`, role: 'assistant', text: reply }])
-        if (readReply) {
-          setVoiceStatus('AI đang đọc câu trả lời...')
-          speakReply(reply)
-        }
-      })
-      .catch((error) => {
-        setMessages((current) => [...current, { id: `assistant-error-${Date.now()}`, role: 'assistant', text: error.message || 'Không thể kết nối AI Assistant. Vui lòng thử lại sau.' }])
-      })
-      .finally(() => setIsTyping(false))
+  const closeChat = () => {
+    stopVoiceInput()
+    stopSpeaking()
+    setIsOpen(false)
   }
 
   const handleSubmit = (event) => {
@@ -78,59 +76,12 @@ export default function GlobalAiButton() {
     sendMessage(input)
   }
 
-  const toggleVoiceChat = () => {
-    if (isListening) {
-      speechRecognitionRef.current?.stop?.()
-      return
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      setVoiceStatus('Trình duyệt chưa hỗ trợ nhận diện giọng nói. Hãy dùng Chrome hoặc Edge.')
-      return
-    }
-
-    const recognition = new SpeechRecognition()
-    recognition.lang = 'vi-VN'
-    recognition.interimResults = false
-    recognition.continuous = false
-    recognition.onstart = () => {
-      setIsListening(true)
-      setVoiceStatus('Đang lắng nghe... Hãy nói câu hỏi của bạn.')
-    }
-    recognition.onresult = (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript?.trim()
-      if (transcript) {
-        setVoiceStatus(`Đã nhận: “${transcript}”`)
-        sendMessage(transcript, true)
-      }
-    }
-    recognition.onerror = (event) => {
-      const message = event.error === 'not-allowed'
-        ? 'Bạn chưa cho phép dùng microphone.'
-        : 'Không thể nhận diện giọng nói. Vui lòng thử lại.'
-      setVoiceStatus(message)
-    }
-    recognition.onend = () => setIsListening(false)
-    speechRecognitionRef.current = recognition
-    recognition.start()
-  }
-
-  const closeChat = () => {
-    speechRecognitionRef.current?.abort?.()
-    window.speechSynthesis?.cancel?.()
-    setIsListening(false)
-    setIsOpen(false)
-  }
-
-  if (isAdminRoute) return null
-
   return (
     <>
       <button
         type='button'
         className={`global-ai-button${isOpen ? ' is-open' : ''}`}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={openAssistant}
         aria-label='Mở AI Assistant'
         aria-expanded={isOpen}
         aria-controls='global-ai-chat'
@@ -150,16 +101,32 @@ export default function GlobalAiButton() {
               <button type='button' onClick={closeChat} aria-label='Đóng AI Assistant'><FaTimes /></button>
             </div>
           </header>
+
           <div className='global-ai-chat-messages'>
             {messages.map((message) => (
-              <p key={message.id} className={`global-ai-message ${message.role}`}>{message.text}</p>
+              <div key={message.id} className={`global-ai-message-group ${message.role}`}>
+                <p className={`global-ai-message ${message.role}`}>{message.text}</p>
+                {message.role === 'assistant' && message.text && (
+                  <button
+                    type='button'
+                    className={`global-ai-read-message${speakingMessageId === message.id ? ' is-speaking' : ''}`}
+                    onClick={() => (speakingMessageId === message.id ? stopSpeaking() : speakReply(message.text, message.id))}
+                    aria-label={speakingMessageId === message.id ? 'Dừng đọc câu trả lời' : 'Đọc câu trả lời bằng tiếng Việt'}
+                  >
+                    {speakingMessageId === message.id ? <FaStop /> : <FaVolumeUp />}
+                    {speakingMessageId === message.id ? 'Dừng' : 'Nghe'}
+                  </button>
+                )}
+                {message.role === 'assistant' && <AiMovieCards movies={message.movies} onNavigate={closeChat} />}
+              </div>
             ))}
             {isTyping && <p className='global-ai-message assistant typing'>AI đang trả lời...</p>}
             {voiceStatus && <p className='global-ai-voice-status'>{voiceStatus}</p>}
             <div ref={messagesEndRef} />
           </div>
+
           <form className='global-ai-chat-form' onSubmit={handleSubmit}>
-            <input value={input} onChange={(event) => setInput(event.target.value)} maxLength={300} placeholder='Nhập câu hỏi của bạn...' />
+            <input value={input} onChange={(event) => setInput(event.target.value)} maxLength={300} placeholder='Hỏi phim hay, lịch chiếu...' />
             <button type='submit' aria-label='Gửi câu hỏi' disabled={!input.trim() || isTyping}><FaPaperPlane /></button>
           </form>
         </section>
