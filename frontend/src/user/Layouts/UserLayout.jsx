@@ -13,7 +13,7 @@ export default function UserLayout() {
   }
 
   return (
-    <div>
+    <div className='user-layout'>
       <Navbar />
       <main className='main-content'>
         <Outlet />

@@ -470,7 +470,7 @@ export default function AdminBookings() {
 
   const tabs = [
     { key: "list",  label: "Danh sách vé" },
-    { key: "create", label: "➕ Đặt vé nhanh" },
+    { key: "create", label: "➕ Đặt vé" },
     { key: "check", label: "Kiểm tra vé", disabled: activeTab !== "check" && activeTab !== "detail" },
   ];
 
@@ -487,7 +487,7 @@ export default function AdminBookings() {
             onClick={() => setActiveTab("create")}
             style={{ padding: "10px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}
           >
-            🎟️ Đặt vé nhanh (cho khách hàng)
+            🎟️ Đặt vé (cho khách hàng)
           </button>
         </div>
       </div>

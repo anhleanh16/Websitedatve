@@ -1,0 +1,117 @@
+.user-layout,
+.user-layout * {
+  box-sizing: border-box;
+}
+
+.user-layout img,
+.user-layout video {
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .user-layout {
+    width: 100%;
+    overflow-x: clip;
+  }
+
+  .user-layout form,
+  .user-layout fieldset,
+  .user-layout .form-group,
+  .user-layout .ef-field {
+    min-width: 0;
+  }
+
+  .user-layout input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  .user-layout select,
+  .user-layout textarea {
+    width: 100%;
+    max-width: 100%;
+    min-height: 46px;
+    font-size: 16px;
+  }
+
+  .user-layout textarea {
+    min-height: 112px;
+    resize: vertical;
+  }
+
+  .user-layout button,
+  .user-layout input[type='submit'],
+  .user-layout input[type='button'] {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .user-layout input[type='checkbox'],
+  .user-layout input[type='radio'] {
+    flex: 0 0 auto;
+    min-width: 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  .user-layout .form-row,
+  .user-layout .edit-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .user-layout .auth-page {
+    min-height: calc(100svh - 64px);
+    padding: 24px 14px;
+    align-items: flex-start;
+  }
+
+  .user-layout .auth-container,
+  .user-layout .register-container {
+    max-width: none;
+  }
+
+  .user-layout .auth-card {
+    width: 100%;
+    padding: 24px 16px;
+    border-radius: 16px;
+  }
+
+  .user-layout .auth-header {
+    margin-bottom: 24px;
+  }
+
+  .user-layout .auth-form {
+    gap: 16px;
+  }
+
+  .user-layout .input-wrapper input {
+    padding-right: 46px;
+  }
+
+  .user-layout .register-otp-actions {
+    flex-direction: column;
+  }
+
+  .user-layout .register-otp-actions .submit-btn {
+    width: 100%;
+  }
+
+  .user-layout .terms-checkbox,
+  .user-layout label:has(> input[type='checkbox']),
+  .user-layout label:has(> input[type='radio']) {
+    align-items: flex-start;
+    line-height: 1.45;
+  }
+
+  .user-layout .rs-form-actions,
+  .user-layout .newsletter-form,
+  .user-layout .global-ai-chat-form {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .user-layout .auth-page {
+    padding-inline: 10px;
+  }
+
+  .user-layout .auth-card {
+    padding-inline: 14px;
+  }
+}

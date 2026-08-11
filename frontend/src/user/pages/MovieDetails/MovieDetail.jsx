@@ -75,6 +75,7 @@ export default function MovieDetail() {
 
   const [activeDay, setActiveDay] = useState(scheduleDays[0].key);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [showAllActors, setShowAllActors] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [showAllCinemas, setShowAllCinemas] = useState(false);
   const [activeCinema, setActiveCinema] = useState(null);
@@ -119,6 +120,11 @@ export default function MovieDetail() {
   const trailerSrc = movie?.trailer || '';
   const hasTrailer = Boolean(trailerSrc);
   const movieTitle = movie?.title || location.state?.movieTitle || '';
+  const actorsText = String(movie?.actors || '').trim();
+  const shouldCollapseActors = actorsText.length > 90;
+  const displayedActors = shouldCollapseActors && !showAllActors
+    ? actorsText.slice(0, 90).trimEnd()
+    : actorsText || '--';
 
   const galleryImages = [
     posterSrc,
@@ -131,6 +137,8 @@ export default function MovieDetail() {
 
   useEffect(() => {
     if (!id) return;
+
+    setShowAllActors(false);
 
     const loadMovie = async () => {
       setLoadingMovie(true);
@@ -643,7 +651,27 @@ export default function MovieDetail() {
                     </div>
                     <div className="movie-meta-row">
                       <p>Diễn viên</p>
-                      <strong>{movie?.actors || '--'}</strong>
+                      <div className="movie-actors-value">
+                        <strong>{displayedActors}</strong>
+                        {shouldCollapseActors && (
+                          <span
+                            className="movie-actors-toggle"
+                            onClick={() => setShowAllActors((current) => !current)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                setShowAllActors((current) => !current);
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            aria-expanded={showAllActors}
+                            aria-label={showAllActors ? 'Thu gọn danh sách diễn viên' : 'Xem toàn bộ danh sách diễn viên'}
+                          >
+                            {showAllActors ? 'Thu gọn' : '…'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

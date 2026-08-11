@@ -614,6 +614,36 @@ h1.movie-detail-title,
   font-size: 1rem;
 }
 
+.movie-actors-value {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+}
+
+.movie-detail-page .movie-actors-toggle {
+  display: inline;
+  margin: 0 0 0 0.35rem;
+  padding: 0;
+  color: #c4b5fd;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.movie-detail-page .movie-actors-toggle:hover {
+  color: #ede9fe;
+}
+
+.movie-detail-page .movie-actors-toggle:focus-visible {
+  outline: 1px solid #a78bfa;
+  outline-offset: 2px;
+}
+
 .movie-description-wrapper {
   display: flex;
   flex-direction: column;

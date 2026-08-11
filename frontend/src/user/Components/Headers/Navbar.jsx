@@ -229,7 +229,7 @@ export default function Navbar() {
   }
 
   return (
-    <header className={`navbar-container${scrolled ? ' scrolled' : ''}`}>
+    <header className={`navbar-container${scrolled ? ' scrolled' : ''}${(guestNeedsAuthentication || emailUnlinked || emailNeedsVerification) && !emailAlertDismissed ? ' has-email-alert' : ''}`}>
 
       {/* Logo */}
       <Link to='/' className='nav-logo'>
@@ -259,15 +259,17 @@ export default function Navbar() {
             <span>⚠</span>
             <span>{guestNeedsAuthentication ? 'Bạn chưa đăng nhập hoặc đăng kí. Vui lòng đăng nhập để đặt vé và dùng các tính năng khác.' : emailNeedsVerification ? 'Email đăng kí chưa được xác minh. Vui lòng xác minh để đặt vé và dùng các tính năng khác.' : 'Tài khoản chưa liên kết email. Vui lòng liên kết để đặt vé và dùng các tính năng khác.'}</span>
             {guestNeedsAuthentication ? (
-              <>
+              <div className='email-link-alert-actions'>
                 <button type='button' className='email-link-alert-action' onClick={() => navigate('/Logins/Login')}>Đăng nhập</button>
                 <span>hoặc</span>
                 <button type='button' className='email-link-alert-action' onClick={() => navigate('/Registers/Register')}>Đăng kí</button>
-              </>
+              </div>
             ) : (
-              <button type='button' className='email-link-alert-action' onClick={() => navigate('/profile?tab=edit')}>
-                {emailNeedsVerification ? 'Xác minh' : 'Liên kết'}
-              </button>
+              <div className='email-link-alert-actions'>
+                <button type='button' className='email-link-alert-action' onClick={() => navigate('/profile?tab=edit')}>
+                  {emailNeedsVerification ? 'Xác minh' : 'Liên kết'}
+                </button>
+              </div>
             )}
             <button type='button' className='email-link-alert-close' onClick={() => setEmailAlertDismissed(true)} aria-label='Đóng thông báo email'>
               <FaTimes />

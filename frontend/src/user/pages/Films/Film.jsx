@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import "./Film.css";
+import "./Film.css?v=20260811-1";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import QuickBookWidget from "../../Components/QuickBookWidget/QuickBookWidget";
 import { userMovieService } from "../../services/userApi";
@@ -278,24 +278,24 @@ export default function Film() {
                   <h2>{banners[currentBannerIndex]?.title}</h2>
                   <p>{banners[currentBannerIndex]?.subtitle}</p>
                 </div>
-              </div>
-              <div className="hero-controls">
-                <button className="hc" onClick={goToPrevBanner}>
-                  ‹
-                </button>
-                <button className="hc" onClick={goToNextBanner}>
-                  ›
-                </button>
-              </div>
-              <div className="banner-indicators">
-                {banners.map((_, idx) => (
-                  <button
-                    key={idx}
-                    className={`indicator ${idx === currentBannerIndex ? "active" : ""}`}
-                    onClick={() => handleBannerChange(idx)}
-                    aria-label={`Banner ${idx + 1}`}
-                  />
-                ))}
+                <div className="hero-controls">
+                  <button className="hc" onClick={goToPrevBanner} aria-label="Banner trước">
+                    ‹
+                  </button>
+                  <button className="hc" onClick={goToNextBanner} aria-label="Banner sau">
+                    ›
+                  </button>
+                </div>
+                <div className="banner-indicators">
+                  {banners.map((_, idx) => (
+                    <button
+                      key={idx}
+                      className={`indicator ${idx === currentBannerIndex ? "active" : ""}`}
+                      onClick={() => handleBannerChange(idx)}
+                      aria-label={`Banner ${idx + 1}`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
 

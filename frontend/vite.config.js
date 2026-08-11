@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      allowedHosts: ["sweetstarcinemar.qlinterior.shop"],
       proxy: {
         "/api": {
           target: backendTarget,

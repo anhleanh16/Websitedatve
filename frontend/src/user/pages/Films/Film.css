@@ -94,7 +94,7 @@
   position: relative;
   background: rgba(10, 14, 28, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  height: 452px;
+  height: auto;
   border-radius: 28px;
   padding: 22px;
   box-shadow: 0 26px 60px rgba(0, 0, 0, 0.24);
@@ -235,6 +235,7 @@
 .indicator {
   width: 24px;
   height: 5px;
+  min-height: 5px;
   padding: 0;
   border-radius: 999px;
   border: 0;
@@ -816,6 +817,94 @@
   }
 }
 
+@media (max-width: 800px) {
+  .film-page {
+    padding: 12px 0 48px;
+  }
+
+  .film-container {
+    width: 100%;
+    padding: 0 12px;
+  }
+
+  .film-left {
+    gap: 18px;
+  }
+
+  .film-page .hero {
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 10px;
+    border-radius: 18px;
+  }
+
+  .film-page .hero-carousel {
+    width: 100%;
+    height: auto !important;
+    min-height: 210px;
+    aspect-ratio: 16 / 9;
+    border-radius: 15px;
+  }
+
+  .hero-carousel .banner-content {
+    width: calc(100% - 64px);
+    max-width: calc(100% - 64px);
+    margin-left: 32px;
+    overflow: hidden;
+  }
+
+  .hero-carousel .banner-content h2,
+  .hero-carousel .banner-content p {
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+  }
+
+  .hero-carousel .banner-content h2 {
+    margin-bottom: 8px;
+    font-size: clamp(20px, 6vw, 26px);
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .hero-carousel .banner-content p {
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .hero-controls {
+    inset: 10px;
+    padding: 0 6px;
+  }
+
+  .hero-controls .hc {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+  }
+
+  .banner-indicators {
+    bottom: 18px;
+  }
+
+  .film-page button.indicator {
+    width: 20px;
+    height: 5px;
+    min-height: 5px !important;
+  }
+
+  .film-page .indicator.active {
+    width: 34px;
+  }
+
+  .tabs {
+    margin: 0 0 12px;
+  }
+}
+
 @media (max-width: 480px) {
   .film-page {
     padding: 16px 0;
@@ -834,10 +923,7 @@
   .tab {
     white-space: nowrap;
   }
-  .hero-carousel {
-    height: 200px;
-    border-radius: 18px;
-  }
+  .hero-carousel { min-height: 190px; }
   .hero-carousel .banner-content {
     max-width: calc(100% - 48px);
     margin-left: 24px;

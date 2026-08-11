@@ -19,9 +19,15 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://sweetstarcinemar.qlinterior.shop',
+];
+
 // CORS configuration for credential requests
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'], // Allow frontend origins
+  origin: allowedOrigins,
   credentials: true,                // Allow credentials
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
