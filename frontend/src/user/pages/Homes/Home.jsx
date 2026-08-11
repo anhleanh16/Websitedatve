@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import QuickBookWidget from '../../Components/QuickBookWidget/QuickBookWidget'
+import AutoMarqueeText from '../../Components/AutoMarqueeText/AutoMarqueeText'
 import {
   FaPlay, FaTicketAlt, FaStar, FaMapMarkerAlt, FaClock,
   FaFire, FaRobot, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt, FaEye, FaPaperPlane, FaTimes, FaMicrophone, FaStop
@@ -50,6 +51,14 @@ const HOME_NEWS_GROUPS = [
   { key: 'movie_news', label: 'Tin điện ảnh', color: '#7c3aed', icon: '🎬' },
   { key: 'promotion', label: 'Khuyến mãi', color: '#f59e0b', icon: '🎁' },
   { key: 'event', label: 'Sự kiện', color: '#22c55e', icon: '🎉' },
+  {
+    key: 'spotlight',
+    label: 'Nổi bật',
+    color: '#06b6d4',
+    icon: '✨',
+    categories: ['coming_soon', 'review', 'announcement'],
+    useLatestAsFallback: true,
+  },
 ]
 
 const HOME_BLOG_PRIORITY = ['guide', 'payment', 'cinema']
@@ -527,10 +536,18 @@ export default function Home() {
   )
   const groupedHomeNews = useMemo(
     () =>
-      HOME_NEWS_GROUPS.map((group) => ({
-        ...group,
-        items: homeNews.filter((item) => item.category === group.key).slice(0, 3),
-      })),
+      HOME_NEWS_GROUPS.map((group) => {
+        const categories = group.categories || [group.key]
+        const matchingItems = homeNews.filter((item) => categories.includes(item.category))
+
+        return {
+          ...group,
+          items: (matchingItems.length > 0 || !group.useLatestAsFallback
+            ? matchingItems
+            : homeNews
+          ).slice(0, 3),
+        }
+      }),
     [homeNews],
   )
   const featuredHomeBlogs = useMemo(() => {
@@ -1054,8 +1071,8 @@ export default function Home() {
                     <span className='movie-age'>{m.age}</span>
                   </div>
                   <div className='movie-info'>
-                    <div className='movie-title'>{m.title}</div>
-                    <div className='movie-genre'>{m.genre}</div>
+                    <AutoMarqueeText className='movie-title'>{m.title}</AutoMarqueeText>
+                    <AutoMarqueeText className='movie-genre'>{m.genre}</AutoMarqueeText>
                     <div className='movie-footer'>
                       <div className='movie-rating-wrap'>
                         {m.rating > 0 ? <StarRating rating={m.rating} /> : <FaStar style={{ color: '#475569', fontSize: '0.7rem' }} />}
@@ -1145,9 +1162,9 @@ export default function Home() {
                 </div>
               )}
               {groupedShowtimes.map(row => (
-                <div key={row.id} className='showtime-block'>
+                <div key={row.id} className='showtime-block showtime-movie-block'>
                   <div className='sb-movie-header'>
-                    <span className='sb-title'>{row.title}</span>
+                    <AutoMarqueeText as='span' className='sb-title'>{row.title}</AutoMarqueeText>
                     <span className='sb-format'
                       style={{
                         background: `${FORMAT_COLORS[row.format] || '#7c3aed'}22`,
@@ -1189,7 +1206,7 @@ export default function Home() {
             <div className='sec-header'>
               <div className='sec-title-group'>
                 <h2>Tin tức mới nhất</h2>
-                <p>Tổng hợp theo 3 chủ đề nổi bật từ hệ thống tin tức.</p>
+                <p>Tổng hợp theo 4 chủ đề nổi bật từ hệ thống tin tức.</p>
               </div>
               <Link to='/News' className='sec-link'>Xem tất cả →</Link>
             </div>
@@ -1232,9 +1249,9 @@ export default function Home() {
                             {!group.items[0].image && <span>{group.items[0].icon}</span>}
                           </div>
                           <div className='news-feature-body'>
-                            <span className='news-tag'>{group.items[0].tag}</span>
-                            <h4 className='news-feature-title'>{group.items[0].title}</h4>
-                            {group.items[0].excerpt && <p className='news-feature-excerpt'>{group.items[0].excerpt}</p>}
+                            <AutoMarqueeText as='span' className='news-tag'>{group.items[0].tag}</AutoMarqueeText>
+                            <AutoMarqueeText as='h4' className='news-feature-title' lines={2}>{group.items[0].title}</AutoMarqueeText>
+                            {group.items[0].excerpt && <AutoMarqueeText as='p' className='news-feature-excerpt' lines={2}>{group.items[0].excerpt}</AutoMarqueeText>}
                             <span className='news-time'><FaClock /> {group.items[0].time}</span>
                           </div>
                         </Link>
@@ -1248,8 +1265,8 @@ export default function Home() {
                               {!n.image && n.icon}
                             </div>
                             <div className='news-body'>
-                              <span className='news-tag'>{n.tag}</span>
-                              <p className='news-title'>{n.title}</p>
+                              <AutoMarqueeText as='span' className='news-tag'>{n.tag}</AutoMarqueeText>
+                              <AutoMarqueeText as='p' className='news-title' lines={2}>{n.title}</AutoMarqueeText>
                               <span className='news-time'><FaClock /> {n.time}</span>
                             </div>
                           </Link>
@@ -1294,9 +1311,9 @@ export default function Home() {
                     {!blog.image && <span>📝</span>}
                   </div>
                   <div className='home-blog-body'>
-                    <span className='news-tag'>{blog.categoryLabel}</span>
-                    <h3 className='home-blog-title'>{blog.title}</h3>
-                    <p className='home-blog-excerpt'>{blog.excerpt || 'Nội dung đang được cập nhật.'}</p>
+                    <AutoMarqueeText as='span' className='news-tag'>{blog.categoryLabel}</AutoMarqueeText>
+                    <AutoMarqueeText as='h3' className='home-blog-title' lines={2}>{blog.title}</AutoMarqueeText>
+                    <AutoMarqueeText as='p' className='home-blog-excerpt' lines={2}>{blog.excerpt || 'Nội dung đang được cập nhật.'}</AutoMarqueeText>
                     <div className='home-blog-meta'>
                       <span><FaClock /> {blog.time}</span>
                       <span><FaEye /> {blog.views.toLocaleString('vi-VN')}</span>
@@ -1327,10 +1344,10 @@ export default function Home() {
                   <span className='deal-emoji'>{d.emoji}</span>
                   <div className='deal-body'>
                     <div className='deal-title-row'>
-                      <span className='deal-title'>{d.title}</span>
+                      <AutoMarqueeText as='span' className='deal-title'>{d.title}</AutoMarqueeText>
                       <span className='deal-tag' style={{ background: d.color + '22', color: d.color }}>{d.tag}</span>
                     </div>
-                    <span className='deal-desc'>{d.desc}</span>
+                    <AutoMarqueeText as='span' className='deal-desc'>{d.desc}</AutoMarqueeText>
                   </div>
                 </div>
               ))}
@@ -1341,7 +1358,7 @@ export default function Home() {
           </div>
 
           {/* Banner quảng cáo nhỏ tự động slide */}
-          <div className='ad-mini-banner' style={{ borderColor: adCurrent.color + '44', background: adCurrent.color + '0d' }}>
+          <div className='ad-mini-banner ad-mini-card' style={{ borderColor: adCurrent.color + '44', background: adCurrent.color + '0d' }}>
             <div className='ad-mini-icon' style={{ color: adCurrent.color, background: adCurrent.color + '22' }}>
               {adCurrent.icon}
             </div>
@@ -1349,8 +1366,8 @@ export default function Home() {
               <span className='ad-mini-tag' style={{ background: adCurrent.color + '22', color: adCurrent.color }}>
                 {adCurrent.tag}
               </span>
-              <div className='ad-mini-title'>{adCurrent.title}</div>
-              <div className='ad-mini-desc'>{adCurrent.desc}</div>
+              <AutoMarqueeText className='ad-mini-title'>{adCurrent.title}</AutoMarqueeText>
+              <AutoMarqueeText className='ad-mini-desc' lines={2}>{adCurrent.desc}</AutoMarqueeText>
             </div>
             {/* dots */}
             <div className='ad-mini-dots'>

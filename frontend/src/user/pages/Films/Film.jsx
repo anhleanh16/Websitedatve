@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import "./Film.css?v=20260811-1";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import QuickBookWidget from "../../Components/QuickBookWidget/QuickBookWidget";
+import AutoMarqueeText from "../../Components/AutoMarqueeText/AutoMarqueeText";
 import { userMovieService } from "../../services/userApi";
 import { getActiveHomeBanners, hydrateHomeBannerImages } from "../../utils/homeBanners";
 
@@ -397,7 +398,7 @@ export default function Film() {
                       </div>
                     </div>
 
-                    <div className="movie-title">{m.title}</div>
+                    <AutoMarqueeText className="movie-title">{m.title}</AutoMarqueeText>
                     <div className="movie-duration">
                       {m.duration > 0 ? `${m.duration} phút` : "Đang cập nhật"}
                     </div>
@@ -441,15 +442,15 @@ export default function Film() {
                         </span>
                       </div>
                       <div className="suggest-content">
-                        <strong>{movie.title}</strong>
-                        <p>
+                        <AutoMarqueeText as="strong">{movie.title}</AutoMarqueeText>
+                        <AutoMarqueeText as="p">
                           {movie.categories.length > 0
                             ? movie.categories
                                 .slice(0, 2)
                                 .map((category) => category.category_name)
                                 .join(" • ")
                             : "Chưa có Tags"}
-                        </p>
+                        </AutoMarqueeText>
                       </div>
                     </button>
                   ))

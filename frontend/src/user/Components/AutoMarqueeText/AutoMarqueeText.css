@@ -1,0 +1,89 @@
+.auto-marquee-text.auto-marquee-text {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.auto-marquee-track {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.auto-marquee-text[data-lines='1'] .auto-marquee-track {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.auto-marquee-text:not([data-lines='1']) {
+  height: calc(var(--auto-marquee-lines) * 1lh);
+}
+
+.auto-marquee-text:not([data-lines='1']) .auto-marquee-track {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--auto-marquee-lines);
+  line-clamp: var(--auto-marquee-lines);
+}
+
+.auto-marquee-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: none;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+:is(
+  .movie-card,
+  .suggest-card,
+  .news-group-card,
+  .news-feature-card,
+  .news-card,
+  .home-blog-card,
+  .showtime-movie-block,
+  .deal-item,
+  .ad-mini-card
+):hover .auto-marquee-text.is-overflowing .auto-marquee-track,
+.auto-marquee-text.is-overflowing:hover .auto-marquee-track {
+  display: block;
+  width: max-content;
+  max-width: none;
+  overflow: visible;
+  white-space: nowrap;
+  text-overflow: clip;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  animation: autoMarqueeRead var(--auto-marquee-duration) ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes autoMarqueeRead {
+  0%, 12% { transform: translateX(0); }
+  48%, 66% { transform: translateX(var(--auto-marquee-distance)); }
+  92%, 100% { transform: translateX(0); }
+}
+
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  :is(
+    .movie-card,
+    .suggest-card,
+    .news-group-card,
+    .news-feature-card,
+    .news-card,
+    .home-blog-card,
+    .showtime-movie-block,
+    .deal-item,
+    .ad-mini-card
+  ):hover .auto-marquee-track,
+  .auto-marquee-text:hover .auto-marquee-track {
+    animation: none;
+    transform: none;
+  }
+}

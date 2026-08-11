@@ -1123,9 +1123,9 @@
   gap: 1rem;
 }
 
-.news-grid {
+.home-page .news-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
 }
 
@@ -1133,6 +1133,9 @@
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
   padding: 1rem;
   border-radius: 16px;
   background: rgba(255,255,255,0.03);
@@ -1170,6 +1173,7 @@
 .news-group-list {
   display: flex;
   flex-direction: column;
+  flex: 1;
   gap: 0.7rem;
 }
 
@@ -1291,6 +1295,7 @@
   letter-spacing: 0.05em;
   width: fit-content;
 }
+.news-tag.auto-marquee-text { width: fit-content; }
 .news-title {
   margin: 0;
   font-size: 0.82rem;
@@ -1576,10 +1581,12 @@
 }
 
 .deal-emoji { font-size: 1.3rem; flex-shrink: 0; line-height: 1; margin-top: 0.05rem; }
-.deal-body  { display: flex; flex-direction: column; gap: 0.18rem; }
-.deal-title-row { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
-.deal-title { font-weight: 700; font-size: 0.84rem; color: #e2e8f0; }
+.deal-body  { display: flex; flex: 1; flex-direction: column; gap: 0.18rem; min-width: 0; }
+.deal-title-row { display: flex; align-items: center; gap: 0.45rem; flex-wrap: nowrap; min-width: 0; }
+.deal-title { flex: 1; width: auto; font-weight: 700; font-size: 0.84rem; color: #e2e8f0; }
+.deal-title.auto-marquee-text { width: auto; }
 .deal-tag {
+  flex-shrink: 0;
   padding: 0.1rem 0.42rem;
   border-radius: 5px;
   font-size: 0.64rem; font-weight: 800;
@@ -1697,7 +1704,7 @@
   .ad-mini-banner { grid-column: 1 / -1; }
 
   .showtime-grid-blocks { grid-template-columns: repeat(2, 1fr); }
-  .news-grid { grid-template-columns: 1fr; }
+  .home-page .news-grid { grid-template-columns: 1fr; }
   .home-blog-grid { grid-template-columns: 1fr; }
   .hero-slider { min-height: 340px; }
 }
@@ -1931,7 +1938,7 @@
 
   /* Tin tức */
   .news-block { padding: 0.95rem; border-radius: 16px; }
-  .news-grid { grid-template-columns: 1fr; gap: 0.65rem; }
+  .home-page .news-grid { grid-template-columns: 1fr; gap: 0.65rem; }
   .news-group-card { padding: 0.8rem; gap: 0.75rem; }
   .news-group-head { gap: 0.6rem; }
   .news-group-icon { width: 36px; height: 36px; border-radius: 10px; font-size: 1rem; }
@@ -2127,7 +2134,7 @@
 @media (max-width: 380px) {
   .home-page { padding: 0.6rem 0.6rem 5rem; }
   .hero-title { font-size: 1.05rem; }
-  .news-grid { grid-template-columns: 1fr; }
+  .home-page .news-grid { grid-template-columns: 1fr; }
   .movies-grid { gap: 0.5rem; }
 }
 
