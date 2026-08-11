@@ -116,6 +116,33 @@ const splitTextForSpeech = (value, maxLength = 170) => {
   return chunks
 }
 
+const findVietnameseVoice = (voices) => {
+  const availableVoices = Array.isArray(voices) ? voices : []
+  return availableVoices.find((voice) => voice.lang?.toLowerCase().replace('_', '-') === 'vi-vn')
+    || availableVoices.find((voice) => voice.lang?.toLowerCase().startsWith('vi'))
+    || availableVoices.find((voice) => /tiếng việt|tieng viet|vietnamese/i.test(voice.name || ''))
+    || null
+}
+
+const waitForSpeechVoices = (synthesis, timeoutMs = 1400) => new Promise((resolve) => {
+  const currentVoices = synthesis.getVoices?.() || []
+  if (currentVoices.length) {
+    resolve(currentVoices)
+    return
+  }
+
+  let finished = false
+  const finish = () => {
+    if (finished) return
+    finished = true
+    synthesis.removeEventListener?.('voiceschanged', finish)
+    resolve(synthesis.getVoices?.() || [])
+  }
+
+  synthesis.addEventListener?.('voiceschanged', finish)
+  window.setTimeout(finish, timeoutMs)
+})
+
 export const formatAgeLimit = (ageLimit) => {
   const value = String(ageLimit || '').trim()
   if (!value) return ''
@@ -134,7 +161,30 @@ export default function useAiAssistant() {
   const [messages, setMessages] = useState(() => readChatHistory(storageKey))
   const speechRecognitionRef = useRef(null)
   const speechSessionRef = useRef(0)
+  const speechRequestRef = useRef(null)
+  const audioContextRef = useRef(null)
+  const audioSourceRef = useRef(null)
   const shouldPersistHistoryRef = useRef(false)
+
+  const prepareAudioContext = () => {
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    if (!AudioContext) return null
+
+    if (!audioContextRef.current) audioContextRef.current = new AudioContext()
+    audioContextRef.current.resume?.().catch(() => {})
+    return audioContextRef.current
+  }
+
+  const stopGeneratedAudio = () => {
+    speechRequestRef.current?.abort?.()
+    speechRequestRef.current = null
+    try {
+      audioSourceRef.current?.stop?.()
+    } catch {
+      // Nguồn âm thanh có thể đã tự kết thúc.
+    }
+    audioSourceRef.current = null
+  }
 
   const updateMessages = (updater) => {
     shouldPersistHistoryRef.current = true
@@ -159,75 +209,128 @@ export default function useAiAssistant() {
   useEffect(() => () => {
     speechRecognitionRef.current?.abort?.()
     speechSessionRef.current += 1
+    stopGeneratedAudio()
     window.speechSynthesis?.cancel?.()
+    audioContextRef.current?.close?.().catch(() => {})
+    audioContextRef.current = null
   }, [])
 
   const stopSpeaking = () => {
     speechSessionRef.current += 1
+    stopGeneratedAudio()
     window.speechSynthesis?.cancel?.()
     setSpeakingMessageId(null)
     setVoiceStatus('')
   }
 
-  const speakReply = (text, messageId = 'voice-reply') => {
+  const speakWithDeviceVoice = async (text, sessionId) => {
     const synthesis = window.speechSynthesis
     const SpeechUtterance = window.SpeechSynthesisUtterance
     if (!synthesis || !SpeechUtterance) {
       setVoiceStatus('Thiết bị này chưa hỗ trợ đọc văn bản thành giọng nói.')
-      return
+      return false
     }
 
     const chunks = splitTextForSpeech(text)
-    if (!chunks.length) return
+    if (!chunks.length) return false
+
+    const voices = await waitForSpeechVoices(synthesis)
+    if (sessionId !== speechSessionRef.current) return false
+
+    const vietnameseVoice = findVietnameseVoice(voices)
+    if (!vietnameseVoice) {
+      setSpeakingMessageId(null)
+      setVoiceStatus('Điện thoại chưa có giọng đọc tiếng Việt. Hãy dùng nút Nghe lại để thử giọng AI hoặc cài giọng Tiếng Việt trong phần chuyển văn bản thành giọng nói của máy.')
+      return false
+    }
+
+    synthesis.cancel()
+    synthesis.resume?.()
+    setVoiceStatus('AI đang đọc bằng giọng tiếng Việt trên thiết bị...')
+    let chunkIndex = 0
+
+    const speakNextChunk = () => {
+      if (sessionId !== speechSessionRef.current) return
+      if (chunkIndex >= chunks.length) {
+        setSpeakingMessageId(null)
+        setVoiceStatus('')
+        return
+      }
+
+      const utterance = new SpeechUtterance(chunks[chunkIndex])
+      chunkIndex += 1
+      utterance.lang = vietnameseVoice.lang || 'vi-VN'
+      utterance.voice = vietnameseVoice
+      utterance.rate = 0.94
+      utterance.pitch = 1
+      utterance.onend = speakNextChunk
+      utterance.onerror = (event) => {
+        if (event.error === 'canceled' || event.error === 'interrupted') return
+        setSpeakingMessageId(null)
+        setVoiceStatus('Không thể phát giọng Việt. Hãy kiểm tra dịch vụ chuyển văn bản thành giọng nói trên điện thoại.')
+      }
+      synthesis.speak(utterance)
+    }
+
+    speakNextChunk()
+    return true
+  }
+
+  const speakReply = async (text, messageId = 'voice-reply') => {
+    const speechText = String(text || '').trim()
+    if (!speechText) return
 
     speechSessionRef.current += 1
     const sessionId = speechSessionRef.current
-    synthesis.cancel()
-    synthesis.resume?.()
+    stopGeneratedAudio()
+    window.speechSynthesis?.cancel?.()
     setSpeakingMessageId(messageId)
-    setVoiceStatus('AI đang đọc bằng tiếng Việt...')
 
-    let started = false
-    const beginSpeaking = () => {
-      if (started || sessionId !== speechSessionRef.current) return
-      started = true
-
-      const voices = synthesis.getVoices?.() || []
-      const vietnameseVoice = voices.find((voice) => voice.lang?.toLowerCase() === 'vi-vn')
-        || voices.find((voice) => voice.lang?.toLowerCase().startsWith('vi'))
-      let chunkIndex = 0
-
-      const speakNextChunk = () => {
-        if (sessionId !== speechSessionRef.current) return
-        if (chunkIndex >= chunks.length) {
-          setSpeakingMessageId(null)
-          setVoiceStatus('')
-          return
-        }
-
-        const utterance = new SpeechUtterance(chunks[chunkIndex])
-        chunkIndex += 1
-        utterance.lang = vietnameseVoice?.lang || 'vi-VN'
-        utterance.voice = vietnameseVoice || null
-        utterance.rate = 0.94
-        utterance.pitch = 1
-        utterance.onend = speakNextChunk
-        utterance.onerror = (event) => {
-          if (event.error === 'canceled' || event.error === 'interrupted') return
-          setSpeakingMessageId(null)
-          setVoiceStatus('Không thể phát giọng Việt. Hãy kiểm tra dịch vụ chuyển văn bản thành giọng nói trên điện thoại.')
-        }
-        synthesis.speak(utterance)
-      }
-
-      speakNextChunk()
+    const isMobile = window.matchMedia?.('(max-width: 768px)').matches
+    if (!isMobile) {
+      await speakWithDeviceVoice(speechText, sessionId)
+      return
     }
 
-    if ((synthesis.getVoices?.() || []).length) {
-      beginSpeaking()
-    } else {
-      synthesis.addEventListener?.('voiceschanged', beginSpeaking, { once: true })
-      window.setTimeout(beginSpeaking, 400)
+    const audioContext = prepareAudioContext()
+    const requestController = new AbortController()
+    speechRequestRef.current = requestController
+    setVoiceStatus('AI đang chuẩn bị giọng đọc tiếng Việt tự nhiên...')
+
+    try {
+      const response = await fetch(`${API_BASE}/ai/speech`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: requestController.signal,
+        body: JSON.stringify({ text: speechText }),
+      })
+      if (!response.ok) throw new Error('Gemini TTS unavailable')
+
+      const audioData = await response.arrayBuffer()
+      if (!audioData.byteLength || sessionId !== speechSessionRef.current) return
+      if (!audioContext) throw new Error('Web Audio unavailable')
+
+      const audioBuffer = await audioContext.decodeAudioData(audioData.slice(0))
+      if (sessionId !== speechSessionRef.current) return
+      await audioContext.resume?.()
+
+      const source = audioContext.createBufferSource()
+      source.buffer = audioBuffer
+      source.connect(audioContext.destination)
+      source.onended = () => {
+        if (sessionId !== speechSessionRef.current) return
+        audioSourceRef.current = null
+        setSpeakingMessageId(null)
+        setVoiceStatus('')
+      }
+      audioSourceRef.current = source
+      speechRequestRef.current = null
+      setVoiceStatus('AI đang đọc bằng giọng tiếng Việt...')
+      source.start(0)
+    } catch (error) {
+      speechRequestRef.current = null
+      if (error?.name === 'AbortError' || sessionId !== speechSessionRef.current) return
+      await speakWithDeviceVoice(speechText, sessionId)
     }
   }
 
@@ -293,6 +396,7 @@ export default function useAiAssistant() {
     }
 
     stopSpeaking()
+    prepareAudioContext()
     const recognition = new SpeechRecognition()
     recognition.lang = 'vi-VN'
     recognition.interimResults = false
