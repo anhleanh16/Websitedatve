@@ -256,7 +256,10 @@ export const aiController = {
         return res.status(502).json({ message: 'Giọng đọc tiếng Việt đang tạm thời không phản hồi.' })
       }
 
-      const audioBase64 = data?.output_audio?.data || data?.outputAudio?.data
+      const audioPart = (data?.steps || [])
+        .flatMap((step) => step?.content || [])
+        .find((part) => part?.type === 'audio' && part?.data)
+      const audioBase64 = data?.output_audio?.data || data?.outputAudio?.data || audioPart?.data
       if (!audioBase64) {
         console.error('Gemini TTS returned no audio data')
         return res.status(502).json({ message: 'Gemini chưa tạo được âm thanh tiếng Việt.' })
@@ -267,7 +270,8 @@ export const aiController = {
         return res.status(502).json({ message: 'Dữ liệu giọng đọc tiếng Việt không hợp lệ.' })
       }
 
-      const waveBuffer = createWaveBuffer(pcmBuffer)
+      const sampleRate = Number(audioPart?.sample_rate || audioPart?.sampleRate || 24_000)
+      const waveBuffer = createWaveBuffer(pcmBuffer, Number.isFinite(sampleRate) ? sampleRate : 24_000)
       res.set({
         'Content-Type': 'audio/wav',
         'Content-Length': String(waveBuffer.length),
