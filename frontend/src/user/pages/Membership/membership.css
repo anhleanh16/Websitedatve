@@ -265,6 +265,7 @@
 
 .membership-tab {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 0.5rem;
   padding: 0.7rem 1.2rem;
@@ -1023,7 +1024,50 @@
   }
 
   .membership-tabs {
-    padding: 1rem 1.25rem 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: calc(100% - 24px);
+    margin: 12px auto 0;
+    padding: 10px;
+    overflow: visible;
+    border: 1px solid rgba(148, 163, 184, .12);
+    border-radius: 16px;
+    background: rgba(15, 23, 42, .78);
+  }
+
+  .membership-tab {
+    width: 100%;
+    min-width: 0;
+    min-height: 52px;
+    justify-content: flex-start;
+    gap: 9px;
+    padding: 10px 11px;
+    border: 1px solid rgba(148, 163, 184, .1);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .025);
+    line-height: 1.25;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .membership-tab.active {
+    border-color: rgba(167, 139, 250, .42);
+    background: linear-gradient(135deg, rgba(124, 58, 237, .25), rgba(91, 33, 182, .14));
+    box-shadow: inset 3px 0 0 #8b5cf6;
+  }
+
+  .membership-tab .tab-icon {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    justify-content: center;
+    border-radius: 9px;
+    background: rgba(148, 163, 184, .09);
+  }
+
+  .membership-tab.active .tab-icon {
+    background: rgba(124, 58, 237, .26);
   }
 
   .membership-content {
@@ -1062,6 +1106,9 @@
 }
 
 @media (max-width: 480px) {
+  .membership-tabs { width: calc(100% - 16px); gap: 6px; padding: 8px; }
+  .membership-tab { gap: 7px; padding-inline: 8px; font-size: .8rem; }
+
   .overview-grid {
     grid-template-columns: 1fr;
   }

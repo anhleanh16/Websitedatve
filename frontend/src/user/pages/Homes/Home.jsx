@@ -313,6 +313,11 @@ export default function Home() {
   const [movieTab,    setMovieTab]    = useState('now')
   const [showtimeTab, setShowtimeTab] = useState('all')
   const [movieOff,    setMovieOff]    = useState(0)
+  const [movieSlideDirection, setMovieSlideDirection] = useState('next')
+  const [movieAutoplayReset, setMovieAutoplayReset] = useState(0)
+  const [isMobileMovieCarousel, setIsMobileMovieCarousel] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches,
+  )
   const [adSlide,     setAdSlide]     = useState(0)
   const [nowShowing,  setNowShowing]  = useState([])
   const [comingSoon,  setComingSoon]  = useState([])
@@ -347,6 +352,15 @@ export default function Home() {
   const aiReplyTimer = useRef(null)
   const aiMessagesEndRef = useRef(null)
   const speechRecognitionRef = useRef(null)
+  const movieSwipeStartRef = useRef(null)
+  const movieSwipeAtRef = useRef(0)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 640px)')
+    const handleChange = (event) => setIsMobileMovieCarousel(event.matches)
+    media.addEventListener('change', handleChange)
+    return () => media.removeEventListener('change', handleChange)
+  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -487,8 +501,18 @@ export default function Home() {
     () => buildHeroSlides([...nowShowing, ...comingSoon]),
     [nowShowing, comingSoon],
   )
-  const maxOff = Math.max(featuredMovies.length - VISIBLE, 0)
-  const visibleMovies = featuredMovies.slice(movieOff, movieOff + VISIBLE)
+  const visibleMovieCount = isMobileMovieCarousel ? 1 : VISIBLE
+  const maxOff = Math.max(featuredMovies.length - visibleMovieCount, 0)
+  const visibleMovies = isMobileMovieCarousel && featuredMovies.length > 0
+    ? (featuredMovies.length > 1 ? [-1, 0, 1] : [0]).map((offset) => {
+        const index = (movieOff + offset + featuredMovies.length) % featuredMovies.length
+        return {
+          ...featuredMovies[index],
+          carouselPosition: offset < 0 ? 'previous' : offset > 0 ? 'next' : 'current',
+          carouselKey: `${featuredMovies[index].id}-${offset}`,
+        }
+      })
+    : featuredMovies.slice(movieOff, movieOff + visibleMovieCount)
   const current = heroSlides[slide] || heroSlides[0]
   const adCurrent = AD_SLIDES[adSlide]
   const selectedCinemaObj = cinemas.find(
@@ -524,6 +548,15 @@ export default function Home() {
   useEffect(() => {
     setMovieOff((prev) => Math.min(prev, maxOff))
   }, [maxOff, movieTab])
+
+  useEffect(() => {
+    if (!isMobileMovieCarousel || featuredMovies.length <= 1) return undefined
+    const timer = window.setInterval(() => {
+      setMovieSlideDirection('next')
+      setMovieOff((position) => (position + 1) % featuredMovies.length)
+    }, 4500)
+    return () => window.clearInterval(timer)
+  }, [isMobileMovieCarousel, featuredMovies.length, movieTab, movieAutoplayReset])
 
   // Đồng bộ rạp được chọn từ header navbar
   useEffect(() => {
@@ -670,7 +703,31 @@ export default function Home() {
   }, [])
 
   /* Movie carousel */
-  const goMovies = (dir) => setMovieOff(p => Math.min(Math.max(p + dir, 0), maxOff))
+  const goMovies = (dir) => {
+    setMovieSlideDirection(dir < 0 ? 'previous' : 'next')
+    setMovieOff((position) => {
+      if (isMobileMovieCarousel && featuredMovies.length > 1) {
+        return (position + dir + featuredMovies.length) % featuredMovies.length
+      }
+      return Math.min(Math.max(position + dir, 0), maxOff)
+    })
+  }
+  const handleMovieTouchStart = (event) => {
+    const touch = event.touches[0]
+    movieSwipeStartRef.current = { x: touch.clientX, y: touch.clientY }
+  }
+  const handleMovieTouchEnd = (event) => {
+    if (!isMobileMovieCarousel || !movieSwipeStartRef.current) return
+    const touch = event.changedTouches[0]
+    const deltaX = touch.clientX - movieSwipeStartRef.current.x
+    const deltaY = touch.clientY - movieSwipeStartRef.current.y
+    movieSwipeStartRef.current = null
+    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) <= Math.abs(deltaY)) return
+    event.preventDefault()
+    movieSwipeAtRef.current = Date.now()
+    setMovieAutoplayReset((value) => value + 1)
+    goMovies(deltaX < 0 ? 1 : -1)
+  }
 
   const toggleAiPanel = () => {
     setIsAiOpen((prev) => {
@@ -928,7 +985,17 @@ export default function Home() {
               <Link to='/Films/Film' className='sec-link'>Xem thêm →</Link>
             </div>
 
-            <div className='movies-grid'>
+            <div
+              className={`movies-grid${isMobileMovieCarousel ? ` is-swipe-carousel swipe-${movieSlideDirection}` : ''}`}
+              onTouchStart={handleMovieTouchStart}
+              onTouchEnd={handleMovieTouchEnd}
+              onClickCapture={(event) => {
+                if (Date.now() - movieSwipeAtRef.current < 500) {
+                  event.preventDefault()
+                  event.stopPropagation()
+                }
+              }}
+            >
               {loadingMovies && (
                 <div style={{ gridColumn: '1 / -1', textAlign: 'center', opacity: 0.8 }}>
                   Đang tải phim từ database...
@@ -945,7 +1012,18 @@ export default function Home() {
                 </div>
               )}
               {visibleMovies.map(m => (
-                <Link to={`/movie/${m.id}`} className='movie-card' key={m.id}>
+                <Link
+                  to={`/movie/${m.id}`}
+                  className={`movie-card${m.carouselPosition ? ` carousel-${m.carouselPosition}` : ''}`}
+                  key={m.carouselKey || m.id}
+                  onClick={(event) => {
+                    if (!isMobileMovieCarousel || !m.carouselPosition || m.carouselPosition === 'current') return
+                    event.preventDefault()
+                    setMovieAutoplayReset((value) => value + 1)
+                    goMovies(m.carouselPosition === 'previous' ? -1 : 1)
+                  }}
+                  aria-label={m.carouselPosition && m.carouselPosition !== 'current' ? `Chuyển đến phim ${m.title}` : undefined}
+                >
                   {m.hot && <span className='movie-hot'><FaFire /> HOT</span>}
                   <div
                     className='movie-poster'
@@ -977,9 +1055,16 @@ export default function Home() {
               <div className='movie-carousel-dots'>
                 {Array(maxOff + 1).fill(0).map((_, i) => (
                   <button key={i} className={`mcd${movieOff === i ? ' active' : ''}`}
-                    onClick={() => setMovieOff(i)} aria-label={`Trang ${i + 1}`} />
+                    onClick={() => {
+                      setMovieSlideDirection(i < movieOff ? 'previous' : 'next')
+                      setMovieOff(i)
+                      setMovieAutoplayReset((value) => value + 1)
+                    }} aria-label={`Trang ${i + 1}`} />
                 ))}
               </div>
+            )}
+            {isMobileMovieCarousel && featuredMovies.length > 1 && (
+              <div className='mobile-swipe-hint'>‹ Vuốt để xem phim khác ›</div>
             )}
           </div>
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   FaUser, FaEdit, FaLock, FaCamera, FaTicketAlt,
@@ -78,6 +78,48 @@ const AUDIT_ACTION_LABEL = {
 
 const getAuditLabel = (action) => AUDIT_ACTION_LABEL[action] || action
 
+const toLocalDateKey = (dateValue) => {
+  const date = new Date(dateValue)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function ProfilePagination({ page, totalItems, pageSize, onChange }) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
+  if (totalItems === 0) return null
+
+  const start = (page - 1) * pageSize + 1
+  const end = Math.min(page * pageSize, totalItems)
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
+    .filter(number => totalPages <= 5 || number === 1 || number === totalPages || Math.abs(number - page) <= 1)
+
+  return (
+    <div className='profile-pagination' aria-label='Phân trang'>
+      <span className='profile-pagination-summary'>Hiển thị {start}–{end} / {totalItems}</span>
+      <div className='profile-pagination-controls'>
+        <button type='button' onClick={() => onChange(page - 1)} disabled={page <= 1} aria-label='Trang trước'>‹</button>
+        {pages.map((number, index) => (
+          <span key={number} className='profile-page-number-wrap'>
+            {index > 0 && number - pages[index - 1] > 1 && <span className='profile-page-ellipsis'>…</span>}
+            <button
+              type='button'
+              className={number === page ? 'active' : ''}
+              onClick={() => onChange(number)}
+              aria-current={number === page ? 'page' : undefined}
+            >
+              {number}
+            </button>
+          </span>
+        ))}
+        <button type='button' onClick={() => onChange(page + 1)} disabled={page >= totalPages} aria-label='Trang sau'>›</button>
+      </div>
+    </div>
+  )
+}
+
 const SIDEBAR_ITEMS = [
   { key: 'profile',   label: 'Hồ sơ cá nhân',    icon: <FaUser /> },
   { key: 'edit',      label: 'Chỉnh sửa thông tin', icon: <FaEdit /> },
@@ -133,6 +175,11 @@ export default function Profile() {
   const [bookingsLoading, setBookingsLoading] = useState(false)
   const [bookingsError,   setBookingsError]   = useState(null)
   const [qrModal, setQrModal] = useState(null) // { qrCode, bookingCode, movieTitle, seats, showtime }
+  const [ticketDate, setTicketDate] = useState('')
+  const [historyDate, setHistoryDate] = useState('')
+  const [ticketPage, setTicketPage] = useState(1)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [notificationPage, setNotificationPage] = useState(1)
 
   /* edit form */
   const [editForm, setEditForm] = useState({
@@ -566,6 +613,25 @@ export default function Profile() {
   const historyBookings = bookings.filter(b =>
     b.status !== 'confirmed' || new Date(b.start_time) <= new Date()
   )
+  const filteredUpcomingTickets = ticketDate
+    ? upcomingTickets.filter(booking => toLocalDateKey(booking.start_time) === ticketDate)
+    : upcomingTickets
+  const filteredHistoryBookings = historyDate
+    ? historyBookings.filter(booking => toLocalDateKey(booking.start_time) === historyDate)
+    : historyBookings
+  const TICKET_PAGE_SIZE = 4
+  const HISTORY_PAGE_SIZE = 6
+  const NOTIFICATION_PAGE_SIZE = 6
+  const ticketTotalPages = Math.max(1, Math.ceil(filteredUpcomingTickets.length / TICKET_PAGE_SIZE))
+  const historyTotalPages = Math.max(1, Math.ceil(filteredHistoryBookings.length / HISTORY_PAGE_SIZE))
+  const notificationTotalPages = Math.max(1, Math.ceil(notifs.length / NOTIFICATION_PAGE_SIZE))
+  const visibleUpcomingTickets = filteredUpcomingTickets.slice((ticketPage - 1) * TICKET_PAGE_SIZE, ticketPage * TICKET_PAGE_SIZE)
+  const visibleHistoryBookings = filteredHistoryBookings.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE)
+  const visibleNotifications = notifs.slice((notificationPage - 1) * NOTIFICATION_PAGE_SIZE, notificationPage * NOTIFICATION_PAGE_SIZE)
+
+  useEffect(() => setTicketPage(page => Math.min(page, ticketTotalPages)), [ticketTotalPages])
+  useEffect(() => setHistoryPage(page => Math.min(page, historyTotalPages)), [historyTotalPages])
+  useEffect(() => setNotificationPage(page => Math.min(page, notificationTotalPages)), [notificationTotalPages])
 
   return (
     <div className='profile-page'>
@@ -588,12 +654,17 @@ export default function Profile() {
         </div>
 
         {/* Nav */}
+        <div className='ps-nav-heading'>
+          <strong>Danh mục tài khoản</strong>
+          <span>Chọn chức năng bạn cần</span>
+        </div>
         <nav className='ps-nav'>
           {SIDEBAR_ITEMS.map(item => (
             <button
               key={item.key}
               className={`ps-nav-item${tab === item.key ? ' active' : ''}`}
               onClick={() => handleTabClick(item)}
+              aria-current={tab === item.key ? 'page' : undefined}
             >
               <span className='ps-nav-icon'>{item.icon}</span>
               <span className='ps-nav-label'>{item.label}</span>
@@ -892,18 +963,35 @@ export default function Profile() {
               <h2>Vé của tôi</h2>
             </div>
 
+            <div className='profile-list-toolbar'>
+              <label className='profile-date-filter'>
+                <span>Ngày chiếu</span>
+                <input
+                  type='date'
+                  value={ticketDate}
+                  onChange={(event) => { setTicketDate(event.target.value); setTicketPage(1) }}
+                />
+              </label>
+              {ticketDate && (
+                <button type='button' className='profile-clear-filter' onClick={() => { setTicketDate(''); setTicketPage(1) }}>
+                  <FaTimes /> Xóa bộ lọc
+                </button>
+              )}
+              <span className='profile-result-count'>{filteredUpcomingTickets.length} vé</span>
+            </div>
+
             {bookingsLoading && (
               <div className='booking-loading'><FaSpinner className='spin' /> Đang tải vé...</div>
             )}
             {bookingsError && (
               <div className='booking-error'>⚠️ {bookingsError}</div>
             )}
-            {!bookingsLoading && !bookingsError && upcomingTickets.length === 0 && (
-              <div className='booking-empty'>Bạn chưa có vé nào sắp chiếu.</div>
+            {!bookingsLoading && !bookingsError && filteredUpcomingTickets.length === 0 && (
+              <div className='booking-empty'>{ticketDate ? 'Không tìm thấy vé trong ngày đã chọn.' : 'Bạn chưa có vé nào sắp chiếu.'}</div>
             )}
 
             <div className='tickets-list'>
-              {upcomingTickets.map(t => {
+              {visibleUpcomingTickets.map(t => {
                 const st = getStatus(t.status)
                 const roomType = t.room_type || '2D'
                 return (
@@ -955,6 +1043,12 @@ export default function Profile() {
                 )
               })}
             </div>
+            <ProfilePagination
+              page={ticketPage}
+              totalItems={filteredUpcomingTickets.length}
+              pageSize={TICKET_PAGE_SIZE}
+              onChange={setTicketPage}
+            />
           </div>
         )}
 
@@ -966,14 +1060,31 @@ export default function Profile() {
               <h2>Lịch sử đặt vé</h2>
             </div>
 
+            <div className='profile-list-toolbar'>
+              <label className='profile-date-filter'>
+                <span>Ngày chiếu</span>
+                <input
+                  type='date'
+                  value={historyDate}
+                  onChange={(event) => { setHistoryDate(event.target.value); setHistoryPage(1) }}
+                />
+              </label>
+              {historyDate && (
+                <button type='button' className='profile-clear-filter' onClick={() => { setHistoryDate(''); setHistoryPage(1) }}>
+                  <FaTimes /> Xóa bộ lọc
+                </button>
+              )}
+              <span className='profile-result-count'>{filteredHistoryBookings.length} giao dịch</span>
+            </div>
+
             {bookingsLoading && (
               <div className='booking-loading'><FaSpinner className='spin' /> Đang tải lịch sử...</div>
             )}
             {bookingsError && (
               <div className='booking-error'>⚠️ {bookingsError}</div>
             )}
-            {!bookingsLoading && !bookingsError && historyBookings.length === 0 && (
-              <div className='booking-empty'>Chưa có lịch sử đặt vé.</div>
+            {!bookingsLoading && !bookingsError && filteredHistoryBookings.length === 0 && (
+              <div className='booking-empty'>{historyDate ? 'Không tìm thấy lịch sử trong ngày đã chọn.' : 'Chưa có lịch sử đặt vé.'}</div>
             )}
 
             <div className='history-table-wrap'>
@@ -989,7 +1100,7 @@ export default function Profile() {
                   </tr>
                 </thead>
                 <tbody>
-                  {historyBookings.map(h => {
+                  {visibleHistoryBookings.map(h => {
                     const st = getStatus(h.status)
                     return (
                       <tr key={h.booking_id}>
@@ -1007,6 +1118,12 @@ export default function Profile() {
                 </tbody>
               </table>
             </div>
+            <ProfilePagination
+              page={historyPage}
+              totalItems={filteredHistoryBookings.length}
+              pageSize={HISTORY_PAGE_SIZE}
+              onChange={setHistoryPage}
+            />
           </div>
         )}
 
@@ -1026,7 +1143,7 @@ export default function Profile() {
               {!notifsLoading && !notifsError && notifs.length === 0 && (
                 <div className='booking-empty'>Bạn chưa có thông báo nào.</div>
               )}
-              {notifs.map(n => (
+              {visibleNotifications.map(n => (
                 <div key={n.id} className={`notif-item${n.read ? '' : ' unread'}`} onClick={() => markOneRead(n.id)}>
                   <div className={`notif-dot${n.read ? '' : ' active'}`} />
                   <div className='notif-body'>
@@ -1037,6 +1154,12 @@ export default function Profile() {
                 </div>
               ))}
             </div>
+            <ProfilePagination
+              page={notificationPage}
+              totalItems={notifs.length}
+              pageSize={NOTIFICATION_PAGE_SIZE}
+              onChange={setNotificationPage}
+            />
           </div>
         )}
 

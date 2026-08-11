@@ -736,6 +736,13 @@
   padding: 0.75rem 0.75rem 0.6rem;
 }
 
+.submenu-user-info > div {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
 .submenu-avatar {
   width: 36px;
   height: 36px;
@@ -759,6 +766,9 @@
 }
 
 .submenu-email {
+  display: block;
+  width: 100%;
+  max-width: 100%;
   font-size: 0.75rem;
   color: #64748b;
   overflow: hidden;

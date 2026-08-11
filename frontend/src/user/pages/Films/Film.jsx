@@ -17,6 +17,7 @@ const normalizeMovieItem = (m) => ({
       ? Number(m.rating)
       : null,
   reviewCount: Number(m.review_count || 0),
+  duration: Number(m.duration || m.duration_minutes || 0),
   status: m.status,
   releaseDate: m.release_date || "",
   categories: Array.isArray(m.categories) ? m.categories : [],
@@ -359,7 +360,7 @@ export default function Film() {
                       }
                     >
                       <span className="poster-age-badge">
-                        {m.ageLimit > 0 ? `${m.ageLimit}+` : "P"}
+                        {m.ageLimit > 0 ? `T${m.ageLimit}` : "P"}
                       </span>
                     </div>
 
@@ -397,6 +398,9 @@ export default function Film() {
                     </div>
 
                     <div className="movie-title">{m.title}</div>
+                    <div className="movie-duration">
+                      {m.duration > 0 ? `${m.duration} phút` : "Đang cập nhật"}
+                    </div>
                   </article>
                 ))}
             </div>
