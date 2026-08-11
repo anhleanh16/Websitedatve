@@ -1065,7 +1065,7 @@ export default function Booking() {
 
           {movieTitle && !loadingSeats && !seatError && selectedRoomId && (
             <div className="booking-seat-rule-note">
-              Chọn ghế trong cùng một nhánh và dừng ở khoảng cách giữa. <strong>Trong cùng một hàng phải chọn ghế liền nhau, không được bỏ trống ghế ở giữa.</strong> Khi một hàng ngang trong nhánh chưa kín thì chưa thể chọn sang hàng trên hoặc dưới.
+              <strong>Chọn các ghế liền nhau trong cùng một hàng.</strong> Không bỏ trống ghế ở giữa và hoàn thành một nhánh trước khi chuyển sang nhánh khác.
             </div>
           )}
 

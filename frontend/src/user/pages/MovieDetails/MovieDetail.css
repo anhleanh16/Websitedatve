@@ -1591,6 +1591,20 @@ h1.movie-detail-title,
 
 /* Mobile styles - make it look like the design */
 @media (max-width: 768px) {
+  .movie-detail-page {
+    overflow-x: clip;
+  }
+
+  .movie-detail-content,
+  .movie-detail-content-inner,
+  .movie-detail-hero,
+  .movie-detail-summary,
+  .movie-detail-info,
+  .movie-detail-trailer {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
   .movie-age-modal {
     width: min(100%, 380px);
     padding: 1.4rem 1rem 1rem;
@@ -1704,9 +1718,13 @@ h1.movie-detail-title,
     border-radius: 12px;
   }
 
+  h1.movie-detail-title,
   .movie-detail-title {
     font-size: 1.7rem;
     line-height: 1.1;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: normal;
   }
 
   .movie-rating-row {
@@ -1987,15 +2005,48 @@ h1.movie-detail-title,
 
 @media (max-width: 420px) {
   .movie-detail-summary {
-    grid-template-columns: 100px 1fr;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 0.9rem;
   }
 
   .movie-poster-card {
-    min-height: 160px;
+    width: 100%;
+    min-height: 0;
+    aspect-ratio: 2 / 3;
+    margin: 0;
   }
 
+  h1.movie-detail-title,
   .movie-detail-title {
-    font-size: 1.45rem;
+    font-size: clamp(1.25rem, 6vw, 1.55rem);
+    line-height: 1.12;
+    text-align: left;
+  }
+
+  .movie-status {
+    align-self: flex-start;
+    max-width: 100%;
+  }
+
+  .movie-rating-row {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .movie-chips-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .movie-chips-row > span {
+    width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .movie-meta-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .time-slot {
@@ -2018,4 +2069,90 @@ h1.movie-detail-title,
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1rem;
+}
+
+/* Final mobile layout override. Keep this at the end of the stylesheet so
+   generic movie/card rules imported by other pages cannot expand this view. */
+@media (max-width: 640px) {
+  .user-layout .movie-detail-page .movie-detail-content-inner {
+    box-sizing: border-box;
+    width: calc(100% + 2rem);
+    max-width: none;
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+
+  .user-layout .movie-detail-page .movie-detail-summary {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr) !important;
+    gap: 0.9rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .user-layout .movie-detail-page .movie-poster-card {
+    width: 108px !important;
+    max-width: 108px;
+    min-height: 0 !important;
+    aspect-ratio: 2 / 3;
+    margin: 0;
+    grid-column: 1;
+    grid-row: 1 / span 3;
+  }
+
+  .user-layout .movie-detail-page .movie-detail-info {
+    display: contents;
+  }
+
+  .user-layout .movie-detail-page .movie-status,
+  .user-layout .movie-detail-page h1.movie-detail-title,
+  .user-layout .movie-detail-page .movie-rating-row {
+    grid-column: 2;
+  }
+
+  .user-layout .movie-detail-page h1.movie-detail-title {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    font-size: clamp(1.2rem, 5.6vw, 1.55rem) !important;
+    line-height: 1.12;
+    overflow-wrap: anywhere;
+  }
+
+  .user-layout .movie-detail-page .movie-status {
+    align-self: flex-start;
+    width: auto;
+    max-width: 100%;
+  }
+
+  .user-layout .movie-detail-page .movie-chips-row {
+    display: flex;
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    margin-top: 0.25rem;
+  }
+
+  .user-layout .movie-detail-page .movie-chips-row > span {
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .user-layout .movie-detail-page .movie-meta-grid,
+  .user-layout .movie-detail-page .movie-action-row {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .user-layout .movie-detail-page .movie-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .user-layout .movie-detail-page .movie-action-row .btn-book {
+    width: 100%;
+  }
 }
