@@ -87,12 +87,14 @@ export const StatisticsModel = {
       // 2. Doanh thu theo ngày
       const revenueByDay = await safeQuery(`
         SELECT
-          DATE(o.created_at) AS date,
+          DATE_FORMAT(o.created_at, '%Y-%m-%d') AS date,
           COALESCE(SUM(o.total_amount), 0) AS revenue,
           COUNT(DISTINCT o.order_id) AS bookings
         FROM Orders o
         WHERE o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-        GROUP BY DATE(o.created_at)
+          AND o.payment_status = 'paid'
+          AND o.status IN ('confirmed', 'completed')
+        GROUP BY DATE_FORMAT(o.created_at, '%Y-%m-%d')
         ORDER BY date ASC
       `);
 

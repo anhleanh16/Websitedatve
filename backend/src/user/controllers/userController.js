@@ -319,7 +319,7 @@ export const userGetProfile = async (req, res) => {
         email_change_expires,
         email_change_requested_at,
         phone,
-        birthday,
+        DATE_FORMAT(birthday, '%Y-%m-%d') AS birthday,
         sex,
         avatar,
         point,
@@ -652,7 +652,7 @@ export const userUpdateProfile = async (req, res) => {
     }
 
     const [[currentUser]] = await db.query(
-      "SELECT id, full_name, email, phone, birthday, sex FROM User WHERE id = ? LIMIT 1",
+      "SELECT id, full_name, email, phone, DATE_FORMAT(birthday, '%Y-%m-%d') AS birthday, sex FROM User WHERE id = ? LIMIT 1",
       [userId],
     );
 
@@ -695,7 +695,8 @@ export const userUpdateProfile = async (req, res) => {
 
     const [[updatedUser]] = await db.query(
       `
-      SELECT id, full_name, email, phone, birthday, sex, avatar, point, status, updated_at
+      SELECT id, full_name, email, phone, DATE_FORMAT(birthday, '%Y-%m-%d') AS birthday,
+             sex, avatar, point, status, updated_at
       FROM User
       WHERE id = ?
       LIMIT 1
@@ -1048,7 +1049,9 @@ export const userConfirmEmailChangeOtp = async (req, res) => {
 
     const [[user]] = await db.query(
       `
-      SELECT id, full_name, email, pending_email, email_change_otp_token, email_change_expires, phone, birthday, sex, avatar, point, status
+      SELECT id, full_name, email, pending_email, email_change_otp_token, email_change_expires,
+             phone, DATE_FORMAT(birthday, '%Y-%m-%d') AS birthday,
+             sex, avatar, point, status
       FROM User
       WHERE id = ?
       LIMIT 1

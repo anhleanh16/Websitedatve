@@ -70,13 +70,30 @@ const getStatus = (status) => STATUS_MAP[status] || { label: status, cls: '' }
 const AUDIT_ACTION_LABEL = {
   profile_updated: 'Cập nhật thông tin hồ sơ',
   password_changed: 'Đổi mật khẩu',
+  initial_password_created: 'Tạo mật khẩu mới',
   avatar_updated: 'Cập nhật ảnh đại diện',
   avatar_removed: 'Xóa ảnh đại diện',
   email_change_otp_requested: 'Yêu cầu OTP đổi email',
   email_changed_verified: 'Xác minh đổi email thành công',
 }
 
-const getAuditLabel = (action) => AUDIT_ACTION_LABEL[action] || action
+const getAuditLabel = (action) => AUDIT_ACTION_LABEL[action] || 'Cập nhật hồ sơ'
+
+const AUDIT_FIELD_LABEL = {
+  full_name: 'Họ và tên',
+  name: 'Họ và tên',
+  user_name: 'Tên đăng nhập',
+  email: 'Email',
+  phone: 'Số điện thoại',
+  birthday: 'Ngày sinh',
+  sex: 'Giới tính',
+  avatar: 'Ảnh đại diện',
+  password: 'Mật khẩu',
+  status: 'Trạng thái',
+  point: 'Điểm tích lũy',
+}
+
+const getAuditFieldLabel = (field) => AUDIT_FIELD_LABEL[field] || 'Thông tin khác'
 
 const toLocalDateKey = (dateValue) => {
   const date = new Date(dateValue)
@@ -245,6 +262,8 @@ export default function Profile() {
           email: user.email,
           email_verified: Boolean(user.email && user.email_verified),
           phone: user.phone,
+          birthday: user.birthday || '',
+          sex: user.sex,
           avatar: user.avatar,
           point: user.point,
         }
@@ -398,9 +417,15 @@ export default function Profile() {
           name: updated.name,
           email: updated.email,
           phone: updated.phone,
+          birthday: updated.birthday || '',
+          sex: updated.sex,
           avatar: updated.avatar,
           point: updated.point,
         }
+        setEditForm((prev) => ({
+          ...prev,
+          dob: updated.birthday ? String(updated.birthday).slice(0, 10) : '',
+        }))
         dispatch(setUser({ token: tokenFromStore || localStorage.getItem('token'), user: nextUser }))
         localStorage.setItem('user', JSON.stringify(nextUser))
       }
@@ -460,6 +485,8 @@ export default function Profile() {
           email: updated.email,
           email_verified: Boolean(updated.email && updated.email_verified),
           phone: updated.phone,
+          birthday: updated.birthday || '',
+          sex: updated.sex,
           avatar: updated.avatar,
           point: updated.point,
         }
@@ -749,7 +776,7 @@ export default function Profile() {
               )}
               {auditLogs.map((item) => {
                 const changes = item?.field_changes && typeof item.field_changes === 'object'
-                  ? Object.keys(item.field_changes)
+                  ? Object.keys(item.field_changes).map(getAuditFieldLabel)
                   : []
                 return (
                   <div key={item.audit_id} className='notif-item'>
@@ -757,7 +784,7 @@ export default function Profile() {
                     <div className='notif-body'>
                       <div className='notif-title'>{getAuditLabel(item.action)}</div>
                       <div className='notif-desc'>
-                        {changes.length > 0 ? `Trường thay đổi: ${changes.join(', ')}` : 'Không có chi tiết trường thay đổi.'}
+                        {changes.length > 0 ? `Thông tin đã thay đổi: ${changes.join(', ')}` : 'Không có chi tiết thay đổi.'}
                       </div>
                     </div>
                     <div className='notif-time'>{formatRelativeTime(item.created_at)}</div>

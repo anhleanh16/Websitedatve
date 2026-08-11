@@ -1808,12 +1808,14 @@
 
   .spiderman-event {
     min-height: 150px;
-    align-items: flex-end;
-    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 12px;
     padding: 18px 16px;
     border-radius: 16px;
   }
-  .spiderman-event-content { max-width: calc(100% - 78px); }
+  .spiderman-event-content { max-width: 100%; }
   .spiderman-event-kicker { margin-bottom: 6px; padding: 4px 8px; font-size: 9px; }
   .spiderman-event h2 { font-size: 1.05rem; line-height: 1.15; }
   .spiderman-event p {
@@ -1826,9 +1828,10 @@
     overflow: hidden;
   }
   .spiderman-event-cta {
-    position: absolute;
-    right: 14px;
-    bottom: 16px;
+    position: relative;
+    right: auto;
+    bottom: auto;
+    align-self: flex-end;
     padding: 8px 10px;
     font-size: .68rem;
   }

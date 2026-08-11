@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import './bookings.css';
 import BookingWizard from "./BookingWizard.jsx";
 import { adminBookingService } from "../../services/adminApi";
@@ -22,6 +22,28 @@ const PAYMENT_MAP = {
 
 function formatMoney(n) {
   return n?.toLocaleString("vi-VN") + " ₫";
+}
+
+function stopCameraStream(videoElement) {
+  const stream = videoElement?.srcObject;
+  if (stream && typeof stream.getTracks === "function") {
+    stream.getTracks().forEach((track) => track.stop());
+  }
+  if (videoElement) videoElement.srcObject = null;
+}
+
+function getCameraErrorMessage(error) {
+  const errorName = String(error?.name || "");
+  if (errorName === "NotAllowedError" || errorName === "SecurityError") {
+    return "Không thể mở camera. Vui lòng cấp quyền camera cho trang web rồi thử lại.";
+  }
+  if (errorName === "NotFoundError" || errorName === "OverconstrainedError") {
+    return "Không tìm thấy camera phù hợp trên thiết bị này.";
+  }
+  if (errorName === "NotReadableError") {
+    return "Camera đang được ứng dụng khác sử dụng. Vui lòng đóng ứng dụng đó rồi thử lại.";
+  }
+  return "Không thể khởi động camera. Hãy kiểm tra quyền camera và kết nối HTTPS.";
 }
 
 function mapBookingFromApi(item) {
@@ -262,9 +284,11 @@ function BookingDetail({ booking, onClose, onCheck }) {
               Kiểm tra vé
             </button>
           )}
-          <button className="bk-btn bk-btn-view bk-btn-lg" onClick={() => printTicketPdf(booking)}>
-            In vé / Lưu PDF
-          </button>
+          {booking.checkInTime && (
+            <button className="bk-btn bk-btn-view bk-btn-lg" onClick={() => printTicketPdf(booking)}>
+              In vé / Lưu PDF
+            </button>
+          )}
           <button className="bk-btn bk-btn-secondary bk-btn-lg" onClick={onClose}>
             Đóng
           </button>
@@ -278,19 +302,111 @@ function BookingDetail({ booking, onClose, onCheck }) {
 function CheckModal({ booking, onClose, onConfirm }) {
   const [code, setCode] = useState("");
   const [checkResult, setCheckResult] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const videoRef = useRef(null);
+  const scannerControlsRef = useRef(null);
+  const scanResolvedRef = useRef(false);
+  const scanCancelledRef = useRef(false);
+
+  useEffect(() => () => {
+    scanCancelledRef.current = true;
+    scannerControlsRef.current?.stop();
+    scannerControlsRef.current = null;
+    stopCameraStream(videoRef.current);
+  }, []);
 
   if (!booking) return null;
 
-  const handleVerify = () => {
-    // Simulate verification against booking code or QR code
+  const verifyCode = (value) => {
+    const normalizedCode = String(value || "").trim().toUpperCase();
     const isValid =
-      code.trim().toUpperCase() === booking.bookingCode.toUpperCase() ||
-      code.trim().toUpperCase() === booking.qrCode.toUpperCase();
+      normalizedCode === String(booking.bookingCode || "").toUpperCase() ||
+      normalizedCode === String(booking.qrCode || "").toUpperCase();
 
     setCheckResult({
       valid: isValid,
-      alreadyUsed: booking.checkInTime !== null,
+      alreadyUsed: Boolean(booking.checkInTime),
     });
+  };
+
+  const handleVerify = () => verifyCode(code);
+
+  const stopScanner = () => {
+    scanCancelledRef.current = true;
+    scannerControlsRef.current?.stop();
+    scannerControlsRef.current = null;
+    stopCameraStream(videoRef.current);
+    setScanning(false);
+  };
+
+  const handleStartScanner = async () => {
+    if (scanning) return;
+
+    setScanError("");
+    setCheckResult(null);
+    scanResolvedRef.current = false;
+    scanCancelledRef.current = false;
+
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setScanError("Trình duyệt không hỗ trợ camera hoặc trang chưa chạy qua HTTPS.");
+      return;
+    }
+
+    setScanning(true);
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+
+    try {
+      const { BrowserQRCodeReader } = await import("@zxing/browser");
+      if (scanCancelledRef.current) return;
+
+      const reader = new BrowserQRCodeReader(undefined, { delayBetweenScanAttempts: 150 });
+      const controls = await reader.decodeFromConstraints(
+        {
+          audio: false,
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        },
+        videoRef.current,
+        (result, _error, activeControls) => {
+          scannerControlsRef.current = activeControls;
+          if (scanCancelledRef.current) {
+            activeControls.stop();
+            return;
+          }
+          if (!result || scanResolvedRef.current) return;
+
+          const scannedCode = String(result.getText?.() || "").trim();
+          if (!scannedCode) return;
+
+          scanResolvedRef.current = true;
+          setCode(scannedCode);
+          verifyCode(scannedCode);
+          activeControls.stop();
+          scannerControlsRef.current = null;
+          stopCameraStream(videoRef.current);
+          setScanning(false);
+        },
+      );
+
+      if (scanCancelledRef.current || scanResolvedRef.current) {
+        controls.stop();
+      } else {
+        scannerControlsRef.current = controls;
+      }
+    } catch (error) {
+      if (scanCancelledRef.current) return;
+      stopScanner();
+      setScanError(getCameraErrorMessage(error));
+    }
+  };
+
+  const handleClose = () => {
+    stopScanner();
+    onClose();
   };
 
   const handleCheckIn = () => {
@@ -298,16 +414,17 @@ function CheckModal({ booking, onClose, onConfirm }) {
   };
 
   const st = STATUS_MAP[booking.status] || { label: booking.status, cls: "pending" };
+  const isCheckedIn = Boolean(booking.checkInTime);
 
   return (
-    <div className="bk-modal-overlay" onClick={onClose}>
+    <div className="bk-modal-overlay" onClick={handleClose}>
       <div className="bk-modal bk-modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="bk-modal-header">
           <div>
             <h2>Kiểm tra vé</h2>
             <span className="bk-booking-code">{booking.bookingCode}</span>
           </div>
-          <button className="bk-modal-close" onClick={onClose}>✕</button>
+          <button className="bk-modal-close" onClick={handleClose}>✕</button>
         </div>
 
         <div className="bk-modal-body">
@@ -330,25 +447,47 @@ function CheckModal({ booking, onClose, onConfirm }) {
           </div>
 
           {/* Nhập mã kiểm tra */}
-          <div className="field-group" style={{ marginTop: 18 }}>
-            <label>Nhập mã vé hoặc quét QR</label>
-            <div className="bk-check-input-row">
-              <input
-                className="bk-search"
-                style={{ flex: 1 }}
-                placeholder="Mã vé hoặc mã QR…"
-                value={code}
-                onChange={(e) => { setCode(e.target.value); setCheckResult(null); }}
-                onKeyDown={(e) => e.key === "Enter" && handleVerify()}
-              />
-              <button className="bk-btn bk-btn-view" onClick={handleVerify}>
-                Xác minh
-              </button>
+          {!isCheckedIn && (
+            <div className="field-group" style={{ marginTop: 18 }}>
+              <label>Nhập mã vé hoặc quét QR</label>
+              <div className="bk-check-input-row">
+                <input
+                  className="bk-search"
+                  style={{ flex: 1 }}
+                  placeholder="Mã vé hoặc mã QR…"
+                  value={code}
+                  onChange={(e) => { setCode(e.target.value); setCheckResult(null); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleVerify()}
+                />
+                <button className="bk-btn bk-btn-view" onClick={handleVerify}>
+                  Xác minh
+                </button>
+                <button
+                  type="button"
+                  className="bk-btn bk-btn-scan"
+                  onClick={handleStartScanner}
+                  disabled={scanning}
+                >
+                  {scanning ? "Đang quét…" : "📷 Quét mã QR"}
+                </button>
+              </div>
+
+              <div className={`bk-qr-scanner${scanning ? " is-active" : ""}`} aria-hidden={!scanning}>
+                <video ref={videoRef} autoPlay muted playsInline />
+                <div className="bk-qr-scan-frame" aria-hidden="true" />
+                <div className="bk-qr-scan-status">Đưa mã QR vào giữa khung hình</div>
+                <button type="button" className="bk-qr-scan-stop" onClick={stopScanner}>Dừng quét</button>
+              </div>
+              {scanError && <div className="bk-camera-error">⚠️ {scanError}</div>}
             </div>
-          </div>
+          )}
 
           {/* Kết quả kiểm tra */}
-          {checkResult && (
+          {isCheckedIn ? (
+            <div className="bk-check-result valid">
+              <>✓ Check-in thành công! Có thể in vé.</>
+            </div>
+          ) : checkResult && (
             <div className={`bk-check-result ${checkResult.alreadyUsed ? "used" : checkResult.valid ? "valid" : "invalid"}`}>
               {checkResult.alreadyUsed ? (
                 <>⚠️ Vé này đã được sử dụng vào lúc <strong>{booking.checkInTime}</strong>.</>
@@ -362,12 +501,17 @@ function CheckModal({ booking, onClose, onConfirm }) {
         </div>
 
         <div className="bk-modal-footer">
-          {checkResult?.valid && !checkResult?.alreadyUsed && (
+          {checkResult?.valid && !checkResult?.alreadyUsed && !isCheckedIn && (
             <button className="bk-btn bk-btn-check bk-btn-lg" onClick={handleCheckIn}>
               Xác nhận Check-in
             </button>
           )}
-          <button className="bk-btn bk-btn-secondary bk-btn-lg" onClick={onClose}>
+          {isCheckedIn && (
+            <button className="bk-btn bk-btn-view bk-btn-lg" onClick={() => printTicketPdf(booking)}>
+              In vé / Lưu PDF
+            </button>
+          )}
+          <button className="bk-btn bk-btn-secondary bk-btn-lg" onClick={handleClose}>
             Đóng
           </button>
         </div>
@@ -395,6 +539,11 @@ export default function AdminBookings() {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [toast, setToast] = useState(null);
 
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
   useEffect(() => {
     const fetchBookings = async () => {
       try {
@@ -413,11 +562,6 @@ export default function AdminBookings() {
 
     fetchBookings();
   }, []);
-
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
 
   // Mở chi tiết
   const handleView = async (b) => {
@@ -455,8 +599,7 @@ export default function AdminBookings() {
         )
       );
       showToast(`Check-in vé ${booking.bookingCode} thành công!`, "success");
-      setActiveTab("list");
-      setSelectedBooking(null);
+      setSelectedBooking(updatedBooking);
     } catch (error) {
       console.error("Check-in failed", error);
       showToast(error.message || "Không thể check-in vé", "error");

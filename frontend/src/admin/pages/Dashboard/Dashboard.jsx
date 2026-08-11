@@ -15,6 +15,40 @@ function formatNumber(num) {
   return new Intl.NumberFormat("vi-VN").format(n);
 }
 
+const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentWeekStats(items = []) {
+  const valuesByDate = new Map(
+    items.map((item) => [
+      String(item?.date || "").slice(0, 10),
+      {
+        revenue: Number(item?.revenue) || 0,
+        bookings: Number(item?.bookings) || 0,
+      },
+    ]),
+  );
+
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+
+  return WEEKDAY_LABELS.map((label, index) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + index);
+    const dateKey = toDateKey(date);
+    const value = valuesByDate.get(dateKey) || { revenue: 0, bookings: 0 };
+
+    return { date: dateKey, label, ...value };
+  });
+}
+
 function generateLinePoints(data, width, height, padding) {
   if (!data || data.length === 0) {
     return "0,0";
@@ -135,9 +169,10 @@ export default function AdminDashboard() {
     );
   }
 
-  const chartLabels = statisticsData?.revenueByDay?.map((item) => new Date(item.date).toLocaleDateString("vi-VN", { weekday: "short" })) || ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-  const revenueData = statisticsData?.revenueByDay?.map((item) => Math.round(Number(item.revenue) / 1000000)) || [0, 0, 0, 0, 0, 0, 0];
-  const visitsData = statisticsData?.revenueByDay?.map((item) => Number(item.bookings)) || [0, 0, 0, 0, 0, 0, 0];
+  const currentWeekStats = getCurrentWeekStats(statisticsData?.revenueByDay);
+  const chartLabels = currentWeekStats.map((item) => item.label);
+  const revenueData = currentWeekStats.map((item) => Math.round(item.revenue / 1000000));
+  const visitsData = currentWeekStats.map((item) => item.bookings);
   const ticketData = statisticsData?.ticketSalesByType || [];
   const monthlyTopTickets = statisticsData?.ticketSalesByType?.map((item, i, arr) => {
     const max = Math.max(...arr.map((x) => Number(x.tickets_sold)), 1);
@@ -177,8 +212,8 @@ export default function AdminDashboard() {
         {[
           { title: "Người dùng", sub: "Tài khoản hoạt động", value: formatNumber(dashboardStats?.total_customers || 0), icon: "👤", color: "#7c61ff" },
           { title: "Phim", sub: "Đang được liệt kê", value: formatNumber(dashboardStats?.total_movies || 0), icon: "🎬", color: "#5bcad4" },
-          { title: "Đặt vé", sub: "Xác nhận hôm nay", value: formatNumber(dashboardStats?.total_bookings || 0), icon: "🎟", color: "#4ade80" },
-          { title: "Doanh thu", sub: "Dự đoán tháng", value: formatCurrency(dashboardStats?.total_revenue || 0), icon: "💰", color: "#fbbf24" },
+          { title: "Đặt vé", sub: "Đơn trong 30 ngày", value: formatNumber(dashboardStats?.total_bookings || 0), icon: "🎟", color: "#4ade80" },
+          { title: "Doanh thu", sub: "30 ngày gần nhất", value: formatCurrency(dashboardStats?.total_revenue || 0), icon: "💰", color: "#fbbf24" },
         ].map((s) => (
           <div className="stat-card" key={s.title}>
             <div className="stat-card-top">
