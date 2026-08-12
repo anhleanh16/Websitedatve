@@ -411,7 +411,7 @@ router.post('/payments/zalopay/confirm', authMiddleware, async (req, res) => {
     );
 
     try {
-      const fullBooking = await BookingModel.findById(Number(finalBooking?.booking_id || booking.booking_id || 0));
+      const fullBooking = await BookingModel.findById(Number(finalBooking?.booking_id || booking.booking_id || 0), { includeTicketQr: true });
       if (fullBooking) {
         await sendBookingSuccessNotification({
           userId: Number(pending.user_id),
@@ -424,7 +424,7 @@ router.post('/payments/zalopay/confirm', authMiddleware, async (req, res) => {
 
     let emailSent = false;
     try {
-      const fullBooking = await BookingModel.findById(Number(finalBooking?.booking_id || booking.booking_id || 0));
+      const fullBooking = await BookingModel.findById(Number(finalBooking?.booking_id || booking.booking_id || 0), { includeTicketQr: true });
       if (fullBooking) {
         const emailResult = await sendTicketQrEmail(fullBooking);
         emailSent = Boolean(emailResult?.sent);
@@ -522,7 +522,7 @@ router.post('/payments/zalopay/callback', async (req, res) => {
     await db.query(`DELETE FROM Pending_Payments WHERE app_trans_id = ?`, [String(app_trans_id)]).catch(() => {});
 
     try {
-      const fullBooking = await BookingModel.findById(Number(booking.booking_id || 0));
+      const fullBooking = await BookingModel.findById(Number(booking.booking_id || 0), { includeTicketQr: true });
       if (fullBooking) {
         try {
           await sendBookingSuccessNotification({

@@ -1150,8 +1150,13 @@ export default function AdminStaff() {
   const loadEmployees = async () => {
     try {
       const response = await adminEmployeeService.getAll();
+      let persisted = [];
+      try {
+        persisted = JSON.parse(localStorage.getItem('adminStaffList') || '[]');
+      } catch {
+        persisted = [];
+      }
       const serverEmployees = (response?.employees || []).map((employee) => {
-        const persisted = JSON.parse(localStorage.getItem('adminStaffList') || '[]');
         const localFallback = persisted.find((item) => String(item.id) === String(employee.id));
         return mapEmployeeToStaff(employee, localFallback);
       });

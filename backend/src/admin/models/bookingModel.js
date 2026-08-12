@@ -1,4 +1,5 @@
 import { db } from "../../../config/db.js";
+import { randomInt } from "node:crypto";
 import { PointsModel } from "./pointsModel.js";
 import { ensurePromotionSchema } from './promotionModel.js';
 
@@ -128,6 +129,27 @@ const normalizeFoodItems = (foodItems = []) => {
 
 const generateBookingCode = () =>
   `LNX${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+const generateTicketQrToken = () => {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  let token = '';
+  do {
+    token = Array.from({ length: 15 }, () => alphabet[randomInt(alphabet.length)]).join('');
+  } while (!/[A-Za-z]/.test(token) || !/\d/.test(token));
+  return token;
+};
+
+const getUniqueTicketQrToken = async (connection) => {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const token = generateTicketQrToken();
+    const [[exists]] = await connection.query(
+      'SELECT order_id FROM Orders WHERE ticket_qr_token = ? LIMIT 1',
+      [token],
+    );
+    if (!exists) return token;
+  }
+  throw buildBookingError('Không thể tạo mã QR vé. Vui lòng thử lại.', 500);
+};
 
 const shouldMarkAsPaidImmediately = (paymentMethod = "") => {
   const normalizedPaymentMethod = String(paymentMethod || "").trim().toLowerCase();
@@ -324,7 +346,7 @@ const awardBookingPoints = async (connection, userId, orderId, totalAmount, seat
   return { earnedPoints, newPoints: nextPoints, expiresAt };
 };
 
-const ensureBookingSchema = async () => {
+export const ensureBookingSchema = async () => {
   if (bookingSchemaPromise) return bookingSchemaPromise;
 
   bookingSchemaPromise = (async () => {
@@ -357,13 +379,39 @@ const ensureBookingSchema = async () => {
     if (!orderColumnSet.has('promotion_id')) {
       await db.query('ALTER TABLE Orders ADD COLUMN promotion_id INT NULL AFTER user_id');
     }
+    if (!orderColumnSet.has('guest_name')) {
+      await db.query('ALTER TABLE Orders ADD COLUMN guest_name VARCHAR(100) NULL AFTER user_id');
+    }
+    if (!orderColumnSet.has('guest_phone')) {
+      await db.query('ALTER TABLE Orders ADD COLUMN guest_phone VARCHAR(20) NULL AFTER guest_name');
+    }
+    if (!orderColumnSet.has('guest_email')) {
+      await db.query('ALTER TABLE Orders ADD COLUMN guest_email VARCHAR(100) NULL AFTER guest_phone');
+    }
+    if (!orderColumnSet.has('ticket_qr_token')) {
+      await db.query('ALTER TABLE Orders ADD COLUMN ticket_qr_token CHAR(15) NULL AFTER booking_code');
+    }
+    const [qrIndexes] = await db.query("SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Orders' AND INDEX_NAME = 'uq_orders_ticket_qr_token'");
+    if (!qrIndexes.length) {
+      await db.query('ALTER TABLE Orders ADD UNIQUE INDEX uq_orders_ticket_qr_token (ticket_qr_token)');
+    }
+    const [ordersWithoutToken] = await db.query(
+      "SELECT order_id FROM Orders WHERE user_id IS NOT NULL AND payment_status = 'paid' AND ticket_qr_token IS NULL",
+    );
+    for (const order of ordersWithoutToken) {
+      const token = await getUniqueTicketQrToken(db);
+      await db.query('UPDATE Orders SET ticket_qr_token = ? WHERE order_id = ? AND ticket_qr_token IS NULL', [token, order.order_id]);
+    }
 
     return {
       orderCombos: {
         hasSelectedPopcornType: true,
         hasSelectedDrinkType: true,
       },
-      orders: { hasPromotionId: true },
+      orders: {
+        hasPromotionId: true,
+        hasGuestCustomer: true,
+      },
     };
   })();
 
@@ -444,6 +492,7 @@ export const BookingModel = {
   },
 
   async findByUserId(userId) {
+    await ensureBookingSchema();
     await this.expirePendingBookings();
     const [bookings] = await db.query(
       `
@@ -464,7 +513,7 @@ export const BookingModel = {
         MIN(r.room_type)    AS room_type,
         GROUP_CONCAT(DISTINCT seat.seat_code ORDER BY seat.seat_code SEPARATOR ', ') AS seat_codes,
         COUNT(DISTINCT t.ticket_id) AS ticket_count,
-        MIN(t.qr_code)      AS primary_qr_code,
+        o.ticket_qr_token   AS primary_qr_code,
         MAX(t.check_in_time) AS check_in_time
       FROM Orders o
       LEFT JOIN Tickets t    ON t.order_id    = o.order_id
@@ -481,7 +530,8 @@ export const BookingModel = {
         o.payment_method,
         o.payment_status,
         o.status,
-        o.created_at
+        o.created_at,
+        o.ticket_qr_token
       ORDER BY o.created_at DESC
       `,
       [userId],
@@ -493,6 +543,7 @@ export const BookingModel = {
    * Lấy danh sách booking với các tùy chọn filter và search.
    */
   async findAll(filters = {}) {
+    await ensureBookingSchema();
     await this.expirePendingBookings();
     let query = `
       SELECT
@@ -503,9 +554,10 @@ export const BookingModel = {
         o.payment_status,
         o.status,
         o.created_at,
-        u.full_name,
-        u.email,
-        u.phone,
+        COALESCE(NULLIF(TRIM(u.full_name), ''), NULLIF(TRIM(o.guest_name), ''), 'Khách vãng lai') AS full_name,
+        COALESCE(u.email, o.guest_email) AS email,
+        COALESCE(u.phone, o.guest_phone) AS phone,
+        CASE WHEN o.user_id IS NULL THEN 'guest' ELSE 'account' END AS customer_type,
         MIN(m.title) AS movie_title,
         MIN(s.start_time) AS start_time,
         MIN(c.cinema_name) AS cinema_name,
@@ -513,7 +565,7 @@ export const BookingModel = {
         GROUP_CONCAT(DISTINCT seat.seat_code ORDER BY seat.seat_code SEPARATOR ', ') AS seat_codes,
         MAX(t.check_in_time) AS check_in_time
       FROM Orders o
-      JOIN User u ON o.user_id = u.id
+      LEFT JOIN User u ON o.user_id = u.id
       LEFT JOIN Tickets t ON t.order_id = o.order_id
       LEFT JOIN Showtimes s ON t.showtime_id = s.showtime_id
       LEFT JOIN Movies m ON s.movie_id = m.movie_id
@@ -532,10 +584,21 @@ export const BookingModel = {
 
     if (filters.search) {
       whereClauses.push(
-        "(u.full_name LIKE ? OR u.email LIKE ? OR m.title LIKE ? OR o.booking_code LIKE ?)",
+        `(u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
+          OR o.guest_name LIKE ? OR o.guest_email LIKE ? OR o.guest_phone LIKE ?
+          OR m.title LIKE ? OR o.booking_code LIKE ?)`,
       );
       const searchTerm = `%${filters.search}%`;
-      queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
+      queryParams.push(
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+      );
     }
 
     if (whereClauses.length > 0) {
@@ -551,6 +614,10 @@ export const BookingModel = {
         o.payment_status,
         o.status,
         o.created_at,
+        o.user_id,
+        o.guest_name,
+        o.guest_email,
+        o.guest_phone,
         u.full_name,
         u.email,
         u.phone
@@ -564,7 +631,8 @@ export const BookingModel = {
   /**
    * Lấy chi tiết một booking bằng ID.
    */
-  async findById(id) {
+  async findById(id, { includeTicketQr = false } = {}) {
+    await ensureBookingSchema();
     await this.expirePendingBookings();
     const [bookingDetails] = await db.query(
       `
@@ -577,19 +645,20 @@ export const BookingModel = {
         o.status,
         o.created_at,
         u.id AS user_id,
-        u.full_name,
-        u.email,
-        u.phone AS phone_number,
+        COALESCE(NULLIF(TRIM(u.full_name), ''), NULLIF(TRIM(o.guest_name), ''), 'Khách vãng lai') AS full_name,
+        COALESCE(u.email, o.guest_email) AS email,
+        COALESCE(u.phone, o.guest_phone) AS phone_number,
+        CASE WHEN o.user_id IS NULL THEN 'guest' ELSE 'account' END AS customer_type,
         MIN(s.start_time) AS start_time,
         MIN(s.end_time) AS end_time,
         MIN(m.title) AS movie_title,
         MIN(m.poster) AS poster,
         MIN(c.cinema_name) AS cinema_name,
         MIN(r.room_name) AS room_name,
-        MIN(t.qr_code) AS primary_qr_code,
+        ${includeTicketQr ? 'o.ticket_qr_token' : 'NULL'} AS primary_qr_code,
         MAX(t.check_in_time) AS check_in_time
       FROM Orders o
-      JOIN User u ON o.user_id = u.id
+      LEFT JOIN User u ON o.user_id = u.id
       LEFT JOIN Tickets t ON t.order_id = o.order_id
       LEFT JOIN Showtimes s ON t.showtime_id = s.showtime_id
       LEFT JOIN Movies m ON s.movie_id = m.movie_id
@@ -604,10 +673,15 @@ export const BookingModel = {
         o.payment_status,
         o.status,
         o.created_at,
+        o.user_id,
+        o.guest_name,
+        o.guest_email,
+        o.guest_phone,
         u.id,
         u.full_name,
         u.email,
-        u.phone
+        u.phone,
+        o.ticket_qr_token
     `,
       [id],
     );
@@ -626,9 +700,7 @@ export const BookingModel = {
       [id],
     );
     booking.seats = seats.map((s) => s.seat_code);
-    booking.qr_codes = seats.map((s) => s.qr_code).filter(Boolean);
-    booking.primary_qr_code =
-      booking.primary_qr_code || booking.qr_codes[0] || booking.booking_code;
+    booking.qr_codes = includeTicketQr && booking.primary_qr_code ? [booking.primary_qr_code] : [];
     booking.check_in_time =
       booking.check_in_time || seats.find((seat) => seat.check_in_time)?.check_in_time || null;
 
@@ -655,25 +727,27 @@ export const BookingModel = {
    * Tìm booking bằng mã code.
    */
   async findByCode(code) {
+    await ensureBookingSchema();
     const [bookingDetails] = await db.query(
       `
       SELECT 
         o.order_id AS booking_id,
         o.booking_code,
         o.status,
-        u.full_name,
+        COALESCE(NULLIF(TRIM(u.full_name), ''), NULLIF(TRIM(o.guest_name), ''), 'Khách vãng lai') AS full_name,
+        CASE WHEN o.user_id IS NULL THEN 'guest' ELSE 'account' END AS customer_type,
         MIN(m.title) AS movie_title,
         MIN(s.start_time) AS start_time,
         MAX(t.check_in_time) AS check_in_time
       FROM Orders o
-      JOIN User u ON o.user_id = u.id
+      LEFT JOIN User u ON o.user_id = u.id
       LEFT JOIN Tickets t ON t.order_id = o.order_id
       LEFT JOIN Showtimes s ON t.showtime_id = s.showtime_id
       LEFT JOIN Movies m ON s.movie_id = m.movie_id
-      WHERE o.booking_code = ? OR t.qr_code = ?
-      GROUP BY o.order_id, o.booking_code, o.status, u.full_name
+      WHERE o.ticket_qr_token = ? AND o.user_id IS NOT NULL
+      GROUP BY o.order_id, o.booking_code, o.status, o.user_id, o.guest_name, u.full_name
     `,
-      [code, code],
+      [String(code || '').trim()],
     );
     return bookingDetails[0] || null;
   },
@@ -689,20 +763,37 @@ export const BookingModel = {
     return result.affectedRows > 0;
   },
 
-  async checkIn(id) {
+  async checkIn(id, qrToken) {
     const connection = await db.getConnection();
 
     try {
       await connection.beginTransaction();
 
       const [[order]] = await connection.query(
-        "SELECT order_id, status FROM Orders WHERE order_id = ? FOR UPDATE",
+        "SELECT order_id, status, user_id, ticket_qr_token FROM Orders WHERE order_id = ? FOR UPDATE",
         [id],
       );
 
       if (!order) {
         await connection.rollback();
         return false;
+      }
+
+      if (order.status === 'completed') {
+        throw buildBookingError('Vé này đã được check-in trước đó.', 400);
+      }
+
+      if (order.status !== 'confirmed') {
+        throw buildBookingError(`Vé ở trạng thái ${order.status} không thể check-in.`, 400);
+      }
+
+      if (!order.user_id) {
+        // Khách vãng lai: không cần QR, check-in trực tiếp
+      } else {
+        // Tài khoản khách hàng: bắt buộc phải khớp QR token
+        if (!order.ticket_qr_token || !qrToken || String(order.ticket_qr_token).trim() !== String(qrToken).trim()) {
+          throw buildBookingError('Mã QR không khớp với vé này.', 403);
+        }
       }
 
       await connection.query(
@@ -732,6 +823,7 @@ export const BookingModel = {
 
   async createUserBooking({
     userId,
+    guestCustomer = null,
     showtimeId,
     seatUnits = [],
     foodItems = [],
@@ -739,18 +831,27 @@ export const BookingModel = {
     paymentMethod = "zalopay",
   }) {
     await ensureBookingSchema();
-    await PointsModel.ensureSchema();
     await ensurePromotionSchema();
 
     const normalizedUserId = Number(userId || 0);
+    const normalizedGuestCustomer = {
+      fullName: String(guestCustomer?.full_name || guestCustomer?.fullName || "").trim(),
+      phone: String(guestCustomer?.phone || "").trim(),
+      email: String(guestCustomer?.email || "").trim() || null,
+    };
+    const isGuestBooking = !normalizedUserId && Boolean(normalizedGuestCustomer.fullName);
     const normalizedShowtimeId = Number(showtimeId || 0);
     const normalizedSeatUnits = normalizeSeatUnits(seatUnits);
     const normalizedFoodItems = normalizeFoodItems(foodItems);
     const initialPaymentStatus = shouldMarkAsPaidImmediately(paymentMethod) ? 'paid' : 'pending';
     const initialOrderStatus = shouldMarkAsPaidImmediately(paymentMethod) ? 'confirmed' : 'pending';
 
-    if (!normalizedUserId) {
-      throw buildBookingError("Không xác định được người dùng đặt vé.");
+    if (!normalizedUserId && !isGuestBooking) {
+      throw buildBookingError("Không xác định được khách hàng đặt vé.");
+    }
+
+    if (isGuestBooking && !normalizedGuestCustomer.phone) {
+      throw buildBookingError("Vui lòng nhập số điện thoại khách vãng lai.");
     }
 
     if (!normalizedShowtimeId) {
@@ -770,9 +871,11 @@ export const BookingModel = {
     try {
       await connection.beginTransaction();
 
-      const roleName = await getRoleNameByUserId(connection, normalizedUserId);
-      if (!isCustomerRoleName(roleName)) {
-        throw buildBookingError('Chỉ tài khoản khách hàng mới có quyền đặt vé.', 403);
+      if (!isGuestBooking) {
+        const roleName = await getRoleNameByUserId(connection, normalizedUserId);
+        if (!isCustomerRoleName(roleName)) {
+          throw buildBookingError('Chỉ tài khoản khách hàng mới có quyền đặt vé.', 403);
+        }
       }
 
       const showtimePriceCols = await getShowtimePriceColumns();
@@ -900,7 +1003,9 @@ export const BookingModel = {
         0,
       );
       const subtotalAmount = seatTotal + foodTotal;
-      const membership = await resolveMembershipDiscount(connection, normalizedUserId, subtotalAmount);
+      const membership = isGuestBooking
+        ? { levelName: '', discountPercent: 0, discountAmount: 0 }
+        : await resolveMembershipDiscount(connection, normalizedUserId, subtotalAmount);
       const amountAfterMembership = Math.max(0, subtotalAmount - membership.discountAmount);
       const seatAmountAfterMembership = Math.max(0, Math.round(seatTotal * (1 - membership.discountPercent / 100)));
       const comboAmountAfterMembership = Math.max(0, amountAfterMembership - seatAmountAfterMembership);
@@ -924,22 +1029,41 @@ export const BookingModel = {
         if (!existing) break;
         bookingCode = generateBookingCode();
       }
+      const ticketQrToken = initialPaymentStatus === 'paid' && !isGuestBooking
+        ? await getUniqueTicketQrToken(connection)
+        : null;
 
       const [orderResult] = await connection.query(
         `
         INSERT INTO Orders (
           user_id,
+          guest_name,
+          guest_phone,
+          guest_email,
           promotion_id,
           total_amount,
           payment_method,
           payment_status,
           order_date,
           booking_code,
+          ticket_qr_token,
           status
         )
-        VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
       `,
-        [normalizedUserId, promotion.promotionId, totalAmount, String(paymentMethod || "zalopay").trim(), initialPaymentStatus, bookingCode, initialOrderStatus],
+        [
+          normalizedUserId || null,
+          isGuestBooking ? normalizedGuestCustomer.fullName : null,
+          isGuestBooking ? normalizedGuestCustomer.phone : null,
+          isGuestBooking ? normalizedGuestCustomer.email : null,
+          promotion.promotionId,
+          totalAmount,
+          String(paymentMethod || "zalopay").trim(),
+          initialPaymentStatus,
+          bookingCode,
+          ticketQrToken,
+          initialOrderStatus,
+        ],
       );
 
       const orderId = Number(orderResult.insertId);
@@ -964,7 +1088,7 @@ export const BookingModel = {
               orderId,
               normalizedShowtimeId,
               seat.seat_id,
-              `${bookingCode}-${seatCode}`,
+              null,
             ],
           );
         }
@@ -1005,11 +1129,13 @@ export const BookingModel = {
       let pointsResult = { earnedPoints: 0, newPoints: 0 };
       if (initialPaymentStatus === 'paid') {
         await consumePromotionForOrder(connection, { promotionId: promotion.promotionId, userId: normalizedUserId });
-        pointsResult = await awardBookingPoints(connection, normalizedUserId, orderId, totalAmount, normalizedSeatUnits, normalizedFoodItems);
+        if (!isGuestBooking) {
+          pointsResult = await awardBookingPoints(connection, normalizedUserId, orderId, totalAmount, normalizedSeatUnits, normalizedFoodItems);
+        }
       }
 
       await connection.commit();
-      const booking = await this.findById(orderId);
+      const booking = await this.findById(orderId, { includeTicketQr: true });
       return {
         ...booking,
         pricing: {
@@ -1055,7 +1181,7 @@ export const BookingModel = {
 
       // Lấy thông tin order
       const [[order]] = await connection.query(
-        `SELECT order_id, user_id, promotion_id, total_amount, payment_status, status
+        `SELECT order_id, user_id, promotion_id, total_amount, payment_status, status, ticket_qr_token
          FROM Orders WHERE order_id = ? FOR UPDATE`,
         [normalizedOrderId],
       );
@@ -1066,10 +1192,11 @@ export const BookingModel = {
 
       await consumePromotionForOrder(connection, { promotionId: order.promotion_id, userId: normalizedUserId });
 
-      // Mark paid
+      const ticketQrToken = order.ticket_qr_token || await getUniqueTicketQrToken(connection);
+      // Mark paid and issue the one-time QR ticket token.
       await connection.query(
-        `UPDATE Orders SET payment_status = 'paid', status = 'confirmed' WHERE order_id = ?`,
-        [normalizedOrderId],
+        `UPDATE Orders SET payment_status = 'paid', status = 'confirmed', ticket_qr_token = ? WHERE order_id = ?`,
+        [ticketQrToken, normalizedOrderId],
       );
 
       // Lấy seat units và food items để tính điểm
@@ -1103,7 +1230,7 @@ export const BookingModel = {
 
       await connection.commit();
 
-      const booking = await this.findById(normalizedOrderId);
+      const booking = await this.findById(normalizedOrderId, { includeTicketQr: true });
       return {
         ...booking,
         pointsAwarded: Number(pointsResult?.earnedPoints || 0),

@@ -1,4 +1,5 @@
-﻿import { db } from '../../../config/db.js';
+import { db } from '../../../config/db.js';
+import bcrypt from 'bcryptjs';
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 let emailVerificationSchemaReady = null;
@@ -320,4 +321,66 @@ export const findUserById = async (userId) => {
     ...user,
     role: deriveRoleFromEmployee(user),
   };
+};
+
+export const seedDefaultAdminUser = async () => {
+  try {
+    await ensureUserNameSchema();
+    await ensureEmailVerificationSchema();
+    const [[existing]] = await db.query(
+      'SELECT COUNT(*) AS cnt FROM User WHERE LOWER(email) = ? OR LOWER(user_name) = ?',
+      ['admin@example.com', 'admin']
+    );
+    if (Number(existing?.cnt || 0) > 0) {
+      return { created: false, message: 'Admin user already exists.' };
+    }
+    const adminRoleId = await ensureRoleExists('admin', 'System Administrator with full access');
+    const userRoleId = await ensureRoleExists('user', 'Regular customer user');
+    const staffRoleId = await ensureRoleExists('staff', 'Cinema staff');
+    const managerRoleId = await ensureRoleExists('manager', 'Cinema manager');
+    const technicianRoleId = await ensureRoleExists('technician', 'Technical staff');
+    const hashedPassword = await bcrypt.hash('123456', 10);
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      const adminUserId = await createUser(
+        {
+          roleId: adminRoleId,
+          full_name: 'Quản trị viên',
+          user_name: 'admin',
+          email: 'admin@example.com',
+          password: hashedPassword,
+          phone: '0900000000',
+          birthday: '1990-01-01',
+          sex: 'Nam',
+        },
+        connection
+      );
+      await connection.query(
+        `UPDATE User SET email_verified = 1, email_verified_at = NOW() WHERE id = ?`,
+        [adminUserId]
+      );
+      const [empResult] = await connection.query(
+        `INSERT INTO Employees (user_id, full_name, position, phone, email, hire_date, status)
+         VALUES (?, ?, 'Quản lý hệ thống', '0900000000', 'admin@example.com', CURDATE(), 'active')`,
+        [adminUserId, 'Quản trị viên']
+      );
+      await connection.commit();
+      return {
+        created: true,
+        message: 'Default admin user created successfully.',
+        userId: adminUserId,
+        employeeId: empResult.insertId,
+        credentials: { email: 'admin@example.com', username: 'admin', password: '123456' },
+      };
+    } catch (txErr) {
+      try { await connection.rollback(); } catch {}
+      throw txErr;
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    console.error('[seedDefaultAdminUser] error:', err);
+    return { created: false, error: err.message };
+  }
 };

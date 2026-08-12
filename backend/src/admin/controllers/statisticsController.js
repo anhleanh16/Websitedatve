@@ -10,8 +10,9 @@ export const getStatistics = async (req, res) => {
       startDate: req.query.startDate,
       endDate: req.query.endDate,
       cinemaId: req.query.cinemaId,
+      period: req.query.period || "total",
     });
-    console.log("Model returned stats. Overview:", stats.overview);
+    console.log("Model returned stats. Overview:", stats.overview, "Period:", stats.meta?.period);
     res.json(stats);
   } catch (error) {
     console.error("=== [DEBUG] ERROR in getStatistics ===");

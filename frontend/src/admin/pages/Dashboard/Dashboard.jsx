@@ -15,6 +15,20 @@ function formatNumber(num) {
   return new Intl.NumberFormat("vi-VN").format(n);
 }
 
+function formatCompactCurrency(amount) {
+  const value = Number(amount) || 0;
+  const format = (number) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(number);
+  if (value >= 1_000_000_000) return `${format(value / 1_000_000_000)} tỷ`;
+  if (value >= 1_000_000) return `${format(value / 1_000_000)} tr`;
+  if (value >= 1_000) return `${format(value / 1_000)} nghìn`;
+  return `${format(value)} ₫`;
+}
+
+function formatShortDate(dateKey) {
+  const [, month = "", day = ""] = String(dateKey || "").split("-");
+  return day && month ? `${day}/${month}` : "";
+}
+
 const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
 function toDateKey(date) {
@@ -142,7 +156,8 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    loadData();
+    const timeoutId = window.setTimeout(loadData, 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   if (loading) {
@@ -171,7 +186,7 @@ export default function AdminDashboard() {
 
   const currentWeekStats = getCurrentWeekStats(statisticsData?.revenueByDay);
   const chartLabels = currentWeekStats.map((item) => item.label);
-  const revenueData = currentWeekStats.map((item) => Math.round(item.revenue / 1000000));
+  const revenueData = currentWeekStats.map((item) => item.revenue);
   const visitsData = currentWeekStats.map((item) => item.bookings);
   const ticketData = statisticsData?.ticketSalesByType || [];
   const monthlyTopTickets = statisticsData?.ticketSalesByType?.map((item, i, arr) => {
@@ -183,9 +198,22 @@ export default function AdminDashboard() {
     };
   }) || [];
   const totalTicketsSold = ticketData.reduce((sum, item) => sum + Number(item.tickets_sold), 0);
+  const weeklyRevenue = revenueData.reduce((sum, value) => sum + value, 0);
+  const weeklyBookings = visitsData.reduce((sum, value) => sum + value, 0);
+  const maxWeeklyRevenue = Math.max(...revenueData, 1);
+  const revenueAxisValues = [1, 0.75, 0.5, 0.25, 0].map((ratio) => maxWeeklyRevenue * ratio);
+  const maxBookingValue = Math.max(...visitsData, 0);
+  const bookingAxisMax = maxBookingValue <= 2
+    ? 2
+    : maxBookingValue <= 4
+      ? 4
+      : maxBookingValue <= 6
+        ? 6
+        : Math.ceil(maxBookingValue / 4) * 4;
+  const bookingAxisValues = [bookingAxisMax, bookingAxisMax / 2, 0];
+  const todayKey = toDateKey(new Date());
 
   const revenuePoints = generateLinePoints(revenueData, 520, 220, 24);
-  const visitsPoints = generateLinePoints(visitsData, 520, 220, 24);
   const pieSegments = generatePieSegments(ticketData, 92);
 
   const recentActivity = [
@@ -238,53 +266,100 @@ export default function AdminDashboard() {
               <h3>Doanh thu</h3>
               <p>Báo cáo doanh thu theo ngày trong tuần.</p>
             </div>
+            <div className="chart-week-total">
+              <span>Tổng tuần</span>
+              <strong>{formatCurrency(weeklyRevenue)}</strong>
+            </div>
           </div>
-          <div className="chart-graph">
-            <svg viewBox="0 0 520 220" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="lineGradient" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(124,97,255,0.85)" />
-                  <stop offset="100%" stopColor="rgba(124,97,255,0.12)" />
-                </linearGradient>
-              </defs>
-              <polyline className="chart-line-path" fill="none" stroke="url(#lineGradient)" strokeWidth="4" points={revenuePoints} />
-              {revenueData.map((v, i) => {
-                const max = Math.max(...revenueData, 1);
-                const x = 24 + (i * 472) / (revenueData.length - 1 || 1);
-                const y = 220 - 24 - (v / max) * 172;
-                return <circle key={i} cx={x} cy={y} r="6" fill="#7c61ff" stroke="#fff" strokeWidth="2" />;
-              })}
-            </svg>
-            <div className="chart-labels">
-              {chartLabels.map((lb, i) => (
-                <span key={i}>{lb}</span>
-              ))}
+          <div className="revenue-chart-layout">
+            <div className="revenue-chart-axis" aria-hidden="true">
+              {revenueAxisValues.map((value, index) => <span key={index}>{formatCompactCurrency(value)}</span>)}
+            </div>
+            <div className="revenue-chart-main">
+              <div className="revenue-chart-plot">
+                <svg viewBox="0 0 520 220" preserveAspectRatio="none" aria-label="Biểu đồ doanh thu tuần này">
+                  <defs>
+                    <linearGradient id="lineGradient" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="rgba(124,97,255,0.95)" />
+                      <stop offset="100%" stopColor="rgba(124,97,255,0.35)" />
+                    </linearGradient>
+                  </defs>
+                  {[24, 67, 110, 153, 196].map((y) => (
+                    <line key={y} className="revenue-grid-line" x1="24" x2="496" y1={y} y2={y} />
+                  ))}
+                  <polyline className="chart-line-path" fill="none" stroke="url(#lineGradient)" strokeWidth="4" points={revenuePoints} />
+                  {revenueData.map((value, index) => {
+                    const x = 24 + (index * 472) / (revenueData.length - 1 || 1);
+                    const y = 220 - 24 - (value / maxWeeklyRevenue) * 172;
+                    return (
+                      <circle key={chartLabels[index]} cx={x} cy={y} r="6" fill="#7c61ff" stroke="#fff" strokeWidth="2">
+                        <title>{`${chartLabels[index]}: ${formatCurrency(value)}`}</title>
+                      </circle>
+                    );
+                  })}
+                </svg>
+              </div>
+              <div className="chart-labels">
+                {chartLabels.map((label) => <span key={label}>{label}</span>)}
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Bar chart – lượt truy cập */}
+        {/* Bar chart – số đơn hàng */}
         <section className="activity-panel chart-card">
           <div className="chart-panel-header">
             <div>
               <h3>Số đơn hàng</h3>
-              <p>Biểu đồ số đơn hàng theo ngày.</p>
+              <p>Số đơn đã thanh toán theo từng ngày trong tuần.</p>
+            </div>
+            <div className="chart-week-total">
+              <span>Tổng tuần</span>
+              <strong>{formatNumber(weeklyBookings)} đơn</strong>
             </div>
           </div>
-          <div className="chart-bar-grid">
-            {visitsData.map((v, i) => {
-              const max = Math.max(...visitsData, 1);
-              return (
-                <div key={i} className="chart-bar-item">
-                  <div className="chart-bar-fill" style={{ height: `${(v / max) * 160}px` }} />
-                  <span>{chartLabels[i]}</span>
+          <div className="booking-chart-layout">
+            <div className="booking-chart-axis" aria-hidden="true">
+              {bookingAxisValues.map((value) => <span key={value}>{value}</span>)}
+            </div>
+            <div className="booking-chart-main">
+              <div
+                className="booking-chart-plot"
+                role="img"
+                aria-label={`Số đơn hàng trong tuần: ${currentWeekStats.map((item) => `${item.label} ${item.bookings} đơn`).join(", ")}`}
+              >
+                {bookingAxisValues.map((value, index) => (
+                  <div
+                    key={value}
+                    className="booking-chart-grid-line"
+                    style={{ top: `${(index / (bookingAxisValues.length - 1 || 1)) * 100}%` }}
+                  />
+                ))}
+                <div className="chart-bar-grid">
+                  {visitsData.map((value, index) => (
+                    <div
+                      key={currentWeekStats[index].date}
+                      className="chart-bar-item"
+                      title={`${chartLabels[index]} ${formatShortDate(currentWeekStats[index].date)}: ${value} đơn`}
+                    >
+                      <span className="chart-bar-value">{value}</span>
+                      <div
+                        className={`chart-bar-fill${value === 0 ? " empty" : ""}`}
+                        style={{ height: `${(value / bookingAxisMax) * 176}px` }}
+                      />
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-          <div className="chart-bar-values">
-            <span>{Math.min(...visitsData, 0)}</span>
-            <span>{Math.max(...visitsData, 0)}</span>
+              </div>
+              <div className="booking-chart-labels">
+                {currentWeekStats.map((item) => (
+                  <span key={item.date} className={item.date === todayKey ? "current" : ""}>
+                    <strong>{item.label}</strong>
+                    <small>{formatShortDate(item.date)}</small>
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
       </div>

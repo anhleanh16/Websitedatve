@@ -183,11 +183,15 @@ CREATE TABLE Showtimes (
 CREATE TABLE Orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
+    guest_name VARCHAR(100) NULL,
+    guest_phone VARCHAR(20) NULL,
+    guest_email VARCHAR(100) NULL,
     total_amount DECIMAL(12,2),
     payment_method VARCHAR(50),
     payment_status ENUM('pending','paid','failed'),
     order_date DATETIME,
     booking_code VARCHAR(50),
+    ticket_qr_token CHAR(15) NULL UNIQUE,
     status ENUM('pending','confirmed','completed','cancelled'),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 

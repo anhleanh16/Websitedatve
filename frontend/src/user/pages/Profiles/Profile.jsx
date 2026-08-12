@@ -1042,7 +1042,7 @@ export default function Profile() {
                         </span>
                       </div>
                       <div className='ticket-meta'>
-                        <span>Mã vé: <strong>{t.booking_code}</strong></span>
+                        <span>Mã đơn: <strong>{t.booking_code}</strong></span>
                       </div>
                     </div>
                     <div className='ticket-right'>
@@ -1258,7 +1258,6 @@ export default function Profile() {
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrModal.qrCode)}&bgcolor=ffffff&color=1a1a2e&margin=2`}
                 alt='QR Code vé'
               />
-              <p className='qr-modal-code-text'>{qrModal.bookingCode}</p>
             </div>
 
             <p className='qr-modal-hint'>

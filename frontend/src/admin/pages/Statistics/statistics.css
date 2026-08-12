@@ -462,3 +462,194 @@
 .cinema-stats-table tbody tr:hover {
   background: rgba(124, 97, 255, 0.08);
 }
+
+/* ─── Period Selector ──────────────────────────────────────────────────────── */
+.period-selector-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(90deg, rgba(124, 97, 255, 0.08), rgba(91, 202, 212, 0.04));
+  border: 1px solid rgba(124, 97, 255, 0.15);
+  border-radius: 0.75rem;
+}
+
+.period-selector-label {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.period-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.period-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.125rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: #9ca3af;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.period-tab:hover {
+  background: rgba(124, 97, 255, 0.12);
+  color: #fff;
+  border-color: rgba(124, 97, 255, 0.35);
+}
+
+.period-tab.active {
+  background: linear-gradient(135deg, #7c61ff, #5bcad4);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 18px rgba(124, 97, 255, 0.28);
+}
+
+.pt-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.current-period-tag {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  background: linear-gradient(135deg, rgba(124, 97, 255, 0.2), rgba(91, 202, 212, 0.15));
+  border: 1px solid rgba(124, 97, 255, 0.3);
+  border-radius: 999px;
+  color: #c4b5fd;
+  vertical-align: middle;
+  position: relative;
+  top: -4px;
+}
+
+/* ─── View Toggle ───────────────────────────────────────────────────────────── */
+.view-toggle-group {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.vt-btn {
+  padding: 0.45rem 0.9rem;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.vt-btn:hover {
+  color: #fff;
+  background: rgba(124, 97, 255, 0.1);
+}
+
+.vt-btn.active {
+  background: linear-gradient(135deg, rgba(124, 97, 255, 0.85), rgba(91, 202, 212, 0.7));
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ─── Bar Chart ─────────────────────────────────────────────────────────────── */
+.bar-chart-wrapper {
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.bar-chart-full svg {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.bar-rect {
+  transition: opacity 0.2s, filter 0.2s;
+  cursor: pointer;
+}
+
+.bar-rect:hover {
+  opacity: 0.82;
+  filter: brightness(1.15);
+}
+
+.bar-axis-label {
+  fill: #9ca3af;
+  font-size: 10.5px;
+  font-family: inherit;
+}
+
+.bar-axis-label-h {
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-axis-xlabel {
+  font-size: 10px;
+  fill: #6b7280;
+}
+
+.bar-axis-tiny {
+  font-size: 9.5px;
+  fill: #6b7280;
+}
+
+.bar-value-label {
+  fill: #e5e7eb;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.bar-value-label-v {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/* ─── Misc Table Helpers ──────────────────────────────────────────────────── */
+.td-color-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.04);
+}
+
+.cinema-stats-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cinema-stats-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.cinema-stats-scroll::-webkit-scrollbar-thumb {
+  background: rgba(124, 97, 255, 0.35);
+  border-radius: 4px;
+}
+
+.cinema-stats-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
