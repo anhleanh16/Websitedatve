@@ -33,6 +33,25 @@ DB_NAME=sweetstar
 PORT=4000
 ```
 
+**Cấu hình Sweetstar AI**
+
+AI Assistant sử dụng Gemini từ backend. Mở `backend/.env` và nhập API key lấy tại [Google AI Studio](https://aistudio.google.com/apikey):
+
+```
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-3.6-flash
+GEMINI_TTS_MODEL=gemini-3.1-flash-tts-preview
+```
+
+Không đặt API key trong `frontend/.env` hoặc mã React. Sau khi thêm hoặc thay đổi key, hãy tắt và chạy lại backend:
+
+```bash
+cd backend
+npm run dev
+```
+
+Nếu chưa có key, chat sẽ trả về thông báo `AI Assistant chưa được cấu hình trên máy chủ.`. Khóa được đọc mỗi lần backend khởi động, nên không cần build lại frontend.
+
 Để bật tính năng xác minh email khi đăng ký, bổ sung thêm:
 
 ```
