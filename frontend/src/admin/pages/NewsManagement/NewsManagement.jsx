@@ -39,31 +39,26 @@ const getEditorConfig = () => {
   const apiBase = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
   return {
+    licenseKey: "GPL",
     toolbar: {
       items: [
         "heading",
         "|",
         "bold",
         "italic",
-        "underline",
-        "strikethrough",
-        "fontSize",
-        "fontColor",
-        "highlight",
-        "|",
-        "alignment",
-        "|",
         "link",
         "|",
         "bulletedList",
         "numberedList",
         "|",
         "blockQuote",
-        "code",
         "|",
         "insertTable",
         "|",
         "imageUpload",
+        "|",
+        "undo",
+        "redo",
       ],
       shouldNotGroupWhenFull: true,
     },
@@ -89,12 +84,6 @@ const getEditorConfig = () => {
     table: {
       contentToolbar: ["tableColumn", "tableRow", "mergeTableCells"],
     },
-    fontSize: {
-      options: [9, 11, 13, 16, 18, 24, 32],
-    },
-    alignment: {
-      options: ["left", "center", "right", "justify"],
-    },
     simpleUpload: {
       uploadUrl: `${apiBase}/admin/upload/ckeditor-image`,
       withCredentials: false,
@@ -112,6 +101,8 @@ const uploadPastedImage = async (file, editor) => {
   formData.append("upload", file);
 
   try {
+    formData.append("upload", file);
+
     const response = await fetch(`${apiBase}/admin/upload/ckeditor-image`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},

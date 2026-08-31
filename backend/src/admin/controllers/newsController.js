@@ -61,12 +61,13 @@ export const updateAdminNews = async (req, res) => {
 
 export const uploadNewsInlineImage = async (req, res) => {
   try {
-    if (!req.file) {
+    const uploadedFile = req.file || req.files?.[0];
+    if (!uploadedFile) {
       return res.status(400).json({ error: { message: "Không có file được upload." } });
     }
-    const url = `/uploads/news/inline/${req.file.filename}`;
+    const url = `/uploads/news/inline/${uploadedFile.filename}`;
     // CKEditor 5 expects: { url: "..." }
-    res.json({ url });
+    res.json({ url, default: url });
   } catch (error) {
     console.error("Error in uploadNewsInlineImage:", error);
     res.status(500).json({ error: { message: "Không thể upload ảnh." } });

@@ -15,14 +15,8 @@ const sanitizeShortDescription = (value) => {
   if (!value) return "";
 
   return String(value)
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&(nbsp|#160);/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/\s+/g, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
     .trim();
 };
 
@@ -99,9 +93,9 @@ const resolveEmployeeIdByUserId = async (userId, connection = db) => {
 const mapNewsPayload = async (payload = {}, { excludeNewsId = null, connection = db } = {}) => {
   const title = String(payload.title || "").trim();
   const content = String(payload.content || "").trim();
-  const shortDescription = sanitizeShortDescription(
+  const shortDescription = String(
     payload.short_description || payload.shortDescription || "",
-  );
+  ).trim();
   const thumbnail = String(payload.thumbnail || "").trim();
   const category = String(payload.category || "").trim();
   const status = String(payload.status || "draft").trim();

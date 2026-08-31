@@ -32,6 +32,16 @@ export const getAdminUsers = async (req, res) => {
   }
 };
 
+export const getRoleSummary = async (req, res) => {
+  try {
+    const roles = await UserModel.findRoleSummary();
+    res.json({ roles });
+  } catch (err) {
+    console.error("Error in getRoleSummary:", err);
+    res.status(500).json({ message: "Không thể tải tổng quan vai trò.", roles: [] });
+  }
+};
+
 export const createAdminUser = async (req, res) => {
   try {
     const {

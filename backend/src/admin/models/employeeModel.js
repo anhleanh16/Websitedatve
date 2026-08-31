@@ -1,9 +1,10 @@
 import bcrypt from "bcryptjs";
 import { db } from "../../../config/db.js";
-import { getRoleIdByName, ensureRoleExists } from "./authModel.js";
+import { getRoleIdByName } from "./authModel.js";
 
 /* ── Đảm bảo bảng Employees có đủ cột ─────────────────────────────── */
 let schemaMigrated = false;
+let canonicalRolesReady = null;
 export const ensureEmployeeSchema = async () => {
   if (schemaMigrated) return;
   const add = async (col, definition) => {
@@ -27,7 +28,92 @@ export const ensureEmployeeSchema = async () => {
   await add("id_card_front_url", "id_card_front_url VARCHAR(255) NULL");
   await add("id_card_back_url",  "id_card_back_url VARCHAR(255) NULL");
   await add("cinema_id",    "cinema_id INT NULL");
+  await add("created_at",   "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+  await add("updated_at",   "updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP");
+  const [[statusColumn]] = await db.query(
+    `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Employees' AND COLUMN_NAME = 'status'`,
+  );
+  if (statusColumn && !String(statusColumn.COLUMN_TYPE).includes("'leave'")) {
+    await db.query("ALTER TABLE Employees MODIFY COLUMN status ENUM('active','inactive','leave') NOT NULL DEFAULT 'active'");
+  }
   schemaMigrated = true;
+};
+
+const ensureCanonicalRoles = async (connection = db) => {
+  if (canonicalRolesReady) {
+    await canonicalRolesReady;
+    return;
+  }
+
+  canonicalRolesReady = (async () => {
+    const canonicalRoles = [
+      ["admin", "quản lý"],
+      ["user", "Khách hàng thông thường"],
+      ["employee", "nhân viên"],
+    ];
+
+    const legacyCustomerQuery = await connection.query(
+      "SELECT role_id, role_name FROM Roles WHERE LOWER(role_name) IN ('customer', 'khach hang', 'khachhang', 'khách hàng', 'kháchhang')",
+    );
+    const legacyCustomerRoles = legacyCustomerQuery[0] || [];
+    const userRoleId = await getRoleIdByName("user", connection);
+    for (const legacyRole of legacyCustomerRoles) {
+      await connection.query(
+        "UPDATE User SET role_id = ? WHERE role_id = ?",
+        [userRoleId, legacyRole.role_id],
+      );
+      await connection.query(
+        "DELETE FROM Roles WHERE role_id = ? AND NOT EXISTS (SELECT 1 FROM User WHERE User.role_id = Roles.role_id)",
+        [legacyRole.role_id],
+      );
+    }
+
+    const legacyEmployeeQuery = await connection.query(
+      "SELECT role_id, role_name FROM Roles WHERE LOWER(role_name) IN ('staff', 'manager', 'technician', 'nhan vien', 'nhân viên', 'quan ly', 'quản lý')",
+    );
+    const legacyEmployeeRoles = legacyEmployeeQuery[0] || [];
+    const employeeRoleIdForLegacy = await getRoleIdByName("employee", connection);
+    for (const legacyRole of legacyEmployeeRoles) {
+      await connection.query(
+        "UPDATE User SET role_id = ? WHERE role_id = ?",
+        [employeeRoleIdForLegacy, legacyRole.role_id],
+      );
+      await connection.query(
+        "DELETE FROM Roles WHERE role_id = ? AND NOT EXISTS (SELECT 1 FROM User WHERE User.role_id = Roles.role_id)",
+        [legacyRole.role_id],
+      );
+    }
+
+    for (const [roleName, description] of canonicalRoles) {
+      const existingRoleId = await getRoleIdByName(roleName, connection);
+      if (!existingRoleId) {
+        await connection.query(
+          "INSERT INTO Roles (role_name, description) VALUES (?, ?)",
+          [roleName, description],
+        );
+      }
+    }
+
+    const employeeRoleId = await getRoleIdByName("employee", connection);
+    await connection.query(
+      `UPDATE User u
+       JOIN Roles r ON r.role_id = u.role_id
+       SET u.role_id = ?
+       WHERE r.role_name IN ('staff', 'manager', 'technician')
+          OR (r.role_name = 'admin' AND u.id <> 1 AND EXISTS (
+            SELECT 1 FROM Employees e WHERE e.user_id = u.id
+          ))`,
+      [employeeRoleId],
+    );
+  })();
+
+  try {
+    await canonicalRolesReady;
+  } catch (error) {
+    canonicalRolesReady = null;
+    throw error;
+  }
 };
 
 /* ── Format row ─────────────────────────────────────────────────────── */
@@ -72,39 +158,13 @@ const fmt = (row) => ({
 
 const normalizeEmail = (value) => (value ? String(value).trim().toLowerCase() : "");
 
-const resolveEmployeeRoleId = async (connection = db) => {
-  return await ensureRoleExists('staff', 'Nhân viên', connection);
-};
-
-const syncEmployeeRoleIds = async (connection = db) => {
-  const staffRoleId = await resolveEmployeeRoleId(connection);
-  const managerRoleId = await ensureRoleExists('manager', 'Quản lý', connection);
-  const technicianRoleId = await ensureRoleExists('technician', 'Kỹ thuật viên', connection);
-  const [[adminRole]] = await connection.query('SELECT role_id FROM Roles WHERE role_name = ? LIMIT 1', ['admin']);
-  const adminRoleId = adminRole ? adminRole.role_id : null;
-
-  const adminCondition = adminRoleId ? "AND u.role_id <> ?" : "";
-  const params = [managerRoleId, technicianRoleId, staffRoleId];
-  if (adminRoleId) params.push(adminRoleId);
-  await connection.query(
-    `UPDATE User u
-     JOIN Employees e ON e.user_id = u.id
-     SET u.role_id = CASE
-       WHEN LOWER(e.position) LIKE '%quản lý%' OR LOWER(e.position) LIKE '%manager%' THEN ?
-       WHEN LOWER(e.position) LIKE '%kỹ thuật%' OR LOWER(e.position) LIKE '%ky thuat%'
-         OR LOWER(e.position) LIKE '%technician%' THEN ?
-       ELSE ?
-     END
-     WHERE e.position IS NOT NULL AND e.position != '' ${adminCondition}`,
-    params,
-  );
-};
+const resolveEmployeeRoleId = async (connection = db) => getRoleIdByName("employee", connection);
 
 const resolveUserRoleIdForEmployee = async (userId, connection = db) => {
   const [[user]] = await connection.query('SELECT role_id FROM User WHERE id = ? LIMIT 1', [userId]);
   if (!user) return await resolveEmployeeRoleId(connection);
   const adminRoleId = await getRoleIdByName('admin', connection);
-  if (user.role_id === adminRoleId) return adminRoleId;
+  if (Number(userId) === 1) return adminRoleId;
   return await resolveEmployeeRoleId(connection);
 };
 
@@ -114,6 +174,11 @@ const resolveOrCreateUser = async (data, connection = db) => {
     : null;
 
   if (requestedUserId) {
+    if (requestedUserId === 1) {
+      const error = new Error("Không thể thêm tài khoản quản trị viên vào danh sách nhân viên.");
+      error.statusCode = 400;
+      throw error;
+    }
     const [[user]] = await connection.query("SELECT id, role_id FROM User WHERE id = ? LIMIT 1", [requestedUserId]);
     if (user) {
       const roleId = await resolveUserRoleIdForEmployee(requestedUserId, connection);
@@ -161,12 +226,14 @@ const resolveOrCreateUser = async (data, connection = db) => {
 export const EmployeeModel = {
   async findAll(filters = {}) {
     await ensureEmployeeSchema();
+    await ensureCanonicalRoles();
     let sql = `
       SELECT e.*,
              u.full_name, u.email, u.phone, u.sex, u.birthday AS dob,
              c.cinema_name
       FROM Employees e
       LEFT JOIN User u ON u.id = e.user_id
+            LEFT JOIN Roles r ON r.role_id = u.role_id
       LEFT JOIN Cinemas c ON c.cinemas_id = e.cinema_id
     `;
     const params = [];
@@ -181,6 +248,12 @@ export const EmployeeModel = {
       params.push(q, q, q);
     }
 
+    where.push(`(
+      u.id IS NULL OR LOWER(COALESCE(r.role_name, '')) IN (
+        'employee', 'staff', 'manager', 'technician',
+        'nhan vien', 'nhân viên', 'quan ly', 'quản lý'
+      )
+    )`);
     if (where.length) sql += " WHERE " + where.join(" AND ");
     sql += " ORDER BY e.employee_id DESC";
 
@@ -190,10 +263,12 @@ export const EmployeeModel = {
 
   async findById(id) {
     await ensureEmployeeSchema();
+    await ensureCanonicalRoles();
     const [[row]] = await db.query(
       `SELECT e.*, u.full_name, u.email, u.phone, u.sex, u.birthday AS dob, c.cinema_name
        FROM Employees e
        LEFT JOIN User u ON u.id = e.user_id
+        LEFT JOIN Roles r ON r.role_id = u.role_id
        LEFT JOIN Cinemas c ON c.cinemas_id = e.cinema_id
        WHERE e.employee_id = ?`,
       [id],
@@ -203,6 +278,7 @@ export const EmployeeModel = {
 
   async create(data) {
     await ensureEmployeeSchema();
+    await ensureCanonicalRoles();
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -237,7 +313,6 @@ export const EmployeeModel = {
         "UPDATE Employees SET employee_code = ? WHERE employee_id = ?",
         [generatedCode, result.insertId],
       );
-      await syncEmployeeRoleIds(connection);
       await connection.commit();
       return result.insertId;
     } catch (err) {
@@ -250,6 +325,7 @@ export const EmployeeModel = {
 
   async update(id, data) {
     await ensureEmployeeSchema();
+    await ensureCanonicalRoles();
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -289,7 +365,6 @@ export const EmployeeModel = {
       }
       params.push(id);
       const [result] = await connection.query(`UPDATE Employees SET ${fields.join(", ")} WHERE employee_id = ?`, params);
-      await syncEmployeeRoleIds(connection);
       await connection.commit();
       return result.affectedRows > 0;
     } catch (err) {

@@ -3,6 +3,7 @@ import { useSelector } from "react-redux";
 import AdminLayout from "../layouts/AdminLayout";
 import Dashboard from "../pages/Dashboard/Dashboard";
 import Users from "../pages/Users/Users";
+import Roles from "../pages/Roles/Roles";
 import Movies from "../pages/Movies/Movies";
 import Showtimes from "../pages/Showtimes/Showtimes";
 import Cinemas from "../pages/cinemas/Cinemas";
@@ -25,36 +26,19 @@ export function AdminRoutes() {
   const token = getValidStoredToken();
   const storedUser = profile || JSON.parse(localStorage.getItem('user') || '{}');
   const userRole = String(storedUser?.role || '').toLowerCase();
-  const canAccessAdmin = token && ['admin', 'staff', 'manager', 'technician'].includes(userRole);
+  const canAccessAdmin = token && ['admin', 'employee'].includes(userRole);
 
-  const isStaff = userRole === 'staff';
-  const isTechnician = userRole === 'technician';
+  const isEmployee = userRole === 'employee';
 
-  const staffRoutes = [
+  const employeeRoutes = [
     <Route key="users" path="users" element={<AdminLayout><Users /></AdminLayout>} />,
     <Route key="bookings" path="bookings" element={<AdminLayout><Bookings /></AdminLayout>} />,
     <Route key="statistics" path="statistics" element={<AdminLayout><Statistics /></AdminLayout>} />,
     <Route key="index" path="" element={<AdminLayout><Bookings /></AdminLayout>} />,
   ];
-  const technicianRoutes = [
-    <Route key="users" path="users" element={<AdminLayout><Users /></AdminLayout>} />,
-    <Route key="staff" path="staff" element={<AdminLayout><Staff /></AdminLayout>} />,
-    <Route key="movies" path="movies" element={<AdminLayout><Movies /></AdminLayout>} />,
-    <Route key="showtimes" path="showtimes" element={<AdminLayout><Showtimes /></AdminLayout>} />,
-    <Route key="cinemas" path="cinemas" element={<AdminLayout><Cinemas /></AdminLayout>} />,
-    <Route key="bookings" path="bookings" element={<AdminLayout><Bookings /></AdminLayout>} />,
-    <Route key="combos" path="combos" element={<AdminLayout><Combos /></AdminLayout>} />,
-    <Route key="promotions" path="promotions" element={<AdminLayout><Promotions /></AdminLayout>} />,
-    <Route key="points" path="points" element={<AdminLayout><PointsManagement /></AdminLayout>} />,
-    <Route key="news" path="news" element={<AdminLayout><NewsManagement /></AdminLayout>} />,
-    <Route key="blog" path="blog" element={<AdminLayout><BlogManagement /></AdminLayout>} />,
-    <Route key="notifications" path="notifications" element={<AdminLayout><Notifications /></AdminLayout>} />,
-    <Route key="comments" path="comments" element={<AdminLayout><Comments /></AdminLayout>} />,
-    <Route key="settings" path="settings" element={<AdminLayout><Settings /></AdminLayout>} />,
-    <Route key="index" path="" element={<AdminLayout><Staff /></AdminLayout>} />,
-  ];
-  const adminRoutes = [
+  const fullAdminRoutes = [
     <Route key="dashboard" path="dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />,
+    <Route key="roles" path="roles" element={<AdminLayout><Roles /></AdminLayout>} />,
     <Route key="staff" path="staff" element={<AdminLayout><Staff /></AdminLayout>} />,
     <Route key="users" path="users" element={<AdminLayout><Users /></AdminLayout>} />,
     <Route key="movies" path="movies" element={<AdminLayout><Movies /></AdminLayout>} />,
@@ -78,10 +62,10 @@ export function AdminRoutes() {
       <Route path="login" element={<AdminLogin />} />
       {canAccessAdmin && (
         <>
-          {isStaff ? staffRoutes : isTechnician ? technicianRoutes : adminRoutes}
+          {isEmployee ? employeeRoutes : fullAdminRoutes}
           <Route
             path="*"
-            element={<Navigate to={isStaff ? "/admin/bookings" : isTechnician ? "/admin/staff" : "/admin/dashboard"} replace />}
+            element={<Navigate to={isEmployee ? "/admin/bookings" : "/admin/dashboard"} replace />}
           />
         </>
       )}

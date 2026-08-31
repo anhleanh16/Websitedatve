@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getPointsDashboard,
+  getPointsHistory,
   getPointsUserSummary,
   adjustUserPoints,
   getPointsSettings,
@@ -20,6 +21,7 @@ import { authMiddleware, adminOnly, selfOrAdminOnly } from '../middleware/authMi
 const router = express.Router();
 
 router.get('/points/dashboard', authMiddleware, adminOnly, getPointsDashboard);
+router.get('/points/history', authMiddleware, adminOnly, getPointsHistory);
 router.get('/points/settings', authMiddleware, adminOnly, getPointsSettings);
 router.get('/points/users/:userId', authMiddleware, adminOnly, getPointsUserSummary);
 router.post('/points/users/:userId/adjust', authMiddleware, adminOnly, adjustUserPoints);

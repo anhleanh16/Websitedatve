@@ -1,43 +1,10 @@
 import { useState, useEffect } from "react";
-import { adminUserService } from "../../services/adminApi.js";
+import { adminPointsService, adminUserService } from "../../services/adminApi.js";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../../utils/birthDate.js";
 import "./users.css";
 
-const MEMBERSHIP_LEVELS = [
-  {
-    id: 1,
-    name: "Đồng",
-    minPoints: 0,
-    maxPoints: 499,
-    color: "#cd7f32",
-    discount: 0,
-  },
-  {
-    id: 2,
-    name: "Bạc",
-    minPoints: 500,
-    maxPoints: 1499,
-    color: "#9ca3af",
-    discount: 5,
-  },
-  {
-    id: 3,
-    name: "Vàng",
-    minPoints: 1500,
-    maxPoints: 2999,
-    color: "#fbbf24",
-    discount: 10,
-  },
-  {
-    id: 4,
-    name: "Kim Cương",
-    minPoints: 3000,
-    maxPoints: 99999,
-    color: "#60a5fa",
-    discount: 15,
-  },
-];
+const MEMBERSHIP_COLORS = ["#cd7f32", "#9ca3af", "#fbbf24", "#60a5fa"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const STATUS_MAP = {
@@ -52,22 +19,15 @@ const getAccountStatus = (user) => {
 };
 const ROLE_MAP = {
   user: { label: "Khách hàng", cls: "role-user" },
-  staff: { label: "Nhân viên", cls: "role-staff" },
-  manager: { label: "Quản lý", cls: "role-manager" },
-  technician: { label: "Kỹ thuật viên", cls: "role-technician" },
+  employee: { label: "Nhân viên", cls: "role-staff" },
   admin: { label: "Quản trị viên", cls: "role-admin" },
 };
 
-function getMemberLevel(points) {
+function getMemberLevel(points, levels) {
   return (
-    [...MEMBERSHIP_LEVELS].reverse().find((l) => points >= l.minPoints) ||
-    MEMBERSHIP_LEVELS[0]
+    [...levels].reverse().find((level) => points >= level.minPoints) ||
+    levels[0] || { name: "Chưa xếp hạng", minPoints: 0, maxPoints: 0, color: "#94a3b8" }
   );
-}
-function formatMoney(n) {
-  if (n === 0) return "—";
-  const abs = Math.abs(n).toLocaleString("vi-VN");
-  return (n < 0 ? "−" : "+") + abs + " ₫";
 }
 function getInitials(name) {
   if (!name) return "";
@@ -82,6 +42,7 @@ function getInitials(name) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
+  const [membershipLevels, setMembershipLevels] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [adjustPointsUser, setAdjustPointsUser] = useState(null);
   const [resetPwUser, setResetPwUser] = useState(null);
@@ -93,10 +54,21 @@ export default function UsersPage() {
     fetchUsers();
   }, []);
 
-  const fetchUsers = async () => {
+  async function fetchUsers() {
     try {
       setLoading(true);
-      const data = await adminUserService.getAllUsers();
+      const [data, pointsSettings] = await Promise.all([
+        adminUserService.getAllUsers(),
+        adminPointsService.getSettings(),
+      ]);
+      const levels = (pointsSettings?.levels || [])
+        .map((level, index) => ({
+          ...level,
+          name: level.levelName,
+          color: MEMBERSHIP_COLORS[index] || "#60a5fa",
+        }))
+        .sort((a, b) => a.minPoints - b.minPoints);
+      setMembershipLevels(levels);
       const processedUsers = data.users.map((u) => ({
         ...u,
         email_verified: Boolean(u.email_verified) && !String(u.email || "").endsWith("@unlinked.local"),
@@ -122,7 +94,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const handleToggleStatus = async (user) => {
     if (!user.can_be_locked) return;
@@ -149,14 +121,14 @@ export default function UsersPage() {
   if (loading)
     return (
       <div className="us-page">
-        <h1>Quản lý người dùng</h1>
+        <h1>Quản lý khách hàng</h1>
         <div>Đang tải...</div>
       </div>
     );
   if (error)
     return (
       <div className="us-page">
-        <h1>Quản lý người dùng</h1>
+        <h1>Quản lý khách hàng</h1>
         <div>{error}</div>
       </div>
     );
@@ -173,8 +145,9 @@ export default function UsersPage() {
         </button>
       </div>
 
-      <UserList
+        <UserList
         users={users}
+          membershipLevels={membershipLevels}
         onView={setSelectedUser}
         onToggleStatus={handleToggleStatus}
         onResetPassword={handleResetPassword}
@@ -182,6 +155,7 @@ export default function UsersPage() {
 
       <UserDetail
         user={selectedUser}
+        membershipLevels={membershipLevels}
         onClose={() => setSelectedUser(null)}
         onToggleStatus={handleToggleStatus}
         onAdjustPoints={handleAdjustPoints}
@@ -222,8 +196,8 @@ export default function UsersPage() {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-/** 1. Danh sách khách hàng */
-function UserList({ users, onView, onToggleStatus, onResetPassword }) {
+/** Danh sách khách hàng */
+function UserList({ users, membershipLevels, onView, onToggleStatus, onResetPassword }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFS] = useState("all");
   const [filterRole, setFR] = useState("all");
@@ -267,9 +241,7 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
         >
           <option value="all">Tất cả vai trò</option>
           <option value="user">Khách hàng</option>
-          <option value="staff">Nhân viên</option>
-          <option value="manager">Quản lý</option>
-          <option value="technician">Kỹ thuật viên</option>
+          <option value="employee">Nhân viên</option>
           <option value="admin">Quản trị viên</option>
         </select>
       </div>
@@ -304,7 +276,7 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
                 const rl = ROLE_MAP[u.role] || ROLE_MAP.user;
                 const roleLabel = rl.label;
                 const roleCls = rl.cls;
-                const lvl = getMemberLevel(u.points);
+                const lvl = getMemberLevel(u.points, membershipLevels);
                 return (
                   <tr key={u.id}>
                     <td>
@@ -402,14 +374,14 @@ function UserList({ users, onView, onToggleStatus, onResetPassword }) {
 }
 
 /** Chi tiết người dùng (modal) */
-function UserDetail({ user, onClose, onToggleStatus, onAdjustPoints, onResetPassword }) {
+function UserDetail({ user, membershipLevels, onClose, onToggleStatus, onAdjustPoints, onResetPassword }) {
   if (!user) return null;
   const st = STATUS_MAP[user.accountStatus || getAccountStatus(user)] || STATUS_MAP.unverified;
   const rl = ROLE_MAP[user.role] || ROLE_MAP.user;
   const roleLabel = rl.label;
   const roleCls = rl.cls;
-  const lvl = getMemberLevel(user.points);
-  const nextLvl = MEMBERSHIP_LEVELS.find((l) => l.minPoints > user.points);
+  const lvl = getMemberLevel(user.points, membershipLevels);
+  const nextLvl = membershipLevels.find((level) => level.minPoints > user.points);
   const pctToNext = nextLvl
     ? Math.round(
         ((user.points - lvl.minPoints) / (nextLvl.minPoints - lvl.minPoints)) *
@@ -597,7 +569,7 @@ function AdjustPointsModal({ user, onClose, onConfirm }) {
       setError("Vui lòng nhập số điểm và lý do.");
       return;
     }
-    // onConfirm({ userId: user.id, delta: num, reason });
+    onConfirm({ userId: user.id, delta: num, reason });
   };
 
   return (

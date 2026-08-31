@@ -1,28 +1,11 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect } from "react";
 import './staff.css';
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../../utils/birthDate.js";
 import {
-  adminBookingService,
   adminUserService,
-  adminShowtimeService,
-  adminCinemaService,
-  adminRoomService,
-  adminSeatService,
-  adminComboService,
   adminEmployeeService,
 } from "../../services/adminApi.js";
-
-const API_ORIGIN = (() => {
-  const base = import.meta.env.VITE_API_URL || "/api";
-  if (/^https?:\/\//i.test(base)) {
-    return new URL(base).origin;
-  }
-  if (typeof window !== "undefined") {
-    return window.location.origin;
-  }
-  return "";
-})();
 
 const DEPARTMENTS = [
   { id: 1, name: "Vé & Quầy thu ngân" },
@@ -43,120 +26,6 @@ const SHIFTS = [
   { id: "morning",   label: "Ca sáng",  time: "06:00 – 14:00" },
   { id: "afternoon", label: "Ca chiều", time: "14:00 – 22:00" },
   { id: "night",     label: "Ca đêm",   time: "22:00 – 06:00" },
-];
-
-const SAMPLE_STAFF = [
-  {
-    id: 1, name: "Trần Văn Bình", code: "NV001",
-    email: "binh.tran@sweetstar.vn", phone: "0901111001",
-    dob: "1998-04-12", sex: "Nam", address: "Hà Nội",
-    avatar: "",
-    cinemaId: 1, departmentId: 1,
-    role: "staff", type: "full_time",
-    salary: 8500000, baseSalary: 8500000,
-    status: "active",
-    hireDate: "2024-01-15",
-    shifts: ["morning", "afternoon"],
-    tasks: [
-      { id: 1, title: "Phụ trách quầy vé buổi sáng",    status: "done",    deadline: "08/06/2026" },
-      { id: 2, title: "Kiểm tra máy bán vé tự động",   status: "pending", deadline: "10/06/2026" },
-    ],
-    attendance: [
-      { date: "2026-06-01", shiftId: "morning",   status: "present" },
-      { date: "2026-06-02", shiftId: "morning",   status: "present" },
-      { date: "2026-06-03", shiftId: "afternoon", status: "late"    },
-      { date: "2026-06-04", shiftId: "morning",   status: "absent"  },
-      { date: "2026-06-05", shiftId: "morning",   status: "present" },
-    ],
-  },
-  {
-    id: 2, name: "Lê Thị Hương", code: "NV002",
-    email: "huong.le@sweetstar.vn", phone: "0901111002",
-    dob: "2000-09-22", sex: "Nữ", address: "TP.HCM",
-    avatar: "",
-    cinemaId: 2, departmentId: 3,
-    role: "staff", type: "part_time",
-    salary: 45000, baseSalary: 45000,
-    status: "active",
-    hireDate: "2025-03-01",
-    shifts: ["afternoon"],
-    tasks: [
-      { id: 3, title: "Phục vụ khu vực F&B tầng 2",    status: "in_progress", deadline: "09/06/2026" },
-      { id: 4, title: "Kiểm kê tồn kho đồ ăn nhẹ",     status: "pending",     deadline: "12/06/2026" },
-    ],
-    attendance: [
-      { date: "2026-06-01", shiftId: "afternoon", status: "present" },
-      { date: "2026-06-02", shiftId: "afternoon", status: "present" },
-      { date: "2026-06-03", shiftId: "afternoon", status: "present" },
-      { date: "2026-06-04", shiftId: "afternoon", status: "absent"  },
-      { date: "2026-06-05", shiftId: "afternoon", status: "present" },
-    ],
-  },
-  {
-    id: 3, name: "Nguyễn Quốc Dũng", code: "NV003",
-    email: "dung.nguyen@sweetstar.vn", phone: "0901111003",
-    dob: "1995-12-05", sex: "Nam", address: "Đà Nẵng",
-    avatar: "",
-    cinemaId: 3, departmentId: 2,
-    role: "technician", type: "full_time",
-    salary: 12000000, baseSalary: 12000000,
-    status: "active",
-    hireDate: "2023-08-10",
-    shifts: ["morning", "afternoon", "night"],
-    tasks: [
-      { id: 5, title: "Bảo trì máy chiếu phòng IMAX",  status: "done",        deadline: "07/06/2026" },
-      { id: 6, title: "Kiểm tra hệ thống âm thanh P02", status: "in_progress", deadline: "11/06/2026" },
-    ],
-    attendance: [
-      { date: "2026-06-01", shiftId: "morning",   status: "present" },
-      { date: "2026-06-02", shiftId: "morning",   status: "present" },
-      { date: "2026-06-03", shiftId: "morning",   status: "present" },
-      { date: "2026-06-04", shiftId: "morning",   status: "present" },
-      { date: "2026-06-05", shiftId: "morning",   status: "present" },
-    ],
-  },
-  {
-    id: 4, name: "Phạm Thu Trang", code: "NV004",
-    email: "trang.pham@sweetstar.vn", phone: "0901111004",
-    dob: "1997-06-18", sex: "Nữ", address: "TP.HCM",
-    avatar: "",
-    cinemaId: 4, departmentId: 5,
-    role: "manager", type: "full_time",
-    salary: 20000000, baseSalary: 20000000,
-    status: "active",
-    hireDate: "2022-11-01",
-    shifts: ["morning", "afternoon"],
-    tasks: [
-      { id: 7, title: "Họp sơ kết tháng 6",                 status: "pending",     deadline: "15/06/2026" },
-      { id: 8, title: "Phê duyệt lịch làm việc tháng 7",    status: "pending",     deadline: "20/06/2026" },
-      { id: 9, title: "Đánh giá nhân viên quý 2",           status: "in_progress", deadline: "30/06/2026" },
-    ],
-    attendance: [
-      { date: "2026-06-01", shiftId: "morning", status: "present" },
-      { date: "2026-06-02", shiftId: "morning", status: "present" },
-      { date: "2026-06-03", shiftId: "morning", status: "present" },
-      { date: "2026-06-04", shiftId: "morning", status: "late"    },
-      { date: "2026-06-05", shiftId: "morning", status: "present" },
-    ],
-  },
-  {
-    id: 5, name: "Hoàng Minh Khoa", code: "NV005",
-    email: "khoa.hoang@sweetstar.vn", phone: "0901111005",
-    dob: "2002-03-30", sex: "Nam", address: "Hà Nội",
-    avatar: "",
-    cinemaId: 1, departmentId: 4,
-    role: "staff", type: "part_time",
-    salary: 40000, baseSalary: 40000,
-    status: "inactive",
-    hireDate: "2025-09-01",
-    shifts: ["night"],
-    tasks: [],
-    attendance: [
-      { date: "2026-06-01", shiftId: "night", status: "absent"  },
-      { date: "2026-06-02", shiftId: "night", status: "absent"  },
-      { date: "2026-06-03", shiftId: "night", status: "absent"  },
-    ],
-  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -215,7 +84,7 @@ const getStaffRoleFromPosition = (position) => {
   return "staff";
 };
 
-const mapEmployeeToStaff = (employee, localFallback = null) => ({
+const mapEmployeeToStaff = (employee) => ({
   id: employee.id,
   userId: employee.userId || "",
   name: employee.name || "",
@@ -238,8 +107,8 @@ const mapEmployeeToStaff = (employee, localFallback = null) => ({
   status: employee.status || "active",
   hireDate: employee.hireDate || "",
   shifts: Array.isArray(employee.shifts) ? employee.shifts : [],
-  tasks: localFallback?.tasks || [],
-  attendance: localFallback?.attendance || [],
+  tasks: [],
+  attendance: [],
   position: employee.position || "",
 });
 
@@ -1128,12 +997,7 @@ function TaskOverview({ staff }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminStaff() {
   const [staffList, setStaffList] = useState(() => {
-    const saved = localStorage.getItem('adminStaffList');
-    try {
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    return [];
   });
   const [customerAccounts, setCustomerAccounts] = useState([]);
   const [activeTab,  setActiveTab]  = useState("list");
@@ -1150,13 +1014,8 @@ export default function AdminStaff() {
   const loadEmployees = async () => {
     try {
       const response = await adminEmployeeService.getAll();
-      const serverEmployees = (response?.employees || []).map((employee) => {
-        const persisted = JSON.parse(localStorage.getItem('adminStaffList') || '[]');
-        const localFallback = persisted.find((item) => String(item.id) === String(employee.id));
-        return mapEmployeeToStaff(employee, localFallback);
-      });
+      const serverEmployees = (response?.employees || []).map(mapEmployeeToStaff);
       setStaffList(serverEmployees);
-      localStorage.setItem('adminStaffList', JSON.stringify(serverEmployees));
     } catch (err) {
       showToast(`Không thể tải dữ liệu nhân viên: ${err.message}`);
     }
@@ -1221,7 +1080,6 @@ export default function AdminStaff() {
 
   const handleSaveTasks = (data) => {
     const updatedList = staffList.map(s => s.id === data.id ? data : s);
-    localStorage.setItem('adminStaffList', JSON.stringify(updatedList));
     setStaffList(updatedList);
     showToast(`Đã cập nhật phân công cho "${data.name}".`);
     setTaskStaff(null); setViewStaff(null);
@@ -1229,7 +1087,6 @@ export default function AdminStaff() {
 
   const handleSaveAttend = (data) => {
     const updatedList = staffList.map(s => s.id === data.id ? data : s);
-    localStorage.setItem('adminStaffList', JSON.stringify(updatedList));
     setStaffList(updatedList);
     showToast(`Đã cập nhật chấm công cho "${data.name}".`);
     setAttendStaff(null); setViewStaff(null);

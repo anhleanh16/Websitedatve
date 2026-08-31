@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import "./Booking.css";
 import { userComboService, userCinemaService } from "../../services/userApi";
 import { getValidStoredToken } from "../../../utils/auth";
+import { toAbsoluteAssetUrl } from "../../../utils/api";
 
 const parseSeatCode = (seatCode) => {
   const match = String(seatCode || "")
@@ -357,13 +358,25 @@ function FoodSelectionCard({
   const key = getFoodKey(item);
   const popcornOptions = Array.isArray(item.popcorn_options) ? item.popcorn_options : [];
   const drinkOptions = Array.isArray(item.drink_options) ? item.drink_options : [];
+  const comboImage = item?.image ? toAbsoluteAssetUrl(item.image) : "";
 
   return (
     <div className="combo-card" key={key}>
       <div className="combo-info">
-        <span className="item-icon" aria-hidden>
-          {getFoodIcon(item)}
-        </span>
+        {comboImage ? (
+          <img
+            src={comboImage}
+            alt={item.combo_name}
+            className="combo-card-image"
+            onError={(event) => {
+              event.target.style.display = "none";
+            }}
+          />
+        ) : (
+          <span className="item-icon" aria-hidden>
+            {getFoodIcon(item)}
+          </span>
+        )}
         <div>
           <h4>{item.combo_name}</h4>
           <p>{getFoodSummary(item)}</p>
@@ -572,8 +585,19 @@ export default function Booking() {
 
     fetchCombos();
 
+    const handleRefresh = () => {
+      fetchCombos();
+    };
+
+    window.addEventListener("focus", handleRefresh);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) handleRefresh();
+    });
+
     return () => {
       ignore = true;
+      window.removeEventListener("focus", handleRefresh);
+      document.removeEventListener("visibilitychange", handleRefresh);
     };
   }, []);
 

@@ -67,6 +67,40 @@
   color: #5a6e9e;
 }
 
+.combo-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.combo-name-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.combo-table-image {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  flex-shrink: 0;
+  display: block;
+}
+
+.missing-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7a8fc0;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
 .combo-field select {
   cursor: pointer;
 }
@@ -87,6 +121,39 @@
   resize: vertical;
   min-height: 80px;
   font-family: inherit;
+}
+
+.combo-image-upload-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.combo-image-upload-wrap input[type="file"] {
+  height: auto;
+  padding: 10px 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+}
+
+.combo-image-preview {
+  width: 100%;
+  min-height: 120px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(124, 97, 255, 0.2);
+  background: rgba(124, 97, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.combo-image-preview img {
+  max-width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  display: block;
 }
 
 .combo-field-row {

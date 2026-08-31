@@ -28,10 +28,10 @@ const mapEmployeePositionToRole = (position) => {
 };
 
 const deriveRoleFromEmployee = (user) => {
-  if (Number(user.id) === 1) return 'admin';
-
-  const position = String(user.employee_position || '').trim();
-  return position ? mapEmployeePositionToRole(position) : 'user';
+  const storedRole = String(user.role_name || '').trim().toLowerCase();
+  if (Number(user.id) === 1 || storedRole === 'admin') return 'admin';
+  if (storedRole === 'employee' || user.employee_position) return 'employee';
+  return 'user';
 };
 
 const getCurrentDatabaseName = async () => {
@@ -180,12 +180,53 @@ export const userNameExists = async (userName) => {
   return Boolean(existing);
 };
 
+const normalizeRoleName = (value = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+const getCanonicalRoleSet = (roleName) => {
+  const normalized = normalizeRoleName(roleName);
+  if (!normalized) return [''];
+
+  if (['user', 'customer', 'khach hang', 'khachhang', 'khách hàng', 'khachhang'].includes(normalized)) {
+    return ['user', 'customer', 'khach hang', 'khachhang', 'khách hàng', 'khachhang'];
+  }
+
+  if (['admin', 'quan tri vien', 'quản trị viên', 'quan tri', 'quản trị', 'quan ly', 'quản lý'].includes(normalized)) {
+    return ['admin', 'quan tri vien', 'quản trị viên', 'quan tri', 'quản trị', 'quan ly', 'quản lý'];
+  }
+
+  if (['employee', 'staff', 'nhan vien', 'nhân viên', 'manager', 'technician', 'quan ly', 'quản lý'].includes(normalized)) {
+    return ['employee', 'staff', 'nhan vien', 'nhân viên', 'manager', 'technician', 'quan ly', 'quản lý'];
+  }
+
+  return [normalized];
+};
+
 export const getRoleIdByName = async (roleName, connection = db) => {
-  const [[roleRow]] = await connection.query(
-    'SELECT role_id FROM Roles WHERE role_name = ? LIMIT 1',
-    [roleName]
+  const canonicalName = normalizeRoleName(roleName);
+  const aliasSet = getCanonicalRoleSet(roleName);
+
+  const [exactRow] = await connection.query(
+    'SELECT role_id, role_name FROM Roles WHERE LOWER(role_name) = ? LIMIT 1',
+    [canonicalName || normalizeRoleName(roleName)]
   );
-  return roleRow ? roleRow.role_id : null;
+  if (exactRow?.[0]?.role_id) {
+    return exactRow[0].role_id;
+  }
+
+  const placeholders = aliasSet.map(() => '?').join(', ');
+  const [rows] = await connection.query(
+    `SELECT role_id, role_name FROM Roles WHERE LOWER(role_name) IN (${placeholders}) OR LOWER(REPLACE(REPLACE(REPLACE(role_name, ' ', ''), '-', ''), '.', '')) IN (${placeholders}) ORDER BY CASE WHEN LOWER(role_name) = ? THEN 0 ELSE 1 END LIMIT 1`,
+    [...aliasSet, ...aliasSet.map((value) => value.replace(/\s+/g, '')), canonicalName || normalizeRoleName(roleName)],
+  );
+
+  return rows?.[0]?.role_id || null;
 };
 
 export const ensureRoleExists = async (roleName, description = '', connection = db) => {

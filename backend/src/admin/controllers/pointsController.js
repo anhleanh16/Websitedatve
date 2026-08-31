@@ -2,11 +2,35 @@ import { PointsModel } from '../models/pointsModel.js';
 
 export const getPointsDashboard = async (req, res) => {
   try {
-    const data = await PointsModel.getAdminUsersSummary();
-    res.json({ users: data });
+    const [users, summary, history] = await Promise.all([
+      PointsModel.getAdminUsersSummary(),
+      PointsModel.getDashboardOverview(),
+      PointsModel.listPointsHistory({ page: 1, limit: 10 }),
+    ]);
+
+    res.json({
+      users,
+      summary,
+      history: history.items,
+      pagination: history.pagination,
+    });
   } catch (error) {
     console.error('Error in getPointsDashboard:', error);
     res.status(500).json({ message: 'Không thể tải dữ liệu điểm.' });
+  }
+};
+
+export const getPointsHistory = async (req, res) => {
+  try {
+    const search = String(req.query.search || '');
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 10);
+
+    const history = await PointsModel.listPointsHistory({ search, page, limit });
+    res.json(history);
+  } catch (error) {
+    console.error('Error in getPointsHistory:', error);
+    res.status(500).json({ message: 'Không thể tải lịch sử điểm thưởng.' });
   }
 };
 

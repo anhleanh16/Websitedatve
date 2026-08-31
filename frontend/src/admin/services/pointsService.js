@@ -24,6 +24,11 @@ async function apiFetch(path, options = {}) {
 
 export const pointsService = {
   getDashboard: () => apiFetch("/points/dashboard"),
+  getHistory: ({ search = "", page = 1, limit = 10 } = {}) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (search) params.set("search", search);
+    return apiFetch(`/points/history?${params.toString()}`);
+  },
   getSettings: () => apiFetch("/points/settings"),
   getUserSummary: (userId) => apiFetch(`/points/users/${encodeURIComponent(userId)}`),
   adjustUserPoints: (userId, payload) => apiFetch(`/points/users/${encodeURIComponent(userId)}/adjust`, { method: "POST", body: JSON.stringify(payload) }),

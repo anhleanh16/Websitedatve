@@ -337,6 +337,105 @@ export const PointsModel = {
     }));
   },
 
+  async getDashboardOverview() {
+    await ensurePointsSchema();
+
+    const [[memberRow]] = await db.query(`SELECT COUNT(*) AS total_members FROM User`);
+    const [[earnedRow]] = await db.query(`
+      SELECT COALESCE(SUM(CASE WHEN points_change > 0 THEN points_change ELSE 0 END), 0) AS total_earned_points
+      FROM Point_History
+    `);
+    const [[rewardRow]] = await db.query(`
+      SELECT COUNT(*) AS redeemed_count,
+             COALESCE(SUM(CASE WHEN points_change < 0 THEN ABS(points_change) ELSE 0 END), 0) AS total_points_used
+      FROM Point_History
+      WHERE description LIKE 'Đổi quà:%' OR description LIKE 'Đổi quà:%'
+    `);
+    const [[availableRow]] = await db.query(`SELECT COALESCE(SUM(point), 0) AS total_available FROM User`);
+
+    const totalMembers = Number(memberRow?.total_members || 0);
+    const totalEarnedPoints = Number(earnedRow?.total_earned_points || 0);
+    const totalRewardsRedeemed = Number(rewardRow?.redeemed_count || 0);
+    const totalPointsUsed = Number(rewardRow?.total_points_used || 0);
+    const totalAvailablePoints = Number(availableRow?.total_available || 0);
+
+    return {
+      totalMembers,
+      totalEarnedPoints,
+      totalRewardsRedeemed,
+      totalPointsUsed,
+      totalAvailablePoints,
+      totalAccumulatedPoints: totalEarnedPoints,
+    };
+  },
+
+  async listPointsHistory({ search = '', page = 1, limit = 10 } = {}) {
+    await ensurePointsSchema();
+    const pageNumber = Math.max(1, Number(page || 1));
+    const pageSize = Math.max(1, Number(limit || 10));
+    const offset = (pageNumber - 1) * pageSize;
+    const keyword = String(search || '').trim();
+
+    let whereClause = 'WHERE 1 = 1';
+    const params = [];
+
+    if (keyword) {
+      const likeTerm = `%${keyword.toLowerCase()}%`;
+      whereClause += ' AND (LOWER(u.full_name) LIKE ? OR LOWER(u.email) LIKE ? OR LOWER(ph.description) LIKE ?)';
+      params.push(likeTerm, likeTerm, likeTerm);
+    }
+
+    const [[countRow]] = await db.query(`
+      SELECT COUNT(*) AS total
+      FROM Point_History ph
+      LEFT JOIN User u ON u.id = ph.user_id
+      ${whereClause}
+    `, params);
+
+    const total = Number(countRow?.total || 0);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+    const [rows] = await db.query(`
+      SELECT
+        ph.history_id,
+        ph.user_id,
+        u.full_name,
+        u.email,
+        ph.points_change,
+        ph.description,
+        ph.created_at,
+        CASE
+          WHEN ph.points_change > 0 THEN 'Tích điểm'
+          WHEN ph.points_change < 0 THEN 'Đổi điểm'
+          ELSE 'Điều chỉnh'
+        END AS transaction_type
+      FROM Point_History ph
+      LEFT JOIN User u ON u.id = ph.user_id
+      ${whereClause}
+      ORDER BY ph.created_at DESC, ph.history_id DESC
+      LIMIT ? OFFSET ?
+    `, [...params, pageSize, offset]);
+
+    return {
+      items: rows.map((row) => ({
+        id: row.history_id,
+        userId: row.user_id,
+        customerName: row.full_name || 'Khách hàng',
+        email: row.email || '',
+        points: Number(row.points_change || 0),
+        type: row.transaction_type || 'Điều chỉnh',
+        description: row.description || '',
+        createdAt: row.created_at,
+      })),
+      pagination: {
+        page: pageNumber,
+        limit: pageSize,
+        total,
+        totalPages,
+      },
+    };
+  },
+
   async getUserPointSummary(userId) {
     await ensurePointsSchema();
     const [users] = await db.query(`

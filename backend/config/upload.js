@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 const moviesUploadDir = path.join(__dirname, "../uploads/movies");
 const trailersUploadDir = path.join(__dirname, "../uploads/trailers");
 const cinemasUploadDir = path.join(__dirname, "../uploads/cinemas");
+const combosUploadDir = path.join(__dirname, "../uploads/combos");
 const newsUploadDir = path.join(__dirname, "../uploads/news");
 const newsInlineUploadDir = path.join(__dirname, "../uploads/news/inline");
 const staffUploadDir = path.join(__dirname, "../uploads/staff");
@@ -23,6 +24,9 @@ if (!fs.existsSync(trailersUploadDir)) {
 if (!fs.existsSync(cinemasUploadDir)) {
   fs.mkdirSync(cinemasUploadDir, { recursive: true });
 }
+if (!fs.existsSync(combosUploadDir)) {
+  fs.mkdirSync(combosUploadDir, { recursive: true });
+}
 if (!fs.existsSync(newsUploadDir)) {
   fs.mkdirSync(newsUploadDir, { recursive: true });
 }
@@ -34,55 +38,96 @@ if (!fs.existsSync(staffUploadDir)) {
 }
 
 // Cấu hình storage chung, phân biệt dựa trên fieldname
+const isCkeditorInlineUploadRoute = (req) => {
+  const url = String(req?.originalUrl || "");
+  return /\/admin\/upload\/ckeditor-image$/.test(url) || /\/news\/upload-image$/.test(url);
+};
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    if (file.fieldname === "posters") {
+    const field = file.fieldname;
+
+    if (isCkeditorInlineUploadRoute(req)) {
+      return cb(null, newsInlineUploadDir);
+    }
+
+    if (field === "posters") {
       cb(null, moviesUploadDir);
-    } else if (file.fieldname === "trailer") {
+    } else if (field === "trailer") {
       cb(null, trailersUploadDir);
-    } else if (file.fieldname === "image") {
+    } else if (field === "image") {
       // For cinema images
       cb(null, cinemasUploadDir);
-    } else if (file.fieldname === "thumbnailFile") {
+    } else if (field === "comboImage" || field === "imageFile") {
+      cb(null, combosUploadDir);
+    } else if (field === "thumbnailFile") {
       cb(null, newsUploadDir);
-    } else if (file.fieldname === "upload") {
+    } else if (["upload", "file"].includes(field)) {
       // CKEditor inline images (inserted inside news body)
       cb(null, newsInlineUploadDir);
-    } else if (["avatar", "idCardFront", "idCardBack"].includes(file.fieldname)) {
+    } else if (["avatar", "idCardFront", "idCardBack"].includes(field)) {
       // For staff avatars
       cb(null, staffUploadDir);
+    } else {
+      cb(null, newsInlineUploadDir);
     }
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    if (file.fieldname === "posters") {
+    const field = file.fieldname;
+
+    if (isCkeditorInlineUploadRoute(req)) {
+      return cb(null, "news-inline-" + uniqueSuffix + path.extname(file.originalname));
+    }
+
+    if (field === "posters") {
       cb(null, "poster-" + uniqueSuffix + path.extname(file.originalname));
-    } else if (file.fieldname === "trailer") {
+    } else if (field === "trailer") {
       cb(null, "trailer-" + uniqueSuffix + path.extname(file.originalname));
-    } else if (file.fieldname === "image") {
+    } else if (field === "image") {
       cb(null, "cinema-" + uniqueSuffix + path.extname(file.originalname));
-    } else if (file.fieldname === "thumbnailFile") {
+    } else if (field === "comboImage" || field === "imageFile") {
+      cb(null, "combo-" + uniqueSuffix + path.extname(file.originalname));
+    } else if (field === "thumbnailFile") {
       cb(null, "news-" + uniqueSuffix + path.extname(file.originalname));
-    } else if (file.fieldname === "upload") {
+    } else if (["upload", "file"].includes(field)) {
       cb(null, "news-inline-" + uniqueSuffix + path.extname(file.originalname));
-    } else if (file.fieldname === "avatar") {
+    } else if (field === "avatar") {
       cb(null, "avatar-" + uniqueSuffix + path.extname(file.originalname));
-    } else if (file.fieldname === "idCardFront") {
+    } else if (field === "idCardFront") {
       cb(null, "cccd-front-" + uniqueSuffix + path.extname(file.originalname));
-    } else if (file.fieldname === "idCardBack") {
+    } else if (field === "idCardBack") {
       cb(null, "cccd-back-" + uniqueSuffix + path.extname(file.originalname));
+    } else {
+      cb(null, "news-inline-" + uniqueSuffix + path.extname(file.originalname));
     }
   },
 });
 
 // Filter file chung, phân biệt dựa trên fieldname
 const fileFilter = (req, file, cb) => {
+  const field = file.fieldname;
+
+  if (isCkeditorInlineUploadRoute(req)) {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (extname && mimetype) {
+      return cb(null, true);
+    }
+    return cb(new Error("Chỉ cho phép file ảnh (jpeg, jpg, png, gif, webp)!"));
+  }
+
   if (
-    file.fieldname === "posters" ||
-    file.fieldname === "image" ||
-    file.fieldname === "thumbnailFile" ||
-    file.fieldname === "upload" ||
-    ["avatar", "idCardFront", "idCardBack"].includes(file.fieldname)
+    field === "posters" ||
+    field === "image" ||
+    field === "comboImage" ||
+    field === "imageFile" ||
+    field === "thumbnailFile" ||
+    field === "upload" ||
+    field === "file" ||
+    ["avatar", "idCardFront", "idCardBack"].includes(field)
   ) {
     // Gộp filter cho ảnh
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
@@ -96,7 +141,7 @@ const fileFilter = (req, file, cb) => {
     } else {
       cb(new Error("Chỉ cho phép file ảnh (jpeg, jpg, png, gif, webp)!"));
     }
-  } else if (file.fieldname === "trailer") {
+  } else if (field === "trailer") {
     const allowedTypes = /mp4|webm|ogg/;
     const extname = allowedTypes.test(
       path.extname(file.originalname).toLowerCase(),
@@ -151,6 +196,12 @@ export const uploadCinemaImage = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB for cinema images
 });
 
+export const uploadComboImage = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
 export const uploadNewsImage = multer({
   storage: storage,
   fileFilter: fileFilter,
@@ -169,3 +220,16 @@ export const uploadCkeditorNewsImage = multer({
   fileFilter: fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per inline image
 });
+
+export const uploadCkeditorNewsImageAny = (req, res, next) => {
+  uploadCkeditorNewsImage.any()(req, res, (err) => {
+    if (err) {
+      return next(err);
+    }
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (files.length && !req.file) {
+      req.file = files[0];
+    }
+    next();
+  });
+};

@@ -417,7 +417,13 @@ function MovieForm({ movie, categories, onClose, onSave }) {
     if (!form.director?.trim()) e.director = "Vui lòng nhập đạo diễn.";
     if (!form.duration || form.duration <= 0) e.duration = "Thời lượng phải > 0.";
     if (!form.releaseDate) e.releaseDate = "Vui lòng chọn ngày khởi chiếu.";
-    if (allPosters.length < 6) e.posters = "Phải có ít nhất 6 poster.";
+
+    if (isEdit) {
+      if (allPosters.length < 1) e.posters = "Phim cần ít nhất 1 poster để lưu.";
+    } else if (allPosters.length < 6) {
+      e.posters = "Phải có ít nhất 6 poster.";
+    }
+
     if (allPosters.length > 12) e.posters = "Tối đa 12 poster.";
     return e;
   };

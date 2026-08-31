@@ -6,8 +6,11 @@ import {
   adminCinemaService,
   adminSeatService,
   adminComboService,
+  adminMovieService,
 } from "../../services/adminApi.js";
 import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../../utils/birthDate.js";
+import { toAbsoluteAssetUrl } from "../../../utils/api.js";
+import { printTicketPdf } from "../../../utils/ticketPrint.js";
 
 const SEAT_PRICES = {
   Standard: 80000,
@@ -157,9 +160,17 @@ const getFoodSummary = (item) => {
 
 function FoodItemCard({ item, quantity, onChange }) {
   const selected = quantity > 0;
+  const comboImage = item?.image ? toAbsoluteAssetUrl(item.image) : "";
+
   return (
     <article className={`admin-food-card${selected ? " selected" : ""}`}>
-      <div className="admin-food-icon" aria-hidden="true">{getFoodIcon(item)}</div>
+      <div className="admin-food-icon" aria-hidden="true">
+        {comboImage ? (
+          <img src={comboImage} alt={item.combo_name} className="admin-food-image" onError={(event) => { event.target.style.display = "none"; }} />
+        ) : (
+          getFoodIcon(item)
+        )}
+      </div>
       <div className="admin-food-content">
         <h4>{item.combo_name}</h4>
         <p>{getFoodSummary(item)}</p>
@@ -187,7 +198,11 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
   });
   const [newCustomerErrors, setNewCustomerErrors] = useState({});
 
-  // Step 2: Showtime
+  // Step 2: Movie
+  const [movieList, setMovieList] = useState([]);
+  const [selectedMovieId, setSelectedMovieId] = useState("");
+
+  // Step 3: Showtime
   const [cinemas, setCinemas] = useState([]);
   const [selectedCinemaId, setSelectedCinemaId] = useState("");
   const [showtimes, setShowtimes] = useState([]);
@@ -230,13 +245,20 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     let ignore = false;
     (async () => {
       try {
-        const [cinemaResult, comboResult, showtimeCinemaResult] = await Promise.allSettled([
+        const [movieResult, cinemaResult, comboResult, showtimeCinemaResult] = await Promise.allSettled([
+          adminMovieService.getAllMovies(false),
           adminCinemaService.getAllCinemas(),
           adminComboService.getAll(),
           adminShowtimeService.getCinemas(),
         ]);
 
         if (ignore) return;
+
+        const movieData = movieResult.status === "fulfilled" ? movieResult.value : null;
+        const normalizedMovies = Array.isArray(movieData?.movies)
+          ? movieData.movies
+          : (Array.isArray(movieData) ? movieData : []);
+        setMovieList(normalizedMovies.filter((movie) => String(movie?.status || "").toLowerCase() !== "hidden"));
 
         const listC = normalizeCinemaList(
           cinemaResult.status === "fulfilled" ? cinemaResult.value : null,
@@ -296,7 +318,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     return () => clearTimeout(debounceRef.current);
   }, [searchQuery, customerMode]);
 
-  // Load showtimes when cinema/date change
+  // Load showtimes when cinema/date/movie change
   useEffect(() => {
     if (!selectedCinemaId || !selectedDate) {
       setShowtimes([]);
@@ -315,7 +337,9 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
         const filtered = list.filter(st => {
           if (!st?.start_time) return true;
           const stDate = toVNDateString(new Date(st.start_time));
-          return stDate === selectedDate;
+          const matchesDate = stDate === selectedDate;
+          const matchesMovie = !selectedMovieId || String(st.movie_id) === String(selectedMovieId) || String(st.movieId) === String(selectedMovieId);
+          return matchesDate && matchesMovie;
         });
         setShowtimes(filtered);
       } catch (e) {
@@ -325,7 +349,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
       }
     })();
     return () => { ignore = true; };
-  }, [selectedCinemaId, selectedDate]);
+  }, [selectedCinemaId, selectedDate, selectedMovieId]);
 
   // Load rooms & seats when showtime is selected
   useEffect(() => {
@@ -402,14 +426,16 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
   };
 
   const goStep2 = () => { if (canGoStep2()) setStep(2); };
-  const canGoStep3 = () => !!selectedShowtime;
+  const canGoStep3 = () => !!selectedMovieId;
   const goStep3 = () => { if (canGoStep3()) setStep(3); };
-  const canGoStep4 = () => selectedSeats.length > 0;
-  const goStep4 = () => {
-    if (!canGoStep4()) { showSeatRuleError("Vui lòng chọn ít nhất một ghế."); return; }
-    setSeatRuleError(""); setStep(4);
+  const canGoStep4 = () => !!selectedShowtime;
+  const goStep4 = () => { if (canGoStep4()) setStep(4); };
+  const canGoStep5 = () => selectedSeats.length > 0;
+  const goStep5 = () => {
+    if (!canGoStep5()) { showSeatRuleError("Vui lòng chọn ít nhất một ghế."); return; }
+    setSeatRuleError(""); setStep(5);
   };
-  const goStep5 = () => setStep(5);
+  const goStep6 = () => setStep(6);
 
   const toggleSeat = (seatId) => {
     setSelectedSeats((prev) => {
@@ -542,6 +568,10 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     0,
   );
   const totalAmount = seatTotal + comboTotal;
+  const selectedMovie = useMemo(
+    () => movieList.find((movie) => String(movie.movie_id) === String(selectedMovieId)) || null,
+    [movieList, selectedMovieId],
+  );
   const singleFoodItems = useMemo(
     () => comboList.filter((item) => String(item?.category || "combo").toLowerCase() === "single"),
     [comboList],
@@ -610,6 +640,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     setSearchQuery("");
     setSearchResults([]);
     setNewCustomerForm({ full_name: "", email: "", phone: "", birthday: "", sex: "male" });
+    setSelectedMovieId("");
     setSelectedCinemaId("");
     setSelectedShowtime(null);
     setSelectedSeats([]);
@@ -622,6 +653,28 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
   if (bookingResult) {
     const b = bookingResult.booking || {};
     const nu = bookingResult.new_user;
+    const printBooking = () => {
+      const seatList = (b.seats || selectedSeatUnits.flatMap((unit) => unit.seatCodes)).filter(Boolean);
+      const comboPayload = comboList
+        .filter((combo) => Number(comboCounts[combo.combo_id] || 0) > 0)
+        .map((combo) => ({
+          quantity: Number(comboCounts[combo.combo_id] || 0),
+          combo_name: combo.combo_name,
+          name: combo.combo_name,
+        }));
+
+      printTicketPdf({
+        bookingCode: b.booking_code || "",
+        movie: b.movie_title || selectedShowtime?.movie_title || selectedMovie?.title || "",
+        cinema: b.cinema_name || selectedShowtime?.cinema_name || "Sweetstar Cinema",
+        room: b.room_name || selectedShowtime?.room_name || "",
+        showtime: b.start_time ? new Date(b.start_time).toLocaleString("vi-VN") : (selectedShowtime?.start_time ? new Date(selectedShowtime.start_time).toLocaleString("vi-VN") : ""),
+        user: b.full_name || selectedCustomer?.full_name || newCustomerForm.full_name || "",
+        seats: seatList,
+        combos: comboPayload,
+      });
+    };
+
     return (
       <div className="sf-section">
         <div className="sf-detail-card" style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -631,7 +684,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
           </div>
           <div className="sf-detail-row"><span>Mã đặt vé</span><strong style={{ color: "#7c61ff", fontSize: 18 }}>{b.booking_code || "—"}</strong></div>
           <div className="sf-detail-row"><span>Khách hàng</span><strong>{b.full_name || selectedCustomer?.full_name || newCustomerForm.full_name}</strong></div>
-          <div className="sf-detail-row"><span>Phim</span><strong>{b.movie_title || selectedShowtime?.movie_title || selectedShowtime?.title || "—"}</strong></div>
+          <div className="sf-detail-row"><span>Phim</span><strong>{b.movie_title || selectedShowtime?.movie_title || selectedMovie?.title || "—"}</strong></div>
           <div className="sf-detail-row"><span>Suất</span><strong>
             {b.start_time ? new Date(b.start_time).toLocaleString("vi-VN") : (selectedShowtime?.start_time ? new Date(selectedShowtime.start_time).toLocaleString("vi-VN") : "—")}
           </strong></div>
@@ -645,8 +698,9 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
               <div style={{ fontSize: 12, color: "#93c5fd", marginTop: 6 }}>Khách hàng nên đổi mật khẩu sau khi đăng nhập.</div>
             </div>
           )}
-          <div style={{ marginTop: 24, display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <div style={{ marginTop: 24, display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
             <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={resetForm}>Đặt vé khác</button>
+            <button className="sf-btn sf-btn-add sf-btn-lg" onClick={printBooking}>In vé / Lưu PDF</button>
           </div>
         </div>
       </div>
@@ -655,17 +709,18 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
 
   return (
     <div className="sf-section">
-      {/* Step indicator */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {[
           { n: 1, label: "Khách hàng" },
-          { n: 2, label: "Suất chiếu" },
-          { n: 3, label: "Chọn ghế" },
-          { n: 4, label: "Combo" },
-          { n: 5, label: "Xác nhận" },
-        ].map(s => (
+          { n: 2, label: "Phim đang chiếu" },
+          { n: 3, label: "Suất chiếu" },
+          { n: 4, label: "Chọn ghế" },
+          { n: 5, label: "Combo" },
+          { n: 6, label: "Xác nhận & In vé" },
+        ].map((s) => (
           <button
             key={s.n}
+            type="button"
             onClick={() => setStep(s.n)}
             className={`sf-btn ${step === s.n ? "sf-btn-add" : "sf-btn-secondary"} sm`}
             style={{ opacity: step >= s.n ? 1 : 0.55 }}
@@ -676,18 +731,15 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
       </div>
 
       <div className="table-card" style={{ padding: 20 }}>
-        {/* STEP 1: Customer */}
         {step === 1 && (
           <div>
             <h3 style={{ marginBottom: 16 }}>Bước 1: Chọn khách hàng</h3>
             <div style={{ display: "flex", gap: 16, marginBottom: 18 }}>
-              <label className={`sf-role-chip ${customerMode === "existing_user" ? " checked" : ""}`}
-                style={{ cursor: "pointer", padding: "10px 14px" }}>
+              <label className={`sf-role-chip ${customerMode === "existing_user" ? " checked" : ""}`} style={{ cursor: "pointer", padding: "10px 14px" }}>
                 <input type="radio" checked={customerMode === "existing_user"} onChange={() => { setCustomerMode("existing_user"); setSelectedCustomer(null); }} style={{ marginRight: 6 }} />
                 ✅ Đã có tài khoản
               </label>
-              <label className={`sf-role-chip ${customerMode === "new_user" ? " checked" : ""}`}
-                style={{ cursor: "pointer", padding: "10px 14px" }}>
+              <label className={`sf-role-chip ${customerMode === "new_user" ? " checked" : ""}`} style={{ cursor: "pointer", padding: "10px 14px" }}>
                 <input type="radio" checked={customerMode === "new_user"} onChange={() => { setCustomerMode("new_user"); setSelectedCustomer(null); }} style={{ marginRight: 6 }} />
                 ➕ Chưa có tài khoản (tạo mới)
               </label>
@@ -712,10 +764,10 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                     </div>
                   ) : searchResults.length === 0 ? (
                     <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", fontSize: 13 }}>
-                      Không tìm thấy tài khoản nào khớp với &ldquo;{searchQuery}&rdquo;
+                      Không tìm thấy tài khoản nào khớp với “{searchQuery}”
                     </div>
                   ) : (
-                    searchResults.map(u => (
+                    searchResults.map((u) => (
                       <div
                         key={u.user_id}
                         onClick={() => setSelectedCustomer(u)}
@@ -724,7 +776,9 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                           cursor: "pointer",
                           borderBottom: "1px solid #182047",
                           background: selectedCustomer?.user_id === u.user_id ? "rgba(124,97,255,0.15)" : "transparent",
-                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
                         }}
                       >
                         <div>
@@ -750,7 +804,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                       <input
                         className={newCustomerErrors.full_name ? "error" : ""}
                         value={newCustomerForm.full_name}
-                        onChange={(e) => setNewCustomerForm(p => ({ ...p, full_name: e.target.value }))}
+                        onChange={(e) => setNewCustomerForm((p) => ({ ...p, full_name: e.target.value }))}
                         placeholder="Nguyễn Thị A"
                       />
                       {newCustomerErrors.full_name && <span className="sf-error">{newCustomerErrors.full_name}</span>}
@@ -761,7 +815,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                         type="email"
                         className={newCustomerErrors.email ? "error" : ""}
                         value={newCustomerForm.email}
-                        onChange={(e) => setNewCustomerForm(p => ({ ...p, email: e.target.value }))}
+                        onChange={(e) => setNewCustomerForm((p) => ({ ...p, email: e.target.value }))}
                         placeholder="khach@email.com"
                       />
                       {newCustomerErrors.email && <span className="sf-error">{newCustomerErrors.email}</span>}
@@ -773,7 +827,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                       <input
                         className={newCustomerErrors.phone ? "error" : ""}
                         value={newCustomerForm.phone}
-                        onChange={(e) => setNewCustomerForm(p => ({ ...p, phone: e.target.value }))}
+                        onChange={(e) => setNewCustomerForm((p) => ({ ...p, phone: e.target.value }))}
                         placeholder="09xxxxxxxx"
                       />
                       {newCustomerErrors.phone && <span className="sf-error">{newCustomerErrors.phone}</span>}
@@ -785,17 +839,14 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                         value={newCustomerForm.birthday}
                         min={getBirthDateBounds().min}
                         max={getBirthDateBounds().max}
-                        onChange={(e) => setNewCustomerForm(p => ({ ...p, birthday: e.target.value }))}
+                        onChange={(e) => setNewCustomerForm((p) => ({ ...p, birthday: e.target.value }))}
                       />
                       {newCustomerErrors.birthday && <span className="sf-error">{newCustomerErrors.birthday}</span>}
                     </div>
                   </div>
                   <div className="sf-field">
                     <label>Giới tính</label>
-                    <select
-                      value={newCustomerForm.sex}
-                      onChange={(e) => setNewCustomerForm(p => ({ ...p, sex: e.target.value }))}
-                    >
+                    <select value={newCustomerForm.sex} onChange={(e) => setNewCustomerForm((p) => ({ ...p, sex: e.target.value }))}>
                       <option value="male">Nam</option>
                       <option value="female">Nữ</option>
                       <option value="other">Khác</option>
@@ -809,23 +860,80 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
             )}
 
             <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}>
-              <button className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep2}>Tiếp theo →</button>
+              <button type="button" className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep2}>Tiếp theo →</button>
             </div>
           </div>
         )}
 
-        {/* STEP 2: Showtime */}
-        {step === 2 && (() => {
-          // Build quick date buttons: hôm nay + 6 ngày tiếp theo
+        {step === 2 && (
+          <div>
+            <h3 style={{ marginBottom: 16 }}>Bước 2: Chọn phim đang chiếu</h3>
+            {movieList.length === 0 ? (
+              <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>
+                Hiện chưa có phim đang chiếu để đặt vé.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
+                {movieList.map((movie) => {
+                  const isSelected = String(movie.movie_id) === String(selectedMovieId);
+                  const poster = movie.poster_url || movie.poster || movie.image || "";
+                  return (
+                    <button
+                      type="button"
+                      key={movie.movie_id}
+                      onClick={() => {
+                        setSelectedMovieId(String(movie.movie_id));
+                        setSelectedShowtime(null);
+                        setStep(3);
+                      }}
+                      style={{
+                        background: isSelected ? "rgba(124,97,255,0.14)" : "rgba(255,255,255,0.03)",
+                        border: isSelected ? "1px solid rgba(124,97,255,0.7)" : "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 14,
+                        padding: 10,
+                        textAlign: "left",
+                        color: "#eef4ff",
+                        cursor: "pointer",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                        boxShadow: isSelected ? "0 0 0 1px rgba(124,97,255,0.3)" : "none",
+                      }}
+                    >
+                      <div style={{ width: "100%", aspectRatio: "2 / 3", borderRadius: 10, overflow: "hidden", background: "rgba(10,16,32,0.8)" }}>
+                        {poster ? (
+                          <img src={toAbsoluteAssetUrl(poster)} alt={movie.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        ) : (
+                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>🎬</div>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.4 }}>{movie.title}</div>
+                        <div style={{ fontSize: 12, color: "#8fa6ff", marginTop: 4 }}>
+                          {movie.genre || "Phim chiếu rạp"}
+                          {movie.age_limit ? ` • ${movie.age_limit}+` : ""}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between" }}>
+              <button type="button" className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(1)}>← Quay lại</button>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (() => {
           const quickDates = Array.from({ length: 7 }, (_, i) => {
             const d = new Date();
             d.setDate(d.getDate() + i);
             const iso = toVNDateString(d);
-            const label = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : d.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' });
+            const label = i === 0 ? "Hôm nay" : i === 1 ? "Ngày mai" : d.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" });
             return { iso, label };
           });
 
-          // Group showtimes by movie
           const grouped = showtimes.reduce((acc, st) => {
             const key = st.movie_title || `Phim #${st.movie_id}`;
             if (!acc[key]) acc[key] = [];
@@ -835,14 +943,16 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
 
           return (
             <div>
-              <h3 style={{ marginBottom: 16 }}>Bước 2: Chọn suất chiếu</h3>
-
-              {/* Rạp */}
+              <h3 style={{ marginBottom: 16 }}>Bước 3: Chọn suất chiếu</h3>
+              <div className="sf-field" style={{ marginBottom: 14 }}>
+                <label>Phim đã chọn</label>
+                <input value={selectedMovie?.title || "Chưa chọn phim"} readOnly style={{ background: "rgba(255,255,255,0.04)", color: "#eef4ff" }} />
+              </div>
               <div className="sf-field" style={{ marginBottom: 14 }}>
                 <label>Rạp chiếu</label>
                 <select value={selectedCinemaId} onChange={(e) => { setSelectedCinemaId(e.target.value); setSelectedShowtime(null); }}>
                   <option value="">-- Chọn rạp --</option>
-                  {cinemas.map(c => (
+                  {cinemas.map((c) => (
                     <option key={c.cinemas_id || c.id || c.cinema_id} value={c.cinemas_id || c.id || c.cinema_id}>
                       {c.cinema_name || c.name}
                     </option>
@@ -850,7 +960,6 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                 </select>
               </div>
 
-              {/* Date picker nhanh */}
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 13, color: "#8fa6ff", marginBottom: 8, fontWeight: 500 }}>Chọn ngày</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
@@ -865,45 +974,33 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                       {label}
                     </button>
                   ))}
-                  {/* Input ngày tùy chọn */}
                   <input
                     type="date"
                     value={selectedDate}
                     onChange={(e) => { setSelectedDate(e.target.value); setSelectedShowtime(null); }}
-                    style={{
-                      background: "rgba(30,42,85,0.7)", border: "1px solid rgba(124,97,255,0.3)",
-                      borderRadius: 8, color: "#eef4ff", padding: "6px 10px", fontSize: 12,
-                      cursor: "pointer",
-                    }}
+                    style={{ background: "rgba(30,42,85,0.7)", border: "1px solid rgba(124,97,255,0.3)", borderRadius: 8, color: "#eef4ff", padding: "6px 10px", fontSize: 12, cursor: "pointer" }}
                   />
                 </div>
               </div>
 
-              {/* Danh sách suất chiếu */}
-              {!selectedCinemaId ? (
-                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>
-                  Vui lòng chọn rạp trước.
-                </div>
+              {!selectedMovieId ? (
+                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>Vui lòng chọn phim trước.</div>
+              ) : !selectedCinemaId ? (
+                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>Vui lòng chọn rạp trước.</div>
               ) : showtimeLoading ? (
-                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>
-                  Đang tải suất chiếu…
-                </div>
+                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>Đang tải suất chiếu…</div>
               ) : showtimes.length === 0 ? (
-                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>
-                  Không có suất chiếu vào ngày đã chọn.
-                </div>
+                <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>Không có suất chiếu của phim này vào ngày đã chọn.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   {Object.entries(grouped).map(([movieName, sts]) => (
                     <div key={movieName}>
-                      {/* Movie header */}
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "8px 12px", background: "rgba(124,97,255,0.08)", borderRadius: 8 }}>
                         <span style={{ fontSize: 16 }}>🎬</span>
                         <strong style={{ color: "#c4b5fd", fontSize: 14 }}>{movieName}</strong>
                         <span style={{ fontSize: 12, color: "#7a8fc0", marginLeft: "auto" }}>{sts.length} suất</span>
                       </div>
 
-                      {/* Showtime buttons grouped by room */}
                       {(() => {
                         const byRoom = sts.reduce((acc, st) => {
                           const rk = st.room_name || `Phòng #${st.room_id}`;
@@ -919,12 +1016,10 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                               {roomSts
                                 .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
-                                .map(st => {
+                                .map((st) => {
                                   const isSelected = selectedShowtime?.showtime_id === st.showtime_id;
-                                  const isEnded = st.status === 'ended';
-                                  const timeLabel = st.start_time
-                                    ? new Date(st.start_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-                                    : "—";
+                                  const isEnded = st.status === "ended";
+                                  const timeLabel = st.start_time ? new Date(st.start_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "—";
                                   return (
                                     <button
                                       key={st.showtime_id}
@@ -954,12 +1049,8 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                                           {st.available_seats > 0 ? `${st.available_seats} ghế` : "Hết ghế"}
                                         </div>
                                       )}
-                                      {isEnded && (
-                                        <div style={{ fontSize: 10, color: "#6b7280", marginTop: 1 }}>Đã chiếu</div>
-                                      )}
-                                      {isSelected && (
-                                        <div style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, background: "#7c61ff", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10 }}>✓</div>
-                                      )}
+                                      {isEnded && <div style={{ fontSize: 10, color: "#6b7280", marginTop: 1 }}>Đã chiếu</div>}
+                                      {isSelected && <div style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, background: "#7c61ff", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10 }}>✓</div>}
                                     </button>
                                   );
                                 })}
@@ -972,10 +1063,9 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                 </div>
               )}
 
-              {/* Suất đã chọn summary */}
               {selectedShowtime && (
                 <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 10, background: "rgba(124,97,255,0.1)", border: "1px solid rgba(124,97,255,0.25)", fontSize: 13 }}>
-                  ✅ Đã chọn: <strong style={{ color: "#c4b5fd" }}>{selectedShowtime.movie_title}</strong>
+                  ✅ Đã chọn: <strong style={{ color: "#c4b5fd" }}>{selectedShowtime.movie_title || selectedMovie?.title}</strong>
                   {" · "}{selectedShowtime.room_name}
                   {" · "}<strong style={{ color: "#7c61ff" }}>
                     {new Date(selectedShowtime.start_time).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
@@ -984,24 +1074,18 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
               )}
 
               <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between" }}>
-                <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(1)}>← Quay lại</button>
-                <button className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep3} disabled={!canGoStep3()}>Tiếp theo →</button>
+                <button type="button" className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(2)}>← Quay lại</button>
+                <button type="button" className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep4} disabled={!canGoStep4()}>Tiếp theo →</button>
               </div>
             </div>
           );
         })()}
 
-        {/* STEP 3: Seats */}
-        {step === 3 && (
+        {step === 4 && (
           <div>
-            <h3 style={{ marginBottom: 16 }}>Bước 3: Chọn ghế</h3>
-            <div style={{ textAlign: "center", marginBottom: 10, fontSize: 13, color: "#7a8fc0" }}>
-              🎥 Màn hình chiếu phim 🎥
-            </div>
-            <div style={{
-              height: 8, width: "70%", margin: "0 auto 24px", borderRadius: "0 0 50% 50%",
-              background: "linear-gradient(180deg, #7c61ff, #1e2a55)"
-            }} />
+            <h3 style={{ marginBottom: 16 }}>Bước 4: Chọn ghế</h3>
+            <div style={{ textAlign: "center", marginBottom: 10, fontSize: 13, color: "#7a8fc0" }}>🎥 Màn hình chiếu phim 🎥</div>
+            <div style={{ height: 8, width: "70%", margin: "0 auto 24px", borderRadius: "0 0 50% 50%", background: "linear-gradient(180deg, #7c61ff, #1e2a55)" }} />
             {seatLoading ? (
               <div style={{ padding: 30, textAlign: "center", color: "#8fa6ff" }}>Đang tải ghế…</div>
             ) : seatLoadError ? (
@@ -1011,24 +1095,14 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
             ) : (
               <div className="admin-seat-scroll">
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content", margin: "0 auto" }}>
-                  <div
-                    className="booking-seat-grid-map"
-                    style={{
-                      "--booking-grid-columns": seatLayout.totalVisualColumns,
-                      "--booking-seat-size": "42px",
-                      "--booking-seat-gap": "8px",
-                    }}
-                  >
+                  <div className="booking-seat-grid-map" style={{ "--booking-grid-columns": seatLayout.totalVisualColumns, "--booking-seat-size": "42px", "--booking-seat-gap": "8px" }}>
                     {seatLayout.rows.map((row) => (
                       <div className="admin-seat-row" key={row.row}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                           <div style={{ width: 28, minWidth: 28, textAlign: "center", fontWeight: 700, color: "#7a8fc0", fontSize: 13 }}>{row.row}</div>
-                          <div
-                            className="booking-seat-grid-row"
-                            style={{ "--booking-grid-columns": seatLayout.totalVisualColumns }}
-                          >
+                          <div className="booking-seat-grid-row" style={{ "--booking-grid-columns": seatLayout.totalVisualColumns }}>
                             {row.units.map((unit) => {
-                              const isSold = unit.sold || unit.seatCodes.some(c => soldSeatCodes.has(String(c).toUpperCase()));
+                              const isSold = unit.sold || unit.seatCodes.some((c) => soldSeatCodes.has(String(c).toUpperCase()));
                               const isSelected = selectedSeats.includes(unit.id);
                               const t = unit.type || "regular";
                               return (
@@ -1055,26 +1129,11 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
               </div>
             )}
             <div style={{ display: "flex", gap: 16, marginTop: 24, justifyContent: "center", flexWrap: "wrap", fontSize: 13 }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(180deg,rgba(61,74,110,.92),rgba(43,54,87,.98))", border: "1px solid rgba(255,255,255,.09)", display: "inline-block" }} />
-                Ghế thường (80k)
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(180deg,#ffd36f,#eb9830)", display: "inline-block" }} />
-                Ghế VIP (100k)
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(180deg,#ff7084,#f43f5e)", display: "inline-block" }} />
-                Ghế Đôi (120k)
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(135deg,#7f6bff,#6552ff)", display: "inline-block" }} />
-                Đang chọn
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 16, height: 16, borderRadius: 4, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.16)", display: "inline-block" }} />
-                Đã bán
-              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(180deg,rgba(61,74,110,.92),rgba(43,54,87,.98))", border: "1px solid rgba(255,255,255,.09)", display: "inline-block" }} />Ghế thường (80k)</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(180deg,#ffd36f,#eb9830)", display: "inline-block" }} />Ghế VIP (100k)</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(180deg,#ff7084,#f43f5e)", display: "inline-block" }} />Ghế Đôi (120k)</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 16, height: 16, borderRadius: 4, background: "linear-gradient(135deg,#7f6bff,#6552ff)", display: "inline-block" }} />Đang chọn</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 16, height: 16, borderRadius: 4, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.16)", display: "inline-block" }} />Đã bán</span>
             </div>
             {seatRuleError && (
               <div className="admin-seat-rule-toast" role="alert">
@@ -1086,19 +1145,18 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
             <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>Đã chọn <strong style={{ color: "#7c61ff" }}>{selectedSeats.length}</strong> vị trí · Tổng: <strong style={{ color: "#fbbf24" }}>{fmtMoney(seatTotal)}</strong></div>
               <div style={{ display: "flex", gap: 10 }}>
-                <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(2)}>← Quay lại</button>
-                <button className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep4}>Tiếp theo →</button>
+                <button type="button" className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(3)}>← Quay lại</button>
+                <button type="button" className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep5}>Tiếp theo →</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* STEP 4: Combos */}
-        {step === 4 && (
+        {step === 5 && (
           <div>
             <div className="admin-food-heading">
               <div>
-                <h3>Bước 4: Bắp, nước &amp; combo</h3>
+                <h3>Bước 5: Bắp, nước &amp; combo</h3>
                 <p>Chọn món lẻ hoặc combo phù hợp cho khách hàng.</p>
               </div>
               {comboTotal > 0 && <strong>Đã chọn: {fmtMoney(comboTotal)}</strong>}
@@ -1116,12 +1174,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                   {singleFoodItems.length > 0 ? (
                     <div className="admin-food-grid">
                       {singleFoodItems.map((item) => (
-                        <FoodItemCard
-                          key={item.combo_id}
-                          item={item}
-                          quantity={Number(comboCounts[item.combo_id] || 0)}
-                          onChange={(delta) => changeFoodQuantity(item.combo_id, delta)}
-                        />
+                        <FoodItemCard key={item.combo_id} item={item} quantity={Number(comboCounts[item.combo_id] || 0)} onChange={(delta) => changeFoodQuantity(item.combo_id, delta)} />
                       ))}
                     </div>
                   ) : <p className="admin-food-empty-section">Chưa có bắp hoặc nước lẻ.</p>}
@@ -1135,12 +1188,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                   {comboFoodItems.length > 0 ? (
                     <div className="admin-food-grid">
                       {comboFoodItems.map((item) => (
-                        <FoodItemCard
-                          key={item.combo_id}
-                          item={item}
-                          quantity={Number(comboCounts[item.combo_id] || 0)}
-                          onChange={(delta) => changeFoodQuantity(item.combo_id, delta)}
-                        />
+                        <FoodItemCard key={item.combo_id} item={item} quantity={Number(comboCounts[item.combo_id] || 0)} onChange={(delta) => changeFoodQuantity(item.combo_id, delta)} />
                       ))}
                     </div>
                   ) : <p className="admin-food-empty-section">Chưa có combo nào đang bán.</p>}
@@ -1150,17 +1198,16 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
             <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>Tạm tính đồ ăn: <strong style={{ color: "#fbbf24" }}>{fmtMoney(comboTotal)}</strong></div>
               <div style={{ display: "flex", gap: 10 }}>
-                <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(3)}>← Quay lại</button>
-                <button className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep5}>Tiếp theo →</button>
+                <button type="button" className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(4)}>← Quay lại</button>
+                <button type="button" className="sf-btn sf-btn-add sf-btn-lg" onClick={goStep6}>Tiếp theo →</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* STEP 5: Confirm */}
-        {step === 5 && (
+        {step === 6 && (
           <div>
-            <h3 style={{ marginBottom: 16 }}>Bước 5: Xác nhận đặt vé</h3>
+            <h3 style={{ marginBottom: 16 }}>Bước 6: Xác nhận đặt vé</h3>
             <div className="sf-detail-grid">
               <div className="sf-detail-card">
                 <h4>Khách hàng</h4>
@@ -1182,10 +1229,8 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
               </div>
               <div className="sf-detail-card">
                 <h4>Suất chiếu</h4>
-                <div className="sf-detail-row"><span>Phim</span><strong>{selectedShowtime?.movie_title || selectedShowtime?.title || "—"}</strong></div>
-                <div className="sf-detail-row"><span>Giờ chiếu</span><strong>
-                  {selectedShowtime?.start_time ? new Date(selectedShowtime.start_time).toLocaleString("vi-VN") : "—"}
-                </strong></div>
+                <div className="sf-detail-row"><span>Phim</span><strong>{selectedShowtime?.movie_title || selectedShowtime?.title || selectedMovie?.title || "—"}</strong></div>
+                <div className="sf-detail-row"><span>Giờ chiếu</span><strong>{selectedShowtime?.start_time ? new Date(selectedShowtime.start_time).toLocaleString("vi-VN") : "—"}</strong></div>
                 <div className="sf-detail-row"><span>Phòng</span><strong>{selectedShowtime?.room_name || `#${selectedShowtime?.room_id}`}</strong></div>
                 <div className="sf-detail-row"><span>Ghế ({selectedSeats.length})</span><strong>{selectedSeatUnits.map((unit) => unit.label).join(", ")}</strong></div>
               </div>
@@ -1194,9 +1239,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
               <h4>Thanh toán</h4>
               <div className="sf-detail-row"><span>Giá ghế</span><strong>{fmtMoney(seatTotal)}</strong></div>
               {comboTotal > 0 && <div className="sf-detail-row"><span>Combo</span><strong>{fmtMoney(comboTotal)}</strong></div>}
-              <div className="sf-detail-row"><span style={{ fontSize: 16 }}><strong>Tổng cộng</strong></span>
-                <strong style={{ color: "#fbbf24", fontSize: 22 }}>{fmtMoney(totalAmount)}</strong>
-              </div>
+              <div className="sf-detail-row"><span style={{ fontSize: 16 }}><strong>Tổng cộng</strong></span><strong style={{ color: "#fbbf24", fontSize: 22 }}>{fmtMoney(totalAmount)}</strong></div>
               <div className="sf-field" style={{ marginTop: 10 }}>
                 <label>Hình thức thanh toán</label>
                 <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
@@ -1210,13 +1253,8 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
               </div>
             </div>
             <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between" }}>
-              <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(4)}>← Quay lại</button>
-              <button
-                className="sf-btn sf-btn-add sf-btn-lg"
-                disabled={submitting}
-                onClick={handleSubmit}
-                style={{ paddingLeft: 30, paddingRight: 30 }}
-              >
+              <button type="button" className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(5)}>← Quay lại</button>
+              <button type="button" className="sf-btn sf-btn-add sf-btn-lg" disabled={submitting} onClick={handleSubmit} style={{ paddingLeft: 30, paddingRight: 30 }}>
                 {submitting ? "Đang đặt vé…" : "✅ Xác nhận & Đặt vé"}
               </button>
             </div>

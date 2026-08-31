@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { adminComboService } from "../../services/adminApi";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import { toAbsoluteAssetUrl } from "../../../utils/api.js";
 import "./combos.css";
 
 const CATEGORY_LABELS = {
@@ -46,6 +47,8 @@ function summarizeContents(combo) {
   return parts.join(" + ") || "Tùy chỉnh";
 }
 
+const resolveComboImage = (image) => toAbsoluteAssetUrl(image || "");
+
 function ComboFormModal({ combo, onClose, onSave }) {
   const isEdit = Boolean(combo?.combo_id);
   const [form, setForm] = useState(
@@ -59,10 +62,20 @@ function ComboFormModal({ combo, onClose, onSave }) {
       : { ...EMPTY_FORM },
   );
   const [errors, setErrors] = useState({});
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(combo?.image || "");
 
   const setField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => ({ ...prev, [key]: undefined }));
+  };
+
+  const handleImageFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setSelectedImageFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setImagePreview(objectUrl);
   };
 
   const validate = () => {
@@ -86,7 +99,8 @@ function ComboFormModal({ combo, onClose, onSave }) {
       return;
     }
 
-    onSave({
+    const payload = new FormData();
+    Object.entries({
       ...form,
       price: Number(form.price || 0),
       popcorn_quantity: Number(form.popcorn_quantity || 0),
@@ -101,7 +115,22 @@ function ComboFormModal({ combo, onClose, onSave }) {
         .filter(Boolean),
       is_active: Boolean(form.is_active),
       sort_order: Number(form.sort_order || 0),
+    }).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      if (Array.isArray(value)) {
+        payload.append(key, JSON.stringify(value));
+        return;
+      }
+      payload.append(key, String(value));
     });
+
+    if (selectedImageFile) {
+      payload.set("imageFile", selectedImageFile);
+    } else if (form.image && !form.image.startsWith("blob:")) {
+      payload.set("image", form.image);
+    }
+
+    onSave(payload);
   };
 
   const previewSummary = summarizeContents(form);
@@ -168,12 +197,30 @@ function ComboFormModal({ combo, onClose, onSave }) {
               </div>
 
               <div className="combo-field">
-                <label>Ảnh / URL ảnh</label>
-                <input
-                  value={form.image}
-                  onChange={(event) => setField("image", event.target.value)}
-                  placeholder="/uploads/combos/combo-1.png hoặc URL đầy đủ"
-                />
+                <label>Ảnh combo</label>
+                <div className="combo-image-upload-wrap">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageFileChange}
+                  />
+                  <input
+                    value={form.image}
+                    onChange={(event) => setField("image", event.target.value)}
+                    placeholder="/uploads/combos/combo-1.png hoặc URL đầy đủ"
+                  />
+                </div>
+                {(imagePreview || form.image) && (
+                  <div className="combo-image-preview">
+                    <img
+                      src={imagePreview || resolveComboImage(form.image || "")}
+                      alt={form.combo_name || "Combo preview"}
+                      onError={(event) => {
+                        event.target.style.display = "none";
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -435,6 +482,7 @@ export default function AdminCombos() {
         <table>
           <thead>
             <tr>
+              <th>Hình</th>
               <th>Tên combo</th>
               <th>Loại</th>
               <th>Cấu phần</th>
@@ -467,12 +515,29 @@ export default function AdminCombos() {
             ) : (
               pageItems.map((combo) => {
                 const statusMeta = combo.is_active ? STATUS_LABELS.active : STATUS_LABELS.inactive;
+                const comboImage = resolveComboImage(combo.image);
                 return (
                   <tr key={combo.combo_id}>
                     <td>
-                      <div className="bk-user-cell">
-                        <strong>{combo.combo_name}</strong>
-                        <span>{combo.description || "Không có mô tả"}</span>
+                      {comboImage ? (
+                        <img
+                          src={comboImage}
+                          alt={combo.combo_name}
+                          className="combo-table-image"
+                          onError={(event) => {
+                            event.target.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="combo-table-image missing-image-placeholder">—</div>
+                      )}
+                    </td>
+                    <td>
+                      <div className="bk-user-cell combo-name-cell">
+                        <div className="combo-name-copy">
+                          <strong>{combo.combo_name}</strong>
+                          <span>{combo.description || "Không có mô tả"}</span>
+                        </div>
                       </div>
                     </td>
                     <td>{CATEGORY_LABELS[combo.category] || combo.category}</td>

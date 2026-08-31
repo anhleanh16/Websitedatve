@@ -82,6 +82,7 @@ export const adminCategoryService = {
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const adminUserService = {
   getAllUsers: () => apiFetch("/admin/users"),
+  getRoleSummary: () => apiFetch("/admin/roles/summary"),
   searchUsers: (query) =>
     apiFetch(
       `/admin/users/search?query=${encodeURIComponent(query || "")}`,
@@ -100,6 +101,10 @@ export const adminUserService = {
     apiFetch(`/admin/users/${id}/deactivate`, { method: "PUT" }),
   lockUser: (id) => apiFetch(`/admin/users/${id}/lock`, { method: "PUT" }),
   unlockUser: (id) => apiFetch(`/admin/users/${id}/unlock`, { method: "PUT" }),
+};
+
+export const adminPointsService = {
+  getSettings: () => apiFetch("/points/settings"),
 };
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -182,15 +187,15 @@ export const adminComboService = {
     return apiFetch(`/admin/combos${q ? `?${q}` : ""}`);
   },
   getById: (id) => apiFetch(`/admin/combos/${id}`),
-  create: (data) =>
-    apiFetch("/admin/combos", {
+  create: (formData) =>
+    uploadFetch("/admin/combos", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: formData,
     }),
-  update: (id, data) =>
-    apiFetch(`/admin/combos/${id}`, {
+  update: (id, formData) =>
+    uploadFetch(`/admin/combos/${id}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: formData,
     }),
   delete: (id) => apiFetch(`/admin/combos/${id}`, { method: "DELETE" }),
 };

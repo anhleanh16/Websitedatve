@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { adminShowtimeService, adminMovieService } from "../../services/adminApi";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 import './showtimes.css';
@@ -221,19 +221,29 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
     s.startTime.startsWith(selectedDate)
   );
 
-  const HOURS = Array.from({ length: 15 }, (_, i) => i + 8); // 08:00 – 22:00
-  const totalMin = 15 * 60;
+  const HOURS = Array.from({ length: 24 }, (_, i) => i); // 00:00 – 23:00
+  const totalMin = 24 * 60;
+
+  function minutesFromMidnight(iso) {
+    const d = new Date(iso);
+    return d.getHours() * 60 + d.getMinutes();
+  }
 
   function pct(iso) {
-    const d = new Date(iso);
-    const minFromBase = (d.getHours() - 8) * 60 + d.getMinutes();
-    return Math.max(0, (minFromBase / totalMin) * 100);
+    const minFromStart = minutesFromMidnight(iso);
+    return Math.max(0, Math.min(100, (minFromStart / totalMin) * 100));
   }
   function widthPct(startIso, endIso) {
     const start = new Date(startIso);
     const end   = new Date(endIso);
-    const mins  = (end - start) / 60000;
-    return Math.min(100, (mins / totalMin) * 100);
+    let startMin = minutesFromMidnight(start);
+    let endMin = minutesFromMidnight(end);
+
+    if (endMin <= startMin) {
+      endMin += 24 * 60;
+    }
+
+    return Math.min(100, ((endMin - startMin) / totalMin) * 100);
   }
 
   return (
@@ -259,8 +269,28 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
         {cinemaRooms.length === 0 ? (
           <div className="sh-empty">Không có phòng chiếu nào cho rạp này.</div>
         ) : cinemaRooms.map(room => {
-          const roomShows = dayShows.filter(s => s.roomId === room.id);
+          const roomShows = dayShows
+            .filter(s => s.roomId === room.id)
+            .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+
+          const laneEndTimes = [];
+          const arrangedShows = roomShows.map(show => {
+            const start = new Date(show.startTime).getTime();
+            const end = new Date(show.endTime).getTime();
+            let laneIndex = laneEndTimes.findIndex((laneEnd) => laneEnd <= start);
+
+            if (laneIndex === -1) {
+              laneIndex = laneEndTimes.length;
+            }
+
+            laneEndTimes[laneIndex] = end;
+            return { ...show, laneIndex };
+          });
+
+          const maxLanes = Math.max(1, ...arrangedShows.map(show => show.laneIndex + 1));
           const rtColor   = ROOM_TYPE_COLOR[room.type] || "#8fa6ff";
+          const laneSpacing = 20;
+
           return (
             <div key={room.id} className="sh-timeline-row">
               <div className="sh-room-label-col">
@@ -269,23 +299,29 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
                   {room.type} · {room.totalSeats} ghế
                 </span>
               </div>
-              <div className="sh-timeline-track">
+              <div className="sh-timeline-track" style={{ height: `${Math.max(52, 18 + maxLanes * laneSpacing)}px` }}>
                 {HOURS.map(h => (
                   <div key={h} className="sh-track-grid-line" style={{ left: `${((h - 8) / 15) * 100}%` }} />
                 ))}
-                {roomShows.map(s => {
+                {arrangedShows.map(s => {
                   const movie = movies.find(m => m.id === s.movieId);
                   const left  = pct(s.startTime);
                   const width = widthPct(s.startTime, s.endTime);
                   const isFull = s.availableSeats === 0;
                   const isEnded = s.status === "ended";
+                  const laneTop = 8 + (s.laneIndex * 20);
+                  const blockHeight = Math.max(18, 26 - Math.max(0, maxLanes - 2));
+                  const safeWidth = Math.max(8, Math.min(100 - left, width));
+
                   return (
                     <div
                       key={s.id}
                       className="sh-block"
                       style={{
                         left: `${left}%`,
-                        width: `${width}%`,
+                        width: `${safeWidth}%`,
+                        top: `${laneTop}px`,
+                        height: `${blockHeight}px`,
                         background: isEnded
                           ? "rgba(148,163,184,0.16)"
                           : isFull
@@ -401,222 +437,403 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
 function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
   const today = new Date().toISOString().slice(0, 10);
 
-  const [form, setForm] = useState({
-    movieId: "", cinemaId: "", roomId: "",
-    startDate: today, endDate: today,
-    priceStandard: "", priceVip: "", priceCouple: "",
-  });
-  const [timeSlots, setTimeSlots] = useState([{ hour: "10", minute: "00" }]);
-  const [errors, setErrors] = useState({});
-  const [preview, setPreview] = useState(null); // số ngày ước tính
-
-  const set = (f, v) => { setForm(p => ({ ...p, [f]: v })); setErrors(p => ({ ...p, [f]: undefined })); };
-
-  const cinemaRooms = rooms.filter(r => String(r.cinemaId) === String(form.cinemaId));
-  const selMovie = movies.find(m => m.id === Number(form.movieId));
-
-  // Tính số ngày trong khoảng
-  const calcDays = () => {
-    if (!form.startDate || !form.endDate) return 0;
-    const s = new Date(form.startDate);
-    const e = new Date(form.endDate);
-    if (e < s) return 0;
-    return Math.floor((e - s) / 86400000) + 1;
+  const TEMPLATE_PRESETS = {
+    balanced: { label: "Cân bằng", slots: [{ hour: "09", minute: "00" }, { hour: "12", minute: "00" }, { hour: "15", minute: "00" }, { hour: "18", minute: "00" }, { hour: "21", minute: "00" }] },
+    premium: { label: "Khung giờ cao điểm", slots: [{ hour: "10", minute: "30" }, { hour: "13", minute: "30" }, { hour: "16", minute: "30" }, { hour: "19", minute: "30" }, { hour: "22", minute: "30" }] },
+    weekend: { label: "Cuối tuần tập trung", slots: [{ hour: "08", minute: "30" }, { hour: "11", minute: "00" }, { hour: "14", minute: "00" }, { hour: "17", minute: "30" }, { hour: "20", minute: "30" }] },
+    compact: { label: "Mật độ cao", slots: [{ hour: "10", minute: "00" }, { hour: "13", minute: "30" }, { hour: "17", minute: "00" }, { hour: "20", minute: "30" }] },
   };
 
-  const addSlot = () => setTimeSlots(p => [...p, { hour: "10", minute: "00" }]);
-  const removeSlot = (i) => setTimeSlots(p => p.filter((_, idx) => idx !== i));
-  const updateSlot = (i, field, val) =>
-    setTimeSlots(p => p.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
+  const [selectedMovieIds, setSelectedMovieIds] = useState([]);
+  const [selectedCinemaIds, setSelectedCinemaIds] = useState([]);
+  const [form, setForm] = useState({
+    campaignType: "new_release",
+    campaignReason: "",
+    releaseDate: today,
+    officialEndDate: today,
+    earlyShowEnabled: false,
+    earlyShowDays: 3,
+    earlyShowDurationDays: 7,
+    weekdayTemplate: "balanced",
+    weekendTemplate: "weekend",
+    defaultPriority: 3,
+    defaultSlotsPerDay: 2,
+  });
+  const [errors, setErrors] = useState({});
+
+  const set = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: undefined }));
+  };
+
+  const toggleMovie = (movieId) => {
+    setSelectedMovieIds((prev) => {
+      const next = prev.includes(movieId) ? prev.filter((id) => id !== movieId) : [...prev, movieId];
+      return next;
+    });
+  };
+
+  const toggleCinema = (cinemaId) => {
+    setSelectedCinemaIds((prev) => {
+      const next = prev.includes(cinemaId) ? prev.filter((id) => id !== cinemaId) : [...prev, cinemaId];
+      return next;
+    });
+  };
+
+  const movieConfigs = useMemo(() => {
+    return selectedMovieIds.reduce((acc, movieId) => {
+      acc[movieId] = {
+        priority: form.defaultPriority,
+        slotsPerDay: form.defaultSlotsPerDay,
+        earlyBias: 0,
+        ...acc[movieId],
+      };
+      return acc;
+    }, {});
+  }, [selectedMovieIds, form.defaultPriority, form.defaultSlotsPerDay]);
+
+  const updateMovieConfig = (movieId, field, value) => {
+    setSelectedMovieIds((prev) => prev);
+    setForm((prev) => ({
+      ...prev,
+      movieConfig: {
+        ...(prev.movieConfig || {}),
+        [movieId]: {
+          ...((prev.movieConfig && prev.movieConfig[movieId]) || {}),
+          [field]: value,
+        },
+      },
+    }));
+  };
+
+  const weekdaySlots = TEMPLATE_PRESETS[form.weekdayTemplate]?.slots || TEMPLATE_PRESETS.balanced.slots;
+  const weekendSlots = TEMPLATE_PRESETS[form.weekendTemplate]?.slots || TEMPLATE_PRESETS.weekend.slots;
+
+  useEffect(() => {
+    if (!form.releaseDate) return;
+    const start = new Date(form.releaseDate);
+    if (Number.isNaN(start.getTime())) return;
+    if (!form.officialEndDate || form.officialEndDate < form.releaseDate) {
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      setForm((prev) => ({
+        ...prev,
+        officialEndDate: end.toISOString().slice(0, 10),
+      }));
+    }
+  }, [form.releaseDate, form.officialEndDate]);
+
+  const calcDays = () => {
+    if (!form.releaseDate || !form.officialEndDate) return 0;
+    const start = new Date(form.releaseDate);
+    const end = new Date(form.officialEndDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
+    return Math.floor((end - start) / 86400000) + 1;
+  };
+
+  const totalEstimate = useMemo(() => {
+    const dayCount = calcDays();
+    if (!dayCount || selectedMovieIds.length === 0) return 0;
+    return selectedMovieIds.reduce((sum, movieId) => {
+      const config = (form.movieConfig && form.movieConfig[movieId]) || {};
+      const priority = Number(config.priority || form.defaultPriority || 1);
+      const slotsPerDay = Number(config.slotsPerDay || form.defaultSlotsPerDay || 1);
+      const effectiveSlots = Math.max(1, slotsPerDay + Math.max(0, priority - 2));
+      const weekdayCount = weekdaySlots.length;
+      const weekendCount = weekendSlots.length;
+      const estimated = dayCount * ((effectiveSlots > weekdayCount ? weekdayCount : effectiveSlots) + (effectiveSlots > weekendCount ? weekendCount : effectiveSlots)) / 2;
+      return sum + Math.ceil(estimated);
+    }, 0) * selectedCinemaIds.length;
+  }, [calcDays, selectedMovieIds, selectedCinemaIds, form, weekdaySlots, weekendSlots]);
 
   const validate = () => {
     const e = {};
-    if (!form.movieId)    e.movieId    = "Chọn phim.";
-    if (!form.cinemaId)   e.cinemaId   = "Chọn rạp.";
-    if (!form.roomId)     e.roomId     = "Chọn phòng chiếu.";
-    if (!form.startDate)  e.startDate  = "Chọn ngày bắt đầu.";
-    if (!form.endDate)    e.endDate    = "Chọn ngày kết thúc.";
-    if (form.startDate && form.endDate && form.endDate < form.startDate)
-      e.endDate = "Ngày kết thúc phải sau ngày bắt đầu.";
-    if (timeSlots.length === 0) e.slots = "Thêm ít nhất một khung giờ.";
-    if (!form.priceStandard || Number(form.priceStandard) <= 0) e.priceStandard = "Nhập giá vé thường.";
-    if (!form.priceVip     || Number(form.priceVip)      <= 0) e.priceVip      = "Nhập giá vé VIP.";
-    if (!form.priceCouple  || Number(form.priceCouple)   <= 0) e.priceCouple   = "Nhập giá ghế đôi.";
+    if (!selectedMovieIds.length) e.movies = "Chọn ít nhất 1 phim.";
+    if (!selectedCinemaIds.length) e.cinemas = "Chọn ít nhất 1 rạp.";
+    if (!form.releaseDate) e.releaseDate = "Chọn ngày phát hành.";
+    if (!form.officialEndDate) e.officialEndDate = "Chọn ngày kết thúc dự kiến.";
+    if (form.releaseDate && form.officialEndDate && form.officialEndDate < form.releaseDate) e.officialEndDate = "Ngày kết thúc phải sau ngày phát hành.";
+    if (form.earlyShowEnabled && Number(form.earlyShowDays || 0) < 0) e.earlyShowDays = "Sớm bao nhiêu ngày phải >= 0.";
     return e;
   };
 
   const handleSave = () => {
     const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
+    if (Object.keys(e).length) {
+      setErrors(e);
+      return;
+    }
+
+    const moviesPayload = selectedMovieIds.map((movieId) => {
+      const config = (form.movieConfig && form.movieConfig[movieId]) || {};
+      return {
+        movie_id: Number(movieId),
+        priority: Number(config.priority || form.defaultPriority || 1),
+        slots_per_day: Number(config.slotsPerDay || form.defaultSlotsPerDay || 1),
+        early_bias: Number(config.earlyBias || 0),
+      };
+    });
+
     onSave({
-      movieId:       Number(form.movieId),
-      roomId:        Number(form.roomId),
-      startDate:     form.startDate,
-      endDate:       form.endDate,
-      timeSlots:     timeSlots.map(s => ({ hour: Number(s.hour), minute: Number(s.minute) })),
-      priceStandard: Number(form.priceStandard),
-      priceVip:      Number(form.priceVip),
-      priceCouple:   Number(form.priceCouple),
+      campaign_type: form.campaignType,
+      campaign_reason: form.campaignReason,
+      release_date: form.releaseDate,
+      official_end_date: form.officialEndDate,
+      early_show_enabled: Boolean(form.earlyShowEnabled),
+      early_show_days: Number(form.earlyShowDays || 0),
+      early_show_duration_days: Number(form.earlyShowDurationDays || 0),
+      official_time_slots: weekdaySlots,
+      early_time_slots: weekendSlots,
+      movies: moviesPayload,
+      cinemas: selectedCinemaIds.map(Number),
+      start_date: form.releaseDate,
+      end_date: form.officialEndDate,
+      weekday_slots: weekdaySlots,
+      weekend_slots: weekendSlots,
+      weeks: 1,
+      default_priority: Number(form.defaultPriority || 1),
+      default_slots_per_day: Number(form.defaultSlotsPerDay || 1),
     });
   };
 
   const days = calcDays();
-  const totalEstimate = days * timeSlots.length;
 
   return (
     <div className="sh-modal-overlay" onClick={onClose}>
-      <div className="sh-modal sh-modal-recurring" onClick={e => e.stopPropagation()}>
+      <div className="sh-modal sh-modal-recurring" onClick={(event) => event.stopPropagation()}>
         <div className="sh-modal-header">
-          <h2>🔁 Tạo lịch chiếu lặp lại</h2>
+          <h2>🔁 Tạo lịch chiếu theo nhóm</h2>
           <button className="sh-modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="sh-modal-body">
           <p className="sh-recurring-desc">
-            Chọn phim, phòng, khung giờ và khoảng ngày — hệ thống sẽ tự tạo suất chiếu cho mỗi ngày.
-            Những ngày bị xung đột lịch sẽ được bỏ qua tự động.
+            Chọn nhiều phim và nhiều rạp cùng lúc. Mỗi phòng có thể tự động nhận nhiều suất ở các khung giờ khác nhau, theo thời lượng phim, khoảng nghỉ 15 phút và ưu tiên của từng phim.
           </p>
 
+          <div className="sh-recurring-flow" aria-label="Cách vận hành lịch chiếu theo nhóm">
+            <div className="sh-flow-intro">
+              <h3>Vận hành tạo lịch chiếu</h3>
+              <p>Hệ thống sẽ tạo <strong>Lịch chiếu chính thức</strong> hoặc <strong>Lịch chiếu sớm</strong> dựa trên ngày phát hành, ưu tiên phim và khung giờ phù hợp.</p>
+            </div>
+
+            <div className="sh-flow-cards">
+              <div className="sh-flow-card sh-flow-card-active">
+                <span className="sh-flow-step">01</span>
+                <strong>Lịch chiếu chính thức</strong>
+                <small>Bắt đầu từ ngày phát hành, áp dụng khung giờ thường/cuối tuần.</small>
+              </div>
+
+              <div className="sh-flow-card">
+                <span className="sh-flow-step">02</span>
+                <strong>Suất chiếu sớm</strong>
+                <small>Chiếu trước X ngày để mở bán sớm cho phim hot hoặc ưu tiên đặc biệt.</small>
+              </div>
+            </div>
+
+            <div className="sh-priority-clarify">
+              <span className="sh-priority-badge">Ưu tiên phân bổ</span>
+              <p>Ưu tiên ở đây là thứ tự hệ thống dùng để xếp phim vào phòng và suất chiếu: phim hot trước, suất nhiều hơn, thời điểm bắt đầu sớm hơn.</p>
+            </div>
+          </div>
+
           <div className="sh-form-grid">
-            {/* Cột trái */}
             <div className="sh-form-col">
-              <div className="sh-field">
-                <label>Phim *</label>
-                <select className={errors.movieId ? "error" : ""} value={form.movieId} onChange={e => set("movieId", e.target.value)}>
-                  <option value="">-- Chọn phim --</option>
-                  {movies.map(m => <option key={m.id} value={m.id}>{m.title} ({m.duration} phút)</option>)}
-                </select>
-                {errors.movieId && <span className="sh-error">{errors.movieId}</span>}
-              </div>
+              <div className="sh-schedule-card-block">
+                <div className="sh-card-header">Thông tin đợt chiếu</div>
 
-              <div className="sh-field">
-                <label>Rạp chiếu *</label>
-                <select className={errors.cinemaId ? "error" : ""} value={form.cinemaId}
-                  onChange={e => { set("cinemaId", e.target.value); set("roomId", ""); }}>
-                  <option value="">-- Chọn rạp --</option>
-                  {cinemas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                {errors.cinemaId && <span className="sh-error">{errors.cinemaId}</span>}
-              </div>
-
-              <div className="sh-field">
-                <label>Phòng chiếu *</label>
-                <select className={errors.roomId ? "error" : ""} value={form.roomId}
-                  onChange={e => set("roomId", e.target.value)} disabled={!form.cinemaId}>
-                  <option value="">-- Chọn phòng --</option>
-                  {cinemaRooms.map(r => <option key={r.id} value={r.id}>{r.name} · {r.totalSeats} ghế</option>)}
-                </select>
-                {errors.roomId && <span className="sh-error">{errors.roomId}</span>}
-              </div>
-
-              {/* Giá vé */}
-              <div className="sh-field">
-                <label>Giá vé thường (₫) *</label>
-                <input type="number" min={0} className={errors.priceStandard ? "error" : ""}
-                  value={form.priceStandard} onChange={e => set("priceStandard", e.target.value)} placeholder="120000" />
-                {errors.priceStandard && <span className="sh-error">{errors.priceStandard}</span>}
-              </div>
-              <div className="sh-field-row">
                 <div className="sh-field">
-                  <label>Giá vé VIP (₫) *</label>
-                  <input type="number" min={0} className={errors.priceVip ? "error" : ""}
-                    value={form.priceVip} onChange={e => set("priceVip", e.target.value)} placeholder="150000" />
-                  {errors.priceVip && <span className="sh-error">{errors.priceVip}</span>}
+                  <label>Danh sách phim *</label>
+                  <div className="sh-checkbox-list">
+                    {movies.map((movie) => (
+                      <label key={movie.id} className="sh-checkbox-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedMovieIds.includes(movie.id)}
+                          onChange={() => toggleMovie(movie.id)}
+                        />
+                        <span>{movie.title} · {movie.duration} phút</span>
+                      </label>
+                    ))}
+                  </div>
+                  {errors.movies && <span className="sh-error">{errors.movies}</span>}
                 </div>
+
                 <div className="sh-field">
-                  <label>Giá ghế đôi (₫) *</label>
-                  <input type="number" min={0} className={errors.priceCouple ? "error" : ""}
-                    value={form.priceCouple} onChange={e => set("priceCouple", e.target.value)} placeholder="220000" />
-                  {errors.priceCouple && <span className="sh-error">{errors.priceCouple}</span>}
+                  <label>Rạp chiếu *</label>
+                  <div className="sh-checkbox-list">
+                    {cinemas.map((cinema) => (
+                      <label key={cinema.id} className="sh-checkbox-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedCinemaIds.includes(cinema.id)}
+                          onChange={() => toggleCinema(cinema.id)}
+                        />
+                        <span>{cinema.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {errors.cinemas && <span className="sh-error">{errors.cinemas}</span>}
+                </div>
+
+                <div className="sh-field-row">
+                  <div className="sh-field">
+                    <label>Ngày phát hành *</label>
+                    <input type="date" value={form.releaseDate} onChange={(event) => set("releaseDate", event.target.value)} />
+                    {errors.releaseDate && <span className="sh-error">{errors.releaseDate}</span>}
+                  </div>
+                  <div className="sh-field">
+                    <label>Kết thúc dự kiến *</label>
+                    <input type="date" value={form.officialEndDate} onChange={(event) => set("officialEndDate", event.target.value)} min={form.releaseDate} />
+                    {errors.officialEndDate && <span className="sh-error">{errors.officialEndDate}</span>}
+                  </div>
+                </div>
+
+                <div className="sh-field-row">
+                  <div className="sh-field">
+                    <label>Loại đợt chiếu</label>
+                    <select value={form.campaignType} onChange={(event) => set("campaignType", event.target.value)}>
+                      <option value="new_release">Phát hành mới</option>
+                      <option value="rerun">Chiếu lại</option>
+                      <option value="special_event">Sự kiện đặc biệt</option>
+                    </select>
+                  </div>
+                  <div className="sh-field">
+                    <label>Ưu tiên mặc định</label>
+                    <input type="number" min={1} max={5} value={form.defaultPriority} onChange={(event) => set("defaultPriority", Math.min(5, Math.max(1, Number(event.target.value || 1))))} />
+                  </div>
+                </div>
+
+                <div className="sh-field">
+                  <label>Lý do / ghi chú</label>
+                  <textarea
+                    rows={3}
+                    value={form.campaignReason}
+                    onChange={(event) => set("campaignReason", event.target.value)}
+                    placeholder="Ví dụ: Khuyến khích mở bán sớm cho phim mới, chiếu lại dịp cuối tuần, sự kiện đặc biệt..."
+                    style={{ width: "100%", minHeight: "84px", borderRadius: "12px", padding: "12px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#eef4ff", resize: "vertical" }}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Cột phải */}
             <div className="sh-form-col">
-              {/* Khoảng ngày */}
-              <div className="sh-field-row">
-                <div className="sh-field">
-                  <label>Ngày bắt đầu *</label>
-                  <input type="date" className={errors.startDate ? "error" : ""}
-                    value={form.startDate} onChange={e => set("startDate", e.target.value)} />
-                  {errors.startDate && <span className="sh-error">{errors.startDate}</span>}
+              <div className="sh-schedule-card-block">
+                <div className="sh-card-header">Lịch chiếu chính thức</div>
+
+                <div className="sh-field-row">
+                  <div className="sh-field">
+                    <label>Khung giờ chiếu chính thức</label>
+                    <select value={form.weekdayTemplate} onChange={(event) => set("weekdayTemplate", event.target.value)}>
+                      {Object.entries(TEMPLATE_PRESETS).map(([key, preset]) => (
+                        <option key={key} value={key}>{preset.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sh-field">
+                    <label>Khung giờ cuối tuần</label>
+                    <select value={form.weekendTemplate} onChange={(event) => set("weekendTemplate", event.target.value)}>
+                      {Object.entries(TEMPLATE_PRESETS).map(([key, preset]) => (
+                        <option key={key} value={key}>{preset.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
+
                 <div className="sh-field">
-                  <label>Ngày kết thúc *</label>
-                  <input type="date" className={errors.endDate ? "error" : ""}
-                    value={form.endDate} min={form.startDate} onChange={e => set("endDate", e.target.value)} />
-                  {errors.endDate && <span className="sh-error">{errors.endDate}</span>}
+                  <label>Suất chiếu / ngày mặc định</label>
+                  <input type="number" min={1} max={8} value={form.defaultSlotsPerDay} onChange={(event) => set("defaultSlotsPerDay", Math.max(1, Number(event.target.value || 1)))} />
                 </div>
               </div>
+
+              <div className="sh-schedule-card-block sh-early-block">
+                <div className="sh-card-header">Suất chiếu sớm</div>
+
+                <div className="sh-field">
+                  <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <input type="checkbox" checked={form.earlyShowEnabled} onChange={(event) => set("earlyShowEnabled", event.target.checked)} />
+                    Có suất chiếu sớm
+                  </label>
+                </div>
+
+                {form.earlyShowEnabled && (
+                  <div className="sh-field-row">
+                    <div className="sh-field">
+                      <label>Bắt đầu sớm bao nhiêu ngày</label>
+                      <input type="number" min={0} max={30} value={form.earlyShowDays} onChange={(event) => set("earlyShowDays", Number(event.target.value || 0))} />
+                      {errors.earlyShowDays && <span className="sh-error">{errors.earlyShowDays}</span>}
+                    </div>
+                    <div className="sh-field">
+                      <label>Số ngày chiếu sớm</label>
+                      <input type="number" min={1} max={30} value={form.earlyShowDurationDays} onChange={(event) => set("earlyShowDurationDays", Math.max(1, Number(event.target.value || 1)))} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {selectedMovieIds.length > 0 && (
+                <div className="sh-field">
+                  <label>Cấu hình ưu tiên xếp lịch theo phim</label>
+                  <div className="sh-priority-table">
+                    <div className="sh-priority-header">
+                      <span>Phim</span>
+                      <span>Ưu tiên</span>
+                      <span>Suất/ngày</span>
+                      <span>Early show</span>
+                    </div>
+                    {selectedMovieIds.map((movieId) => {
+                      const movie = movies.find((item) => item.id === Number(movieId));
+                      const config = (form.movieConfig && form.movieConfig[movieId]) || {};
+                      return (
+                        <div key={movieId} className="sh-priority-row">
+                          <span className="sh-priority-name">{movie?.title || `Phim ${movieId}`}</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={5}
+                            title="Mức ưu tiên xếp lịch: phim hot sẽ được ưu tiên phòng, suất và khung giờ tốt hơn"
+                            value={config.priority || form.defaultPriority}
+                            onChange={(event) => updateMovieConfig(movieId, "priority", Number(event.target.value || 1))}
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            max={6}
+                            title="Số suất chiếu mỗi ngày để phân bổ lịch cho phim này"
+                            value={config.slotsPerDay || form.defaultSlotsPerDay}
+                            onChange={(event) => updateMovieConfig(movieId, "slotsPerDay", Number(event.target.value || 1))}
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            max={120}
+                            title="Đẩy khung giờ chiếu sớm theo phút để phim bắt đầu sớm hơn khi có suất chiếu sớm"
+                            value={config.earlyBias || 0}
+                            onChange={(event) => updateMovieConfig(movieId, "earlyBias", Number(event.target.value || 0))}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {days > 0 && (
                 <div className="sh-recurring-days-badge">
-                  📅 {days} ngày &nbsp;·&nbsp; {timeSlots.length} khung giờ &nbsp;·&nbsp;
-                  <strong style={{ color: "#4ade80" }}>~{totalEstimate} suất chiếu</strong>
-                  {selMovie && <span style={{ color: "#8fa6ff" }}> ({selMovie.duration} phút/suất)</span>}
+                  📅 {days} ngày • {selectedMovieIds.length} phim • {selectedCinemaIds.length} rạp
+                  <strong style={{ color: "#4ade80" }}> • ~{totalEstimate} suất ước tính</strong>
                 </div>
               )}
 
-              {/* Khung giờ */}
-              <div className="sh-field" style={{ marginTop: 8 }}>
-                <label>Khung giờ chiếu cố định *</label>
-                {errors.slots && <span className="sh-error">{errors.slots}</span>}
-                <div className="sh-slots-list">
-                  {timeSlots.map((slot, i) => (
-                    <div key={i} className="sh-slot-row">
-                      <span className="sh-slot-num">{i + 1}</span>
-                      <div className="sh-slot-inputs">
-                        <select value={slot.hour} onChange={e => updateSlot(i, "hour", e.target.value)}>
-                          {Array.from({ length: 24 }, (_, h) => (
-                            <option key={h} value={String(h).padStart(2, "0")}>{String(h).padStart(2, "0")}</option>
-                          ))}
-                        </select>
-                        <span className="sh-slot-colon">:</span>
-                        <select value={slot.minute} onChange={e => updateSlot(i, "minute", e.target.value)}>
-                          {["00","05","10","15","20","25","30","35","40","45","50","55"].map(m => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
-                        {selMovie && (
-                          <span className="sh-slot-endtime">
-                            → {(() => {
-                              const h = Number(slot.hour), mn = Number(slot.minute), dur = selMovie.duration;
-                              const total = h * 60 + mn + dur;
-                              return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-                            })()}
-                          </span>
-                        )}
-                      </div>
-                      {timeSlots.length > 1 && (
-                        <button className="sh-slot-remove" onClick={() => removeSlot(i)} title="Xóa khung giờ này">✕</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <button className="sh-btn sh-btn-secondary sh-slot-add-btn" onClick={addSlot}>
-                  + Thêm khung giờ
-                </button>
+              <div className="sh-preview-card">
+                <div className="sh-preview-row"><span>Khung ngày thường</span><strong>{weekdaySlots.map((slot) => `${slot.hour}:${slot.minute}`).join(" • ")}</strong></div>
+                <div className="sh-preview-row"><span>Khung cuối tuần</span><strong>{weekendSlots.map((slot) => `${slot.hour}:${slot.minute}`).join(" • ")}</strong></div>
+                <div className="sh-preview-row"><span>Phân bổ</span><strong>Ưu tiên cao ⇒ nhiều suất/ngày</strong></div>
               </div>
-
-              {/* Preview */}
-              {selMovie && form.startDate && form.endDate && form.roomId && (
-                <div className="sh-preview-card" style={{ marginTop: 8 }}>
-                  <div className="sh-preview-row"><span>Phim</span><strong>{selMovie.title}</strong></div>
-                  <div className="sh-preview-row"><span>Phòng</span><strong>{rooms.find(r => r.id === Number(form.roomId))?.name}</strong></div>
-                  <div className="sh-preview-row"><span>Khoảng thời gian</span><strong>{fmtDate(form.startDate)} – {fmtDate(form.endDate)}</strong></div>
-                  <div className="sh-preview-row"><span>Số ngày</span><strong>{days} ngày</strong></div>
-                  <div className="sh-preview-row"><span>Số khung giờ/ngày</span><strong>{timeSlots.length}</strong></div>
-                  <div className="sh-preview-row"><span>Tổng ước tính</span><strong style={{ color: "#4ade80" }}>~{totalEstimate} suất</strong></div>
-                  {form.priceStandard && <div className="sh-preview-row"><span>Vé thường</span><strong style={{ color: "#a78bfa" }}>{fmtMoney(form.priceStandard)}</strong></div>}
-                </div>
-              )}
             </div>
           </div>
         </div>
         <div className="sh-modal-footer">
-          <button className="sh-btn sh-btn-add sh-btn-lg" onClick={handleSave}>
-            🔁 Tạo lịch lặp lại
-          </button>
+          <button className="sh-btn sh-btn-add sh-btn-lg" onClick={handleSave}>🔁 Tạo lịch hàng loạt</button>
           <button className="sh-btn sh-btn-secondary sh-btn-lg" onClick={onClose}>Hủy</button>
         </div>
       </div>
@@ -970,16 +1187,25 @@ export default function AdminShowtimes() {
 
   const handleSaveRecurring = async (data) => {
     try {
-      const res = await adminShowtimeService.createRecurring({
-        movieId:       data.movieId,
-        roomId:        data.roomId,
-        timeSlots:     data.timeSlots,
-        startDate:     data.startDate,
-        endDate:       data.endDate,
-        priceStandard: data.priceStandard,
-        priceVip:      data.priceVip,
-        priceCouple:   data.priceCouple,
-      });
+      const payload = {
+        movies: data.movies || (data.movieId ? [{ movie_id: Number(data.movieId), priority: 1, slots_per_day: 1, early_bias: 0 }] : []),
+        cinemas: data.cinemas || (data.cinemaId ? [Number(data.cinemaId)] : []),
+        room_ids: data.room_ids || (data.roomId ? [Number(data.roomId)] : []),
+        start_date: data.start_date || data.startDate,
+        end_date: data.end_date || data.endDate,
+        weekday_slots: data.weekday_slots || data.timeSlots,
+        weekend_slots: data.weekend_slots || data.timeSlots,
+        weeks: data.weeks,
+        default_priority: data.default_priority,
+        default_slots_per_day: data.default_slots_per_day,
+        time_slots: data.timeSlots,
+        template: data.template,
+        price_standard: data.priceStandard,
+        price_vip: data.priceVip,
+        price_couple: data.priceCouple,
+      };
+
+      const res = await adminShowtimeService.createRecurring(payload);
       showToast(res.message || `Đã tạo ${res.created?.length ?? 0} suất chiếu.`);
       setShowRecurring(false);
       await fetchAll();

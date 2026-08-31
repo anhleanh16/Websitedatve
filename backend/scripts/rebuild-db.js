@@ -6,7 +6,7 @@ import mysql from "mysql2/promise";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const targetDbName = process.argv[2] || "Lunexa_rebuild";
+const targetDbName = process.argv[2] || "sweetstarcinema_rebuild";
 
 const connection = await mysql.createConnection({
   host: process.env.DB_HOST || "localhost",

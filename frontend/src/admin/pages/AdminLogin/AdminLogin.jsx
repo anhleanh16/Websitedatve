@@ -62,11 +62,11 @@ export default function AdminLogin() {
         return
       }
 
-      // Chỉ cho phép các role admin/staff/manager/technician truy cập khu vực quản trị
+      // Chỉ cho phép tài khoản admin hoặc employee truy cập khu vực quản trị
       const userRole = String(data.user?.role || '').toLowerCase()
-      if (!['admin', 'staff', 'manager', 'technician'].includes(userRole)) {
+      if (!['admin', 'employee'].includes(userRole)) {
         setMessageType('info')
-        setMessage('Bạn không có quyền truy cập trang quản trị. Vui lòng sử dụng tài khoản admin, staff, manager hoặc technician.')
+        setMessage('Bạn không có quyền truy cập trang quản trị. Vui lòng sử dụng tài khoản admin hoặc employee.')
         return
       }
 

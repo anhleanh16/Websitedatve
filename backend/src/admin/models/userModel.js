@@ -1,6 +1,84 @@
 import { db } from "../../../config/db.js";
 
+const normalizeRoleKey = (value = "") => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+  if (!normalized) return "";
+
+  if (["user", "customer", "khach hang", "khachhang", "khách hàng", "kháchhang"].includes(normalized)) {
+    return "user";
+  }
+
+  if (["admin"].includes(normalized)) {
+    return "admin";
+  }
+
+  if (["employee", "staff", "nhan vien", "nhân viên", "manager", "technician", "quan ly", "quản lý"].includes(normalized)) {
+    return "employee";
+  }
+
+  return normalized;
+};
+
+const resolveRoleDisplayText = (roleName = "") => {
+  const normalized = normalizeRoleKey(roleName);
+
+  if (normalized === "user") return "Khách hàng";
+  if (normalized === "employee") return "Nhân viên";
+  if (normalized === "admin") return "Quản trị viên";
+
+  return String(roleName || "Khách hàng").trim() || "Khách hàng";
+};
+
 export const UserModel = {
+  async findRoleSummary() {
+    const [roles] = await db.query(
+      `SELECT
+         LOWER(COALESCE(r.role_name, '')) AS raw_role_name,
+         COALESCE(r.description, r.role_name, 'Khách hàng') AS raw_description,
+         COUNT(u.id) AS total_users
+       FROM Roles r
+       LEFT JOIN User u ON u.role_id = r.role_id
+       GROUP BY LOWER(COALESCE(r.role_name, '')), COALESCE(r.description, r.role_name, 'Khách hàng')
+       ORDER BY CASE
+         WHEN LOWER(COALESCE(r.role_name, '')) IN ('user', 'customer', 'khach hang', 'khachhang', 'khách hàng', 'kháchhang') THEN 1
+         WHEN LOWER(COALESCE(r.role_name, '')) IN ('employee', 'staff', 'nhan vien', 'nhân viên', 'manager', 'technician', 'quan ly', 'quản lý') THEN 2
+         WHEN LOWER(COALESCE(r.role_name, '')) = 'admin' THEN 3
+         ELSE 4
+       END, LOWER(COALESCE(r.role_name, ''))`,
+    );
+
+    const groupedMap = new Map();
+
+    for (const role of roles) {
+      const normalized = normalizeRoleKey(role.raw_role_name);
+      if (!normalized) continue;
+
+      const existing = groupedMap.get(normalized) || {
+        name: normalized,
+        description: resolveRoleDisplayText(role.raw_role_name),
+        totalUsers: 0,
+      };
+
+      existing.totalUsers += Number(role.total_users || 0);
+      existing.description = resolveRoleDisplayText(role.raw_role_name);
+      groupedMap.set(normalized, existing);
+    }
+
+    return [...groupedMap.entries()].map(([name, role], index) => ({
+      id: index + 1,
+      name,
+      description: role.description,
+      totalUsers: Number(role.totalUsers || 0),
+    }));
+  },
+
   /**
    * Lấy tất cả người dùng trong hệ thống để hiển thị ở trang quản lý khách hàng.
    * @returns {Promise<Array>} Danh sách người dùng.
@@ -16,13 +94,8 @@ export const UserModel = {
         u.avatar,
         CASE
           WHEN u.id = 1 THEN 'admin'
-          WHEN e.position IS NOT NULL AND e.position != '' THEN
-            CASE
-              WHEN LOWER(e.position) LIKE '%quản lý%' OR LOWER(e.position) LIKE '%manager%' THEN 'manager'
-              WHEN LOWER(e.position) LIKE '%kỹ thuật%' OR LOWER(e.position) LIKE '%technician%' OR LOWER(e.position) LIKE '%technical%' THEN 'technician'
-              ELSE 'staff'
-            END
-          ELSE 'user'
+          WHEN LOWER(COALESCE(r.role_name, '')) IN ('user', 'customer', 'khach hang', 'khachhang', 'khách hàng', 'kháchhang') THEN 'user'
+          ELSE COALESCE(r.role_name, 'user')
         END as role,
         e.position as employee_position,
         u.status,
@@ -37,6 +110,9 @@ export const UserModel = {
         Roles r ON u.role_id = r.role_id
       LEFT JOIN
         Employees e ON e.user_id = u.id
+      WHERE
+        u.id = 1
+        OR LOWER(COALESCE(r.role_name, '')) IN ('user', 'customer', 'khach hang', 'khachhang', 'khách hàng', 'kháchhang')
       ORDER BY
         u.created_at DESC, u.id DESC`,
     );

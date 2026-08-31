@@ -1,9 +1,92 @@
 import { db } from "../../../config/db.js";
 
-const CLEANUP_BUFFER_MINUTES = 20;
+const CLEANUP_BUFFER_MINUTES = 15;
 const ACTIVE_SHOWTIME_STATUS = "active";
 const ENDED_SHOWTIME_STATUS = "ended";
 const CANCELLED_SHOWTIME_STATUS = "cancelled";
+
+const SHOWTIME_TEMPLATE_PRESETS = {
+  balanced: [
+    { hour: 9, minute: 0 },
+    { hour: 12, minute: 0 },
+    { hour: 15, minute: 0 },
+    { hour: 18, minute: 0 },
+    { hour: 21, minute: 0 },
+  ],
+  premium: [
+    { hour: 10, minute: 30 },
+    { hour: 13, minute: 30 },
+    { hour: 16, minute: 30 },
+    { hour: 19, minute: 30 },
+    { hour: 22, minute: 30 },
+  ],
+  weekend: [
+    { hour: 8, minute: 30 },
+    { hour: 11, minute: 0 },
+    { hour: 14, minute: 0 },
+    { hour: 17, minute: 30 },
+    { hour: 20, minute: 30 },
+  ],
+  compact: [
+    { hour: 10, minute: 0 },
+    { hour: 13, minute: 30 },
+    { hour: 17, minute: 0 },
+    { hour: 20, minute: 30 },
+  ],
+};
+
+const addDays = (date, days) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + Number(days || 0));
+  return next;
+};
+
+const sortTimeSlots = (slots = []) =>
+  [...slots]
+    .map((slot) => ({
+      hour: Number(slot?.hour ?? 0),
+      minute: Number(slot?.minute ?? 0),
+    }))
+    .sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute));
+
+const filterSlotsByMovieDuration = (slots, movieDuration) => {
+  const normalized = sortTimeSlots(slots);
+  const sanitized = [];
+  let lastEnd = null;
+
+  for (const slot of normalized) {
+    const start = new Date();
+    start.setHours(slot.hour, slot.minute, 0, 0);
+    const end = addMinutes(start, Number(movieDuration || 0));
+
+    if (lastEnd && start.getTime() < addMinutes(lastEnd, CLEANUP_BUFFER_MINUTES).getTime()) {
+      continue;
+    }
+
+    sanitized.push(slot);
+    lastEnd = end;
+  }
+
+  return sanitized;
+};
+
+const resolveRecurringDateWindow = ({ movie, startDate, endDate, weeks }) => {
+  const releaseDateRaw = movie?.release_date_only || movie?.release_date;
+  const releaseDate = releaseDateRaw ? new Date(`${releaseDateRaw}T00:00:00`) : new Date();
+  const normalizedStart = startDate ? new Date(`${startDate}T00:00:00`) : new Date(releaseDate);
+  const normalizedRelease = new Date(releaseDate);
+
+  const computedStart = normalizedStart < normalizedRelease ? new Date(normalizedRelease) : new Date(normalizedStart);
+  const weeksValue = Number(weeks || 0);
+  const computedEnd = endDate
+    ? new Date(`${endDate}T23:59:59`)
+    : addDays(new Date(computedStart), weeksValue > 0 ? weeksValue * 7 - 1 : 6);
+
+  return {
+    startDate: computedStart,
+    endDate: computedEnd < computedStart ? computedStart : computedEnd,
+  };
+};
 
 let schemaCapabilitiesPromise = null;
 
@@ -191,6 +274,8 @@ export const ShowtimeModel = {
       price,
       available_seats,
       status = ACTIVE_SHOWTIME_STATUS,
+      campaign_id,
+      is_early_show = 0,
     } = showtimeData;
 
     movie_id = Number(movie_id);
@@ -239,6 +324,15 @@ export const ShowtimeModel = {
       normalizedStatus,
     ];
 
+    if (campaign_id != null) {
+      columns.push("campaign_id");
+      params.push(Number(campaign_id));
+    }
+    if (Object.prototype.hasOwnProperty.call(showtimeData, "is_early_show") || Object.prototype.hasOwnProperty.call(showtimeData, "isEarlyShow")) {
+      columns.push("is_early_show");
+      params.push(Number(Boolean(showtimeData.is_early_show ?? showtimeData.isEarlyShow)));
+    }
+
     if (caps.showtimes.hasPriceStandard) {
       columns.splice(5, 0, "price_standard");
       params.splice(5, 0, standardPrice);
@@ -267,137 +361,313 @@ export const ShowtimeModel = {
    * Bỏ qua (không lỗi) những ngày bị xung đột lịch phòng.
    * @returns {{ created: number[], skipped: Array<{date:string, reason:string}> }}
    */
+  async createCampaign({ movieId, campaignType, reason, releaseDate, officialEndDate, earlyShowEnabled, earlyShowDays, earlyShowDurationDays, createdBy = null }) {
+    const normalizedType = campaignType || "new_release";
+    const normalizedReleaseDate = releaseDate || new Date().toISOString().slice(0, 10);
+    const normalizedEndDate = officialEndDate || normalizedReleaseDate;
+
+    const [result] = await db.query(
+      `INSERT INTO Screening_Campaigns (
+        movie_id,
+        campaign_type,
+        reason,
+        release_date,
+        official_end_date,
+        early_show_enabled,
+        early_show_days,
+        early_show_duration_days,
+        status,
+        created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+      `,
+      [
+        Number(movieId),
+        normalizedType,
+        reason || null,
+        normalizedReleaseDate,
+        normalizedEndDate,
+        Boolean(earlyShowEnabled) ? 1 : 0,
+        Number(earlyShowDays || 0),
+        Number(earlyShowDurationDays || 0),
+        createdBy,
+      ],
+    );
+
+    return result.insertId;
+  },
+
+  async createCampaignSlot({ campaignId, slotType, startDate, endDate, weekdayTemplate, weekendTemplate, defaultPriority, defaultSlotsPerDay }) {
+    const [result] = await db.query(
+      `INSERT INTO Screening_Campaign_Slots (
+        campaign_id,
+        slot_type,
+        start_date,
+        end_date,
+        weekday_template,
+        weekend_template,
+        default_priority,
+        default_slots_per_day
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        Number(campaignId),
+        slotType,
+        startDate,
+        endDate || startDate,
+        weekdayTemplate || "balanced",
+        weekendTemplate || "weekend",
+        Number(defaultPriority || 3),
+        Number(defaultSlotsPerDay || 2),
+      ],
+    );
+
+    return result.insertId;
+  },
+
   async createRecurring(data) {
     const caps = await getSchemaCapabilities();
-    const {
-      movie_id,
-      room_id,
-      time_slots,   // [{ hour: 10, minute: 30 }, ...]
-      start_date,   // "YYYY-MM-DD"
-      end_date,     // "YYYY-MM-DD"
-      price_standard,
-      price_vip,
-      price_couple,
-      price,
-      available_seats,
-    } = data;
+    const defaultSlots = SHOWTIME_TEMPLATE_PRESETS.balanced;
+    const weekdaySlots = Array.isArray(data.weekday_slots)
+      ? data.weekday_slots
+      : Array.isArray(data.time_slots)
+        ? data.time_slots
+        : Array.isArray(data.timeSlots)
+          ? data.timeSlots
+          : defaultSlots;
+    const weekendSlots = Array.isArray(data.weekend_slots)
+      ? data.weekend_slots
+      : weekdaySlots;
 
-    const movie = await this.getMovieById(movie_id);
-    const room  = await this.getRoomById(room_id);
+    const cinemaIds = Array.isArray(data.cinemas)
+      ? data.cinemas
+      : Array.isArray(data.cinema_ids)
+        ? data.cinema_ids
+        : data.cinema_id != null || data.cinemaId != null
+          ? [data.cinema_id ?? data.cinemaId]
+          : [];
+    const roomIdList = Array.isArray(data.room_ids)
+      ? data.room_ids
+      : data.room_id != null || data.roomId != null
+        ? [data.room_id ?? data.roomId]
+        : [];
 
-    const standardPrice = Number(price_standard ?? price ?? 0) || 0;
-    const vipPrice      = Number(price_vip ?? standardPrice) || standardPrice;
-    const couplePrice   = Number(price_couple ?? standardPrice) || standardPrice;
-    const seats         = Number(available_seats ?? room.total_seat ?? 0);
-    const normalizedSeats = Number.isNaN(seats) ? 0 : seats;
+    const movieEntries = Array.isArray(data.movies)
+      ? data.movies
+      : data.movie_id != null || data.movieId != null
+        ? [{
+            movie_id: data.movie_id ?? data.movieId,
+            priority: data.priority ?? 1,
+            slots_per_day: data.slots_per_day ?? data.slotsPerDay ?? 1,
+            early_bias: data.early_bias ?? data.earlyBias ?? 0,
+          }]
+        : [];
 
-    // parse start/end date
-    const startD = new Date(`${start_date}T00:00:00`);
-    const endD   = new Date(`${end_date}T23:59:59`);
-    if (isNaN(startD.getTime()) || isNaN(endD.getTime()) || startD > endD) {
-      throw buildAppError("Khoảng ngày không hợp lệ.");
+    if (!movieEntries.length) {
+      throw buildAppError("Cần chọn ít nhất một phim để tạo lịch chiếu.");
     }
-    if (!Array.isArray(time_slots) || time_slots.length === 0) {
-      throw buildAppError("Cần ít nhất một khung giờ.");
+
+    let resolvedCinemaIds = cinemaIds
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0);
+
+    if (!resolvedCinemaIds.length) {
+      const [cinemaRows] = await db.query("SELECT cinemas_id AS cinema_id FROM Cinemas");
+      resolvedCinemaIds = cinemaRows.map((row) => Number(row.cinema_id)).filter(Boolean);
+    }
+
+    if (!resolvedCinemaIds.length) {
+      throw buildAppError("Cần chọn ít nhất một rạp chiếu.");
     }
 
     const created = [];
     const skipped = [];
 
-    // iterate each day in range
-    const cur = new Date(startD);
-    while (cur <= endD) {
-      const dateKey = toDateKey(cur);
-      const todayCreatedSlots = []; // Lưu các slot vừa tạo trong hôm nay để kiểm tra xung đột lẫn nhau
-
-      for (const slot of time_slots) {
-        const hour   = Number(slot.hour   ?? 0);
-        const minute = Number(slot.minute ?? 0);
-
-        const startTime = new Date(cur);
-        startTime.setHours(hour, minute, 0, 0);
-        const endTime = addMinutes(startTime, movie.duration);
-        const endTimeWithCleanup = addMinutes(endTime, CLEANUP_BUFFER_MINUTES);
-
-        // bỏ qua nếu trước ngày phát hành
-        try {
-          this.ensureStartTimeOnOrAfterReleaseDate(movie, startTime);
-        } catch {
-          skipped.push({ date: dateKey, hour, minute, reason: "Trước ngày phát hành phim." });
-          continue;
-        }
-
-        // Kiểm tra xung đột với các slot vừa tạo trong cùng hôm nay
-        let conflictWithTodaySlot = null;
-        for (const existingSlot of todayCreatedSlots) {
-          const existingEndWithCleanup = addMinutes(existingSlot.endTime, CLEANUP_BUFFER_MINUTES);
-          if (startTime < existingEndWithCleanup && endTimeWithCleanup > existingSlot.startTime) {
-            conflictWithTodaySlot = existingSlot;
-            break;
-          }
-        }
-        if (conflictWithTodaySlot) {
-          skipped.push({ 
-            date: dateKey, 
-            hour, 
-            minute, 
-            reason: `Trùng khung giờ với suất vừa tạo (${String(conflictWithTodaySlot.hour).padStart(2, '0')}:${String(conflictWithTodaySlot.minute).padStart(2, '0')})` 
-          });
-          continue;
-        }
-
-        // bỏ qua nếu xung đột lịch phòng trong DB
-        try {
-          await this.ensureRoomScheduleGap({ roomId: room_id, startTime, endTime });
-        } catch (err) {
-          skipped.push({ date: dateKey, hour, minute, reason: err.message });
-          continue;
-        }
-
-        const columns = [
-          "movie_id",
-          "room_id",
-          "start_time",
-          "end_time",
-          "price",
-          "available_seats",
-          "status",
-        ];
-        const params = [
-          movie_id,
-          room_id,
-          startTime,
-          endTime,
-          standardPrice,
-          normalizedSeats,
-          ACTIVE_SHOWTIME_STATUS,
-        ];
-
-        if (caps.showtimes.hasPriceStandard) {
-          columns.splice(5, 0, "price_standard");
-          params.splice(5, 0, standardPrice);
-        }
-        if (caps.showtimes.hasPriceVip) {
-          const insertIndex = columns.indexOf("price") + 1;
-          columns.splice(insertIndex, 0, "price_vip");
-          params.splice(insertIndex, 0, vipPrice);
-        }
-        if (caps.showtimes.hasPriceCouple) {
-          const insertIndex = columns.indexOf("price") + 1;
-          columns.splice(insertIndex, 0, "price_couple");
-          params.splice(insertIndex, 0, couplePrice);
-        }
-
-        const placeholders = columns.map(() => "?").join(", ");
-        const [result] = await db.query(
-          `INSERT INTO Showtimes (${columns.join(", ")}) VALUES (${placeholders})`,
-          params,
-        );
-        created.push(result.insertId);
-        todayCreatedSlots.push({ startTime, endTime, hour, minute });
+    for (const movieEntry of movieEntries) {
+      const movieId = Number(movieEntry.movie_id ?? movieEntry.movieId ?? movieEntry.id ?? 0);
+      if (!movieId) {
+        skipped.push({ reason: "Phim không hợp lệ." });
+        continue;
       }
 
-      cur.setDate(cur.getDate() + 1);
+      const movie = await this.getMovieById(movieId);
+      if (!movie) {
+        skipped.push({ movie_id: movieId, reason: "Không tìm thấy phim." });
+        continue;
+      }
+
+      const priority = Math.max(1, Number(movieEntry.priority ?? 1));
+      const slotsPerDay = Math.max(1, Number(movieEntry.slots_per_day ?? movieEntry.slotsPerDay ?? 1));
+      const earlyBias = Math.max(0, Number(movieEntry.early_bias ?? movieEntry.earlyBias ?? 0));
+      const campaignType = movieEntry.campaign_type ?? movieEntry.campaignType ?? data.campaign_type ?? data.campaignType ?? "new_release";
+      const campaignReason = movieEntry.campaign_reason ?? movieEntry.campaignReason ?? data.campaign_reason ?? data.campaignReason ?? null;
+      const releaseDate = movieEntry.release_date ?? movieEntry.releaseDate ?? data.release_date ?? data.releaseDate ?? data.start_date ?? data.startDate ?? movie.release_date_only;
+      const officialEndDate = movieEntry.official_end_date ?? movieEntry.officialEndDate ?? data.official_end_date ?? data.officialEndDate ?? data.end_date ?? data.endDate ?? null;
+      const earlyEnabled = Boolean(movieEntry.early_show_enabled ?? movieEntry.earlyShowEnabled ?? data.early_show_enabled ?? data.earlyShowEnabled ?? false);
+      const earlyShowDays = Math.max(0, Number(movieEntry.early_show_days ?? movieEntry.earlyShowDays ?? data.early_show_days ?? data.earlyShowDays ?? 0));
+      const earlyShowDurationDays = Math.max(0, Number(movieEntry.early_show_duration_days ?? movieEntry.earlyShowDurationDays ?? data.early_show_duration_days ?? data.earlyShowDurationDays ?? 0));
+
+      const campaignId = await this.createCampaign({
+        movieId,
+        campaignType,
+        reason: campaignReason,
+        releaseDate,
+        officialEndDate,
+        earlyShowEnabled: earlyEnabled,
+        earlyShowDays,
+        earlyShowDurationDays,
+      });
+
+      await this.createCampaignSlot({
+        campaignId,
+        slotType: "official",
+        startDate: releaseDate,
+        endDate: officialEndDate || releaseDate,
+        weekdayTemplate: data.weekday_template ?? data.weekdayTemplate ?? form?.weekdayTemplate ?? "balanced",
+        weekendTemplate: data.weekend_template ?? data.weekendTemplate ?? form?.weekendTemplate ?? "weekend",
+        defaultPriority: priority,
+        defaultSlotsPerDay: slotsPerDay,
+      });
+
+      if (earlyEnabled && earlyShowDays > 0) {
+        const earlyStartDate = addDays(new Date(`${releaseDate}T00:00:00`), -earlyShowDays);
+        const earlyEndDate = addDays(earlyStartDate, Math.max(1, earlyShowDurationDays) - 1);
+        await this.createCampaignSlot({
+          campaignId,
+          slotType: "early",
+          startDate: earlyStartDate.toISOString().slice(0, 10),
+          endDate: earlyEndDate.toISOString().slice(0, 10),
+          weekdayTemplate: data.weekday_template ?? data.weekdayTemplate ?? "balanced",
+          weekendTemplate: data.weekend_template ?? data.weekendTemplate ?? "weekend",
+          defaultPriority: priority,
+          defaultSlotsPerDay: slotsPerDay,
+        });
+      }
+
+      const standardPrice = Number(movieEntry.price_standard ?? movieEntry.priceStandard ?? data.price_standard ?? data.priceStandard ?? data.price ?? 0) || 0;
+      const vipPrice = Number(movieEntry.price_vip ?? movieEntry.priceVip ?? data.price_vip ?? data.priceVip ?? standardPrice) || standardPrice;
+      const couplePrice = Number(movieEntry.price_couple ?? movieEntry.priceCouple ?? data.price_couple ?? data.priceCouple ?? standardPrice) || standardPrice;
+      const seats = Number(movieEntry.available_seats ?? movieEntry.availableSeats ?? data.available_seats ?? data.availableSeats ?? 0) || 0;
+      const normalizedSeats = Number.isNaN(seats) ? 0 : seats;
+
+      const rawTimeSlots = Array.isArray(movieEntry.time_slots) || Array.isArray(movieEntry.timeSlots)
+        ? (Array.isArray(movieEntry.time_slots) ? movieEntry.time_slots : movieEntry.timeSlots)
+        : weekdaySlots;
+      const baseTemplate = rawTimeSlots.length > 0 ? rawTimeSlots : weekdaySlots;
+      const normalizedSlots = filterSlotsByMovieDuration(baseTemplate, movie.duration);
+      if (!normalizedSlots.length) {
+        skipped.push({ movie_id: movieId, reason: "Không có khung giờ phù hợp với thời lượng phim." });
+        continue;
+      }
+
+      const startDateValue = movieEntry.start_date ?? movieEntry.startDate ?? data.start_date ?? data.startDate ?? data.startDate;
+      const endDateValue = movieEntry.end_date ?? movieEntry.endDate ?? data.end_date ?? data.endDate ?? data.endDate;
+      const computedWindow = resolveRecurringDateWindow({
+        movie,
+        startDate: startDateValue,
+        endDate: endDateValue,
+        weeks: Number(data.weeks ?? 1),
+      });
+
+      const startD = new Date(computedWindow.startDate);
+      const endD = new Date(computedWindow.endDate);
+      if (Number.isNaN(startD.getTime()) || Number.isNaN(endD.getTime()) || startD > endD) {
+        skipped.push({ movie_id: movieId, reason: "Khoảng ngày không hợp lệ." });
+        continue;
+      }
+
+      const dayCursor = new Date(startD);
+      while (dayCursor <= endD) {
+        const daySlots = dayCursor.getDay() === 0 || dayCursor.getDay() === 6 ? weekendSlots : weekdaySlots;
+        const selectedSlots = daySlots.length > 0
+          ? daySlots.slice(0, Math.max(1, slotsPerDay + Math.max(0, priority - 2)))
+          : normalizedSlots;
+
+        for (const cinemaId of resolvedCinemaIds) {
+          const [roomRows] = await db.query(
+            `SELECT room_id, total_seat FROM Rooms WHERE cinema_id = ? ${roomIdList.length ? `AND room_id IN (${roomIdList.map(() => "?").join(", ")})` : ""}`,
+            roomIdList.length ? [cinemaId, ...roomIdList] : [cinemaId],
+          );
+
+          if (!roomRows.length) {
+            skipped.push({ movie_id: movieId, cinema_id: cinemaId, date: toDateKey(dayCursor), reason: "Không có phòng chiếu phù hợp trong rạp." });
+            continue;
+          }
+
+          for (const slot of selectedSlots) {
+            const hour = Number(slot.hour ?? 0);
+            const minute = Number(slot.minute ?? 0);
+            const startTime = new Date(dayCursor);
+            startTime.setHours(hour, minute, 0, 0);
+
+            if (earlyBias > 0) {
+              const earlyMinutes = Math.min(earlyBias, 120);
+              const biasedStart = new Date(startTime);
+              biasedStart.setMinutes(startTime.getMinutes() - earlyMinutes);
+              if (biasedStart < new Date(dayCursor)) {
+                // giữ nguyên nếu lùi quá ngày
+              }
+            }
+
+            try {
+              this.ensureStartTimeOnOrAfterReleaseDate(movie, startTime);
+            } catch {
+              skipped.push({ movie_id: movieId, cinema_id: cinemaId, date: toDateKey(dayCursor), hour, minute, reason: "Trước ngày phát hành phim." });
+              continue;
+            }
+
+            let roomAssigned = false;
+            for (const roomRow of roomRows) {
+              const roomId = Number(roomRow.room_id);
+              const endTime = addMinutes(startTime, movie.duration);
+              if (!endTime) continue;
+
+              try {
+                await this.ensureRoomScheduleGap({ roomId, startTime, endTime });
+              } catch {
+                continue;
+              }
+
+              const roomSeatCount = Number(roomRow.total_seat || 0);
+              const roomSeats = roomSeatCount > 0 ? roomSeatCount : normalizedSeats;
+              const isEarlySlot = earlyEnabled && earlyShowDays > 0 && startTime < new Date(`${releaseDate}T00:00:00`);
+              const columns = ["movie_id", "room_id", "start_time", "end_time", "price", "available_seats", "status", "campaign_id", "is_early_show"];
+              const params = [movieId, roomId, startTime, endTime, standardPrice, roomSeats || 0, ACTIVE_SHOWTIME_STATUS, campaignId, isEarlySlot ? 1 : 0];
+
+              if (caps.showtimes.hasPriceStandard) {
+                columns.splice(5, 0, "price_standard");
+                params.splice(5, 0, standardPrice);
+              }
+              if (caps.showtimes.hasPriceVip) {
+                const insertIndex = columns.indexOf("price") + 1;
+                columns.splice(insertIndex, 0, "price_vip");
+                params.splice(insertIndex, 0, vipPrice);
+              }
+              if (caps.showtimes.hasPriceCouple) {
+                const insertIndex = columns.indexOf("price") + 1;
+                columns.splice(insertIndex, 0, "price_couple");
+                params.splice(insertIndex, 0, couplePrice);
+              }
+
+              const placeholders = columns.map(() => "?").join(", ");
+              const [result] = await db.query(
+                `INSERT INTO Showtimes (${columns.join(", ")}) VALUES (${placeholders})`,
+                params,
+              );
+              created.push(result.insertId);
+              roomAssigned = true;
+              break;
+            }
+
+            if (!roomAssigned) {
+              skipped.push({ movie_id: movieId, cinema_id: cinemaId, date: toDateKey(dayCursor), hour, minute, reason: "Không còn phòng phù hợp trong khung giờ này." });
+            }
+          }
+        }
+
+        const nextDate = new Date(dayCursor);
+        nextDate.setDate(dayCursor.getDate() + 1);
+        dayCursor.setTime(nextDate.getTime());
+      }
     }
 
     return { created, skipped };

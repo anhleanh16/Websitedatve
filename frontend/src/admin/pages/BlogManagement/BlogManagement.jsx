@@ -25,6 +25,64 @@ const createInitialBlogForm = (defaultCategory = '') => ({
   status: 'draft'
 })
 
+const getEditorConfig = () => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : ''
+  const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
+
+  return {
+    licenseKey: 'GPL',
+    toolbar: {
+      items: [
+        'heading',
+        '|',
+        'bold',
+        'italic',
+        'link',
+        '|',
+        'bulletedList',
+        'numberedList',
+        '|',
+        'blockQuote',
+        '|',
+        'insertTable',
+        '|',
+        'imageUpload',
+        '|',
+        'undo',
+        'redo',
+      ],
+      shouldNotGroupWhenFull: true,
+    },
+    heading: {
+      options: [
+        { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
+        { model: 'heading1', view: 'h1', title: 'Heading 1', class: 'ck-heading_heading1' },
+        { model: 'heading2', view: 'h2', title: 'Heading 2', class: 'ck-heading_heading2' },
+      ],
+    },
+    image: {
+      toolbar: [
+        'imageStyle:full',
+        'imageStyle:alignLeft',
+        'imageStyle:alignCenter',
+        'imageStyle:alignRight',
+        '|',
+        'imageTextAlternative',
+        'imageResize',
+      ],
+      styles: ['full', 'alignLeft', 'alignCenter', 'alignRight'],
+    },
+    table: {
+      contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells'],
+    },
+    simpleUpload: {
+      uploadUrl: `${apiBase}/admin/upload/ckeditor-image`,
+      withCredentials: false,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  }
+}
+
 const uploadPastedImage = async (file, editor) => {
   if (!file || !file.type?.startsWith('image/')) return
 
@@ -451,28 +509,11 @@ export default function BlogManagement() {
               data={form.content}
               onReady={(editor) => {
                 attachImagePasteHandler(editor)
-                editor.ui.getEditableElement().parentElement.insertBefore(
-                  document.createElement('div'),
-                  editor.ui.getEditableElement()
-                )
               }}
               onChange={(event, editor) => {
                 handleField('content', editor.getData())
               }}
-              config={{
-                toolbar: [
-                  'heading', '|', 'bold', 'italic', 'underline', 'strikethrough', 'fontSize', 'fontColor', 'highlight', '|', 'alignment', '|', 'link', '|', 'bulletedList', 'numberedList', '|', 'blockQuote', 'code', '|', 'insertTable', '|', 'imageUpload'
-                ],
-                fontSize: {
-                  options: [9, 11, 13, 16, 18, 24, 32]
-                },
-                alignment: {
-                  options: ['left', 'center', 'right', 'justify']
-                },
-                table: {
-                  contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
-                }
-              }}
+              config={getEditorConfig()}
             />
           </div>
 

@@ -1,5 +1,5 @@
-﻿CREATE DATABASE IF NOT EXISTS Lunexa;
-USE Lunexa;
+﻿CREATE DATABASE IF NOT EXISTS sweetstarcinema;
+USE sweetstarcinema;
 
 CREATE TABLE Roles (
     role_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -7,6 +7,11 @@ CREATE TABLE Roles (
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+INSERT INTO Roles (role_id, role_name, description) VALUES
+    (1, 'admin', 'quản lý'),
+    (2, 'user', 'Khách hàng thông thường'),
+    (3, 'employee', 'nhân viên');
 
 CREATE TABLE User (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -174,10 +179,58 @@ CREATE TABLE Showtimes (
     price_vip DECIMAL(12,2),
     price_couple DECIMAL(12,2),
     available_seats INT,
-    status ENUM('active','cancelled'),
+    status ENUM('active','cancelled','ended') DEFAULT 'active',
+    campaign_id INT NULL,
+    is_early_show TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL,
 
     FOREIGN KEY (movie_id) REFERENCES Movies(movie_id),
     FOREIGN KEY (room_id) REFERENCES Rooms(room_id)
+);
+
+CREATE TABLE Screening_Campaigns (
+    campaign_id INT AUTO_INCREMENT PRIMARY KEY,
+    movie_id INT NOT NULL,
+    campaign_type ENUM('new_release','rerun','special_event') NOT NULL,
+    reason TEXT,
+    release_date DATE NOT NULL,
+    official_end_date DATE NULL,
+    early_show_enabled TINYINT(1) DEFAULT 0,
+    early_show_days INT DEFAULT 0,
+    early_show_duration_days INT DEFAULT 0,
+    status ENUM('draft','active','completed','cancelled') DEFAULT 'draft',
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL,
+
+    FOREIGN KEY (movie_id) REFERENCES Movies(movie_id),
+    FOREIGN KEY (created_by) REFERENCES User(id)
+);
+
+CREATE TABLE Screening_Campaign_Slots (
+    slot_id INT AUTO_INCREMENT PRIMARY KEY,
+    campaign_id INT NOT NULL,
+    slot_type ENUM('official','early') NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NULL,
+    weekday_template VARCHAR(50) DEFAULT 'balanced',
+    weekend_template VARCHAR(50) DEFAULT 'weekend',
+    default_priority INT DEFAULT 3,
+    default_slots_per_day INT DEFAULT 2,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (campaign_id) REFERENCES Screening_Campaigns(campaign_id) ON DELETE CASCADE
+);
+
+CREATE TABLE Screening_Campaign_Notes (
+    note_id INT AUTO_INCREMENT PRIMARY KEY,
+    campaign_id INT NOT NULL,
+    note_type ENUM('summary','reason','internal') DEFAULT 'summary',
+    note_text TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (campaign_id) REFERENCES Screening_Campaigns(campaign_id) ON DELETE CASCADE
 );
 
 CREATE TABLE Orders (
@@ -260,24 +313,38 @@ CREATE TABLE Employees (
     position VARCHAR(100),
     hire_date DATE,
     salary DECIMAL(12,2),
-    status ENUM('active','inactive'),
+    status ENUM('active','inactive','leave') NOT NULL DEFAULT 'active',
+    department VARCHAR(100),
+    type ENUM('full_time','part_time') NOT NULL DEFAULT 'full_time',
+    shifts VARCHAR(100),
+    address TEXT,
+    sex VARCHAR(10),
+    dob DATE,
+    avatar_url VARCHAR(255),
+    citizen_id VARCHAR(20),
+    id_card_front_url VARCHAR(255),
+    id_card_back_url VARCHAR(255),
+    cinema_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (user_id) REFERENCES User(id)
+    FOREIGN KEY (user_id) REFERENCES User(id),
+    FOREIGN KEY (cinema_id) REFERENCES Cinemas(cinemas_id)
 );
 
 
-USE Lunexa;
+USE sweetstarcinema;
 UPDATE User
 SET password='$2a$10$1G256nBgUCxFdjKLXlVLg.zDbl5oBm1pPvN6oNcMj2M1EWmLrLfqG'
 WHERE email='anhanhle1997@gmail.com';
 
-USE Lunexa;
+USE sweetstarcinema;
 ALTER TABLE `Movies`
 ADD COLUMN `posters` JSON NULL AFTER `poster`,
 ADD COLUMN `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE AFTER `country`,
 ADD COLUMN `is_hidden` BOOLEAN NOT NULL DEFAULT FALSE AFTER `is_deleted`;
 
-USE Lunexa;
+USE sweetstarcinema;
 CREATE TABLE news (
     news_id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -316,7 +383,7 @@ CREATE TABLE news (
         ON DELETE CASCADE
 );
 
-USE Lunexa;
+USE sweetstarcinema;
 CREATE TABLE Blogs (
     blog_id INT AUTO_INCREMENT PRIMARY KEY,
     author_id INT,

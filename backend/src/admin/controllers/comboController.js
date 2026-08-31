@@ -2,6 +2,11 @@ import { ComboModel } from "../models/comboModel.js";
 
 const getStatusCode = (error) => Number(error?.statusCode || 500);
 
+const normalizeUploadedComboImage = (file) => {
+  if (!file) return null;
+  return `/uploads/combos/${file.filename}`.replace(/\\/g, "/");
+};
+
 export const getAdminCombos = async (req, res) => {
   try {
     const combos = await ComboModel.findAll({
@@ -35,7 +40,11 @@ export const getAdminComboById = async (req, res) => {
 
 export const createAdminCombo = async (req, res) => {
   try {
-    const combo = await ComboModel.create(req.body);
+    const payload = {
+      ...(req.body || {}),
+      image: normalizeUploadedComboImage(req.file) || req.body?.image || "",
+    };
+    const combo = await ComboModel.create(payload);
     res.status(201).json({ message: "Tạo combo thành công", combo });
   } catch (error) {
     console.error("Error in createAdminCombo:", error);
@@ -47,7 +56,14 @@ export const createAdminCombo = async (req, res) => {
 
 export const updateAdminCombo = async (req, res) => {
   try {
-    const combo = await ComboModel.update(req.params.id, req.body);
+    const currentCombo = await ComboModel.findById(req.params.id);
+    const payload = {
+      ...(req.body || {}),
+      image:
+        normalizeUploadedComboImage(req.file) ||
+        (typeof req.body?.image === "string" && req.body.image.trim() ? req.body.image.trim() : currentCombo?.image || ""),
+    };
+    const combo = await ComboModel.update(req.params.id, payload);
     if (!combo) {
       return res.status(404).json({ message: "Không tìm thấy combo để cập nhật" });
     }
