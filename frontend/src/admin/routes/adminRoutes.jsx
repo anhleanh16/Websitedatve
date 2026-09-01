@@ -3,7 +3,6 @@ import { useSelector } from "react-redux";
 import AdminLayout from "../layouts/AdminLayout";
 import Dashboard from "../pages/Dashboard/Dashboard";
 import Users from "../pages/Users/Users";
-import Roles from "../pages/Roles/Roles";
 import Movies from "../pages/Movies/Movies";
 import Showtimes from "../pages/Showtimes/Showtimes";
 import Cinemas from "../pages/cinemas/Cinemas";
@@ -46,7 +45,7 @@ export function AdminRoutes() {
   ];
   const fullAdminRoutes = [
     <Route key="dashboard" path="dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />,
-    <Route key="roles" path="roles" element={<AdminLayout><Roles /></AdminLayout>} />,
+    <Route key="roles" path="roles" element={<Navigate to="/admin/dashboard" replace />} />,
     <Route key="staff" path="staff" element={<AdminLayout><Staff /></AdminLayout>} />,
     <Route key="users" path="users" element={<AdminLayout><Users /></AdminLayout>} />,
     <Route key="movies" path="movies" element={<AdminLayout><Movies /></AdminLayout>} />,

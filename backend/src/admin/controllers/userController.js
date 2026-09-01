@@ -247,12 +247,15 @@ export const searchAdminUsers = async (req, res) => {
         u.phone as phone_number,
         CASE
           WHEN u.id = 1 THEN 'admin'
-          WHEN e.position IS NOT NULL AND e.position != '' THEN
-            CASE
-              WHEN LOWER(e.position) LIKE '%quản lý%' OR LOWER(e.position) LIKE '%manager%' THEN 'manager'
-              WHEN LOWER(e.position) LIKE '%kỹ thuật%' OR LOWER(e.position) LIKE '%technician%' OR LOWER(e.position) LIKE '%technical%' THEN 'technician'
-              ELSE 'staff'
-            END
+          WHEN LOWER(COALESCE(e.position, '')) LIKE '%quản lý%'
+            OR LOWER(COALESCE(e.position, '')) LIKE '%manager%'
+            OR LOWER(COALESCE(r.role_name, '')) IN ('manager', 'quan ly', 'quản lý') THEN 'manager'
+          WHEN LOWER(COALESCE(e.position, '')) LIKE '%kỹ thuật%'
+            OR LOWER(COALESCE(e.position, '')) LIKE '%technician%'
+            OR LOWER(COALESCE(e.position, '')) LIKE '%technical%'
+            OR LOWER(COALESCE(r.role_name, '')) IN ('technician', 'technical') THEN 'technician'
+          WHEN e.employee_id IS NOT NULL
+            OR LOWER(COALESCE(r.role_name, '')) IN ('employee', 'staff', 'nhan vien', 'nhân viên') THEN 'staff'
           ELSE 'user'
         END as role,
         e.position as employee_position,

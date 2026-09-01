@@ -605,7 +605,7 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
           <h2>🔁 Tạo lịch chiếu theo nhóm</h2>
           <button className="sh-modal-close" onClick={onClose}>✕</button>
         </div>
-        <div className="sh-modal-body">
+        <div className="sh-modal-body sh-recurring-body">
           <p className="sh-recurring-desc">
             Chọn nhiều phim và nhiều rạp cùng lúc. Mỗi phòng có thể tự động nhận nhiều suất ở các khung giờ khác nhau, theo thời lượng phim, khoảng nghỉ 15 phút và ưu tiên của từng phim.
           </p>
@@ -636,7 +636,7 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
             </div>
           </div>
 
-          <div className="sh-form-grid">
+          <div className="sh-recurring-form-grid">
             <div className="sh-form-col">
               <div className="sh-schedule-card-block">
                 <div className="sh-card-header">Thông tin đợt chiếu</div>
@@ -706,11 +706,11 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
                 <div className="sh-field">
                   <label>Lý do / ghi chú</label>
                   <textarea
+                    className="sh-recurring-textarea"
                     rows={3}
                     value={form.campaignReason}
                     onChange={(event) => set("campaignReason", event.target.value)}
                     placeholder="Ví dụ: Khuyến khích mở bán sớm cho phim mới, chiếu lại dịp cuối tuần, sự kiện đặc biệt..."
-                    style={{ width: "100%", minHeight: "84px", borderRadius: "12px", padding: "12px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#eef4ff", resize: "vertical" }}
                   />
                 </div>
               </div>
@@ -748,10 +748,13 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
               <div className="sh-schedule-card-block sh-early-block">
                 <div className="sh-card-header">Suất chiếu sớm</div>
 
-                <div className="sh-field">
-                  <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div className="sh-field sh-early-toggle-field">
+                  <label className="sh-early-toggle">
                     <input type="checkbox" checked={form.earlyShowEnabled} onChange={(event) => set("earlyShowEnabled", event.target.checked)} />
-                    Có suất chiếu sớm
+                    <span>
+                      <strong>Có suất chiếu sớm</strong>
+                      <small>Tạo thêm lịch trước ngày phát hành chính thức</small>
+                    </span>
                   </label>
                 </div>
 
@@ -771,8 +774,8 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
               </div>
 
               {selectedMovieIds.length > 0 && (
-                <div className="sh-field">
-                  <label>Cấu hình ưu tiên xếp lịch theo phim</label>
+                <div className="sh-schedule-card-block sh-priority-block">
+                  <div className="sh-card-header">Ưu tiên xếp lịch theo phim</div>
                   <div className="sh-priority-table">
                     <div className="sh-priority-header">
                       <span>Phim</span>
@@ -832,7 +835,7 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
             </div>
           </div>
         </div>
-        <div className="sh-modal-footer">
+        <div className="sh-modal-footer sh-recurring-footer">
           <button className="sh-btn sh-btn-add sh-btn-lg" onClick={handleSave}>🔁 Tạo lịch hàng loạt</button>
           <button className="sh-btn sh-btn-secondary sh-btn-lg" onClick={onClose}>Hủy</button>
         </div>

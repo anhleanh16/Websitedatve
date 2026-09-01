@@ -191,25 +191,21 @@
   transform: translateY(-1px);
 }
 
-button.bk-modal-footer-btn-primary,
-button:has-text("Tạo combo") {
+button.bk-modal-footer-btn-primary {
   background: linear-gradient(135deg, #7c61ff 0%, #5b3fd1 100%);
   color: #fff;
 }
 
-button.bk-modal-footer-btn-primary:hover,
-button:has-text("Tạo combo"):hover {
+button.bk-modal-footer-btn-primary:hover {
   background: linear-gradient(135deg, #8a72ff 0%, #6b4fe5 100%);
 }
 
-button.bk-modal-footer-btn-secondary,
-button:has-text("Hủy") {
+button.bk-modal-footer-btn-secondary {
   background: rgba(255, 255, 255, 0.07);
   color: #c8d8ff;
 }
 
-button.bk-modal-footer-btn-secondary:hover,
-button:has-text("Hủy"):hover {
+button.bk-modal-footer-btn-secondary:hover {
   background: rgba(255, 255, 255, 0.14);
 }
 

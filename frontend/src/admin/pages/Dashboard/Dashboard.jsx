@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { adminDashboardService, adminStatisticsService } from "../../services/adminApi";
+import Roles from "../Roles/Roles";
 import "../../admin.css";
 
 function formatCurrency(amount) {
@@ -255,6 +256,8 @@ export default function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      <Roles embedded />
 
       {/* ── Biểu đồ tuần ── */}
       <div className="db-section-label">Thống kê tuần này</div>

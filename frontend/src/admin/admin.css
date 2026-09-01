@@ -548,6 +548,55 @@
   min-width: 0;
 }
 
+.role-summary-section {
+  margin-top: 20px;
+}
+
+.role-summary-header {
+  margin-bottom: 14px;
+}
+
+.role-summary-header h2,
+.role-summary-header p {
+  margin: 0;
+}
+
+.role-summary-header h2 {
+  color: #f5f7ff;
+  font-size: 18px;
+}
+
+.role-summary-header p {
+  margin-top: 5px;
+  color: #8fa6ff;
+  font-size: 13px;
+}
+
+.role-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.role-summary-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.role-summary-card h3,
+.role-summary-card p {
+  margin-top: 0;
+}
+
+@media (max-width: 900px) {
+  .role-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .overview-panel,
 .activity-panel {
   background: rgba(255, 255, 255, 0.04);

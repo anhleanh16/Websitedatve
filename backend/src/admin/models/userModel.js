@@ -47,11 +47,11 @@ export const UserModel = {
        LEFT JOIN User u ON u.role_id = r.role_id
        GROUP BY LOWER(COALESCE(r.role_name, '')), COALESCE(r.description, r.role_name, 'Khách hàng')
        ORDER BY CASE
-         WHEN LOWER(COALESCE(r.role_name, '')) IN ('user', 'customer', 'khach hang', 'khachhang', 'khách hàng', 'kháchhang') THEN 1
-         WHEN LOWER(COALESCE(r.role_name, '')) IN ('employee', 'staff', 'nhan vien', 'nhân viên', 'manager', 'technician', 'quan ly', 'quản lý') THEN 2
-         WHEN LOWER(COALESCE(r.role_name, '')) = 'admin' THEN 3
+         WHEN raw_role_name IN ('user', 'customer', 'khach hang', 'khachhang', 'khách hàng', 'kháchhang') THEN 1
+         WHEN raw_role_name IN ('employee', 'staff', 'nhan vien', 'nhân viên', 'manager', 'technician', 'quan ly', 'quản lý') THEN 2
+         WHEN raw_role_name = 'admin' THEN 3
          ELSE 4
-       END, LOWER(COALESCE(r.role_name, ''))`,
+       END, raw_role_name`,
     );
 
     const groupedMap = new Map();
@@ -94,8 +94,16 @@ export const UserModel = {
         u.avatar,
         CASE
           WHEN u.id = 1 THEN 'admin'
-          WHEN LOWER(COALESCE(r.role_name, '')) IN ('user', 'customer', 'khach hang', 'khachhang', 'khách hàng', 'kháchhang') THEN 'user'
-          ELSE COALESCE(r.role_name, 'user')
+          WHEN LOWER(COALESCE(e.position, '')) LIKE '%quản lý%'
+            OR LOWER(COALESCE(e.position, '')) LIKE '%manager%'
+            OR LOWER(COALESCE(r.role_name, '')) IN ('manager', 'quan ly', 'quản lý') THEN 'manager'
+          WHEN LOWER(COALESCE(e.position, '')) LIKE '%kỹ thuật%'
+            OR LOWER(COALESCE(e.position, '')) LIKE '%technician%'
+            OR LOWER(COALESCE(e.position, '')) LIKE '%technical%'
+            OR LOWER(COALESCE(r.role_name, '')) IN ('technician', 'technical') THEN 'technician'
+          WHEN e.employee_id IS NOT NULL
+            OR LOWER(COALESCE(r.role_name, '')) IN ('employee', 'staff', 'nhan vien', 'nhân viên') THEN 'staff'
+          ELSE 'user'
         END as role,
         e.position as employee_position,
         u.status,
@@ -110,9 +118,6 @@ export const UserModel = {
         Roles r ON u.role_id = r.role_id
       LEFT JOIN
         Employees e ON e.user_id = u.id
-      WHERE
-        u.id = 1
-        OR LOWER(COALESCE(r.role_name, '')) IN ('user', 'customer', 'khach hang', 'khachhang', 'khách hàng', 'kháchhang')
       ORDER BY
         u.created_at DESC, u.id DESC`,
     );

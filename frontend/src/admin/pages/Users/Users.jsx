@@ -20,6 +20,9 @@ const getAccountStatus = (user) => {
 const ROLE_MAP = {
   user: { label: "Khách hàng", cls: "role-user" },
   employee: { label: "Nhân viên", cls: "role-staff" },
+  staff: { label: "Nhân viên", cls: "role-staff" },
+  technician: { label: "Kỹ thuật viên", cls: "role-staff" },
+  manager: { label: "Quản lý", cls: "role-staff" },
   admin: { label: "Quản trị viên", cls: "role-admin" },
 };
 
@@ -241,7 +244,9 @@ function UserList({ users, membershipLevels, onView, onToggleStatus, onResetPass
         >
           <option value="all">Tất cả vai trò</option>
           <option value="user">Khách hàng</option>
-          <option value="employee">Nhân viên</option>
+          <option value="staff">Nhân viên</option>
+          <option value="technician">Kỹ thuật viên</option>
+          <option value="manager">Quản lý</option>
           <option value="admin">Quản trị viên</option>
         </select>
       </div>
@@ -250,7 +255,7 @@ function UserList({ users, membershipLevels, onView, onToggleStatus, onResetPass
         <table>
           <thead>
             <tr>
-              <th>Khách hàng</th>
+              <th>Người dùng</th>
               <th>Liên hệ</th>
               <th>Vai trò</th>
               <th>Hạng thành viên</th>
@@ -393,7 +398,7 @@ function UserDetail({ user, membershipLevels, onClose, onToggleStatus, onAdjustP
     <div className="us-modal-overlay" onClick={onClose}>
       <div className="us-modal" onClick={(e) => e.stopPropagation()}>
         <div className="us-modal-header">
-          <h2>Chi tiết khách hàng</h2>
+          <h2>Chi tiết người dùng</h2>
           <button className="us-modal-close" onClick={onClose}>
             ✕
           </button>
