@@ -1,4 +1,3 @@
-import React from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import Navbar from '../Components/Headers/Navbar'
@@ -20,7 +19,7 @@ export default function UserLayout() {
         <span className='site-web site-web-bottom-right' />
       </div>
       <Navbar />
-      <main className='main-content'>
+      <main key={location.pathname} className='main-content'>
         <Outlet />
       </main>
       <Footer />

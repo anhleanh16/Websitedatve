@@ -273,31 +273,31 @@ export default function Navbar() {
         </ul>
       </nav>
 
+      {(guestNeedsAuthentication || emailUnlinked || emailNeedsVerification) && !emailAlertDismissed && (
+        <div className='email-link-alert' role='alert'>
+          <span>⚠</span>
+          <span>{guestNeedsAuthentication ? 'Bạn chưa đăng nhập hoặc đăng kí. Vui lòng đăng nhập để đặt vé và dùng các tính năng khác.' : emailNeedsVerification ? 'Email đăng ký chưa được xác minh. Vui lòng xác minh để đặt vé và dùng các tính năng khác.' : 'Tài khoản chưa liên kết email. Vui lòng liên kết để đặt vé và dùng các tính năng khác.'}</span>
+          {guestNeedsAuthentication ? (
+            <div className='email-link-alert-actions'>
+              <button type='button' className='email-link-alert-action' onClick={() => navigate('/Logins/Login')}>Đăng nhập</button>
+              <span>hoặc</span>
+              <button type='button' className='email-link-alert-action' onClick={() => navigate('/Registers/Register')}>Đăng ký</button>
+            </div>
+          ) : (
+            <div className='email-link-alert-actions'>
+              <button type='button' className='email-link-alert-action' onClick={() => navigate('/profile?tab=edit')}>
+                {emailNeedsVerification ? 'Xác minh' : 'Liên kết'}
+              </button>
+            </div>
+          )}
+          <button type='button' className='email-link-alert-close' onClick={() => setEmailAlertDismissed(true)} aria-label='Đóng thông báo email'>
+            <FaTimes />
+          </button>
+        </div>
+      )}
+
       {/* Right side */}
       <div className='nav-right'>
-
-        {(guestNeedsAuthentication || emailUnlinked || emailNeedsVerification) && !emailAlertDismissed && (
-          <div className='email-link-alert' role='alert'>
-            <span>⚠</span>
-            <span>{guestNeedsAuthentication ? 'Bạn chưa đăng nhập hoặc đăng kí. Vui lòng đăng nhập để đặt vé và dùng các tính năng khác.' : emailNeedsVerification ? 'Email đăng ký chưa được xác minh. Vui lòng xác minh để đặt vé và dùng các tính năng khác.' : 'Tài khoản chưa liên kết email. Vui lòng liên kết để đặt vé và dùng các tính năng khác.'}</span>
-            {guestNeedsAuthentication ? (
-              <div className='email-link-alert-actions'>
-                <button type='button' className='email-link-alert-action' onClick={() => navigate('/Logins/Login')}>Đăng nhập</button>
-                <span>hoặc</span>
-                <button type='button' className='email-link-alert-action' onClick={() => navigate('/Registers/Register')}>Đăng ký</button>
-              </div>
-            ) : (
-              <div className='email-link-alert-actions'>
-                <button type='button' className='email-link-alert-action' onClick={() => navigate('/profile?tab=edit')}>
-                  {emailNeedsVerification ? 'Xác minh' : 'Liên kết'}
-                </button>
-              </div>
-            )}
-            <button type='button' className='email-link-alert-close' onClick={() => setEmailAlertDismissed(true)} aria-label='Đóng thông báo email'>
-              <FaTimes />
-            </button>
-          </div>
-        )}
 
         {/* Nút Quản trị — hiện khi là admin hoặc nhân viên admin panel */}
         {isAdminPanelUser && (

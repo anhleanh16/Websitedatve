@@ -100,18 +100,33 @@ const getSchemaCapabilities = async () => {
     const [roomCols] = await db.query(
       "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Rooms'",
     );
+    const [campaignTables] = await db.query(
+      `SELECT TABLE_NAME
+       FROM INFORMATION_SCHEMA.TABLES
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME IN ('Screening_Campaigns', 'Screening_Campaign_Slots')`,
+    );
 
     const showtimeSet = new Set(showtimeCols.map((c) => c.COLUMN_NAME));
     const roomSet = new Set(roomCols.map((c) => c.COLUMN_NAME));
+    const campaignTableSet = new Set(
+      campaignTables.map((table) => String(table.TABLE_NAME).toLowerCase()),
+    );
 
     return {
       showtimes: {
         hasPriceStandard: showtimeSet.has("price_standard"),
         hasPriceVip: showtimeSet.has("price_vip"),
         hasPriceCouple: showtimeSet.has("price_couple"),
+        hasCampaignId: showtimeSet.has("campaign_id"),
+        hasIsEarlyShow: showtimeSet.has("is_early_show"),
       },
       rooms: {
         hasStatus: roomSet.has("status"),
+      },
+      campaigns: {
+        hasCampaignsTable: campaignTableSet.has("screening_campaigns"),
+        hasSlotsTable: campaignTableSet.has("screening_campaign_slots"),
       },
     };
   })();
@@ -506,41 +521,46 @@ export const ShowtimeModel = {
       const earlyShowDays = Math.max(0, Number(movieEntry.early_show_days ?? movieEntry.earlyShowDays ?? data.early_show_days ?? data.earlyShowDays ?? 0));
       const earlyShowDurationDays = Math.max(0, Number(movieEntry.early_show_duration_days ?? movieEntry.earlyShowDurationDays ?? data.early_show_duration_days ?? data.earlyShowDurationDays ?? 0));
 
-      const campaignId = await this.createCampaign({
-        movieId,
-        campaignType,
-        reason: campaignReason,
-        releaseDate,
-        officialEndDate,
-        earlyShowEnabled: earlyEnabled,
-        earlyShowDays,
-        earlyShowDurationDays,
-      });
+      let campaignId = null;
+      if (caps.campaigns.hasCampaignsTable) {
+        campaignId = await this.createCampaign({
+          movieId,
+          campaignType,
+          reason: campaignReason,
+          releaseDate,
+          officialEndDate,
+          earlyShowEnabled: earlyEnabled,
+          earlyShowDays,
+          earlyShowDurationDays,
+        });
+      }
 
-      await this.createCampaignSlot({
-        campaignId,
-        slotType: "official",
-        startDate: releaseDate,
-        endDate: officialEndDate || releaseDate,
-        weekdayTemplate: data.weekday_template ?? data.weekdayTemplate ?? form?.weekdayTemplate ?? "balanced",
-        weekendTemplate: data.weekend_template ?? data.weekendTemplate ?? form?.weekendTemplate ?? "weekend",
-        defaultPriority: priority,
-        defaultSlotsPerDay: slotsPerDay,
-      });
-
-      if (earlyEnabled && earlyShowDays > 0) {
-        const earlyStartDate = addDays(new Date(`${releaseDate}T00:00:00`), -earlyShowDays);
-        const earlyEndDate = addDays(earlyStartDate, Math.max(1, earlyShowDurationDays) - 1);
+      if (campaignId && caps.campaigns.hasSlotsTable) {
         await this.createCampaignSlot({
           campaignId,
-          slotType: "early",
-          startDate: earlyStartDate.toISOString().slice(0, 10),
-          endDate: earlyEndDate.toISOString().slice(0, 10),
+          slotType: "official",
+          startDate: releaseDate,
+          endDate: officialEndDate || releaseDate,
           weekdayTemplate: data.weekday_template ?? data.weekdayTemplate ?? "balanced",
           weekendTemplate: data.weekend_template ?? data.weekendTemplate ?? "weekend",
           defaultPriority: priority,
           defaultSlotsPerDay: slotsPerDay,
         });
+
+        if (earlyEnabled && earlyShowDays > 0) {
+          const earlyStartDate = addDays(new Date(`${releaseDate}T00:00:00`), -earlyShowDays);
+          const earlyEndDate = addDays(earlyStartDate, Math.max(1, earlyShowDurationDays) - 1);
+          await this.createCampaignSlot({
+            campaignId,
+            slotType: "early",
+            startDate: earlyStartDate.toISOString().slice(0, 10),
+            endDate: earlyEndDate.toISOString().slice(0, 10),
+            weekdayTemplate: data.weekday_template ?? data.weekdayTemplate ?? "balanced",
+            weekendTemplate: data.weekend_template ?? data.weekendTemplate ?? "weekend",
+            defaultPriority: priority,
+            defaultSlotsPerDay: slotsPerDay,
+          });
+        }
       }
 
       const standardPrice = Number(movieEntry.price_standard ?? movieEntry.priceStandard ?? data.price_standard ?? data.priceStandard ?? data.price ?? 0) || 0;
@@ -630,8 +650,17 @@ export const ShowtimeModel = {
               const roomSeatCount = Number(roomRow.total_seat || 0);
               const roomSeats = roomSeatCount > 0 ? roomSeatCount : normalizedSeats;
               const isEarlySlot = earlyEnabled && earlyShowDays > 0 && startTime < new Date(`${releaseDate}T00:00:00`);
-              const columns = ["movie_id", "room_id", "start_time", "end_time", "price", "available_seats", "status", "campaign_id", "is_early_show"];
-              const params = [movieId, roomId, startTime, endTime, standardPrice, roomSeats || 0, ACTIVE_SHOWTIME_STATUS, campaignId, isEarlySlot ? 1 : 0];
+              const columns = ["movie_id", "room_id", "start_time", "end_time", "price", "available_seats", "status"];
+              const params = [movieId, roomId, startTime, endTime, standardPrice, roomSeats || 0, ACTIVE_SHOWTIME_STATUS];
+
+              if (caps.showtimes.hasCampaignId && campaignId) {
+                columns.push("campaign_id");
+                params.push(campaignId);
+              }
+              if (caps.showtimes.hasIsEarlyShow) {
+                columns.push("is_early_show");
+                params.push(isEarlySlot ? 1 : 0);
+              }
 
               if (caps.showtimes.hasPriceStandard) {
                 columns.splice(5, 0, "price_standard");
@@ -763,6 +792,18 @@ export const ShowtimeModel = {
    */
   async delete(id) {
     // Cảnh báo: Chỉ nên xóa lịch chiếu chưa có ai đặt vé.
+    const [[showtime]] = await db.query(
+      "SELECT end_time, status FROM Showtimes WHERE showtime_id = ?",
+      [id],
+    );
+    if (!showtime) return false;
+
+    const hasEnded = showtime.status === CANCELLED_SHOWTIME_STATUS
+      || (toDate(showtime.end_time)?.getTime() ?? 0) < Date.now();
+    if (hasEnded) {
+      throw buildAppError("Lịch chiếu đã kết thúc không thể xóa.");
+    }
+
     const [result] = await db.query(
       "DELETE FROM Showtimes WHERE showtime_id = ?",
       [id],

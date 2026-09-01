@@ -10,6 +10,11 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       allowedHosts: ["sweetstarcinemar.qlinterior.shop"],
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
       proxy: {
         "/api": {
           target: backendTarget,

@@ -4582,3 +4582,492 @@
 .admin-pagination-controls button:disabled { opacity: .38; cursor: not-allowed; }
 .admin-pagination-ellipsis { padding: 0 2px; }
 @media (max-width: 600px) { .admin-pagination { align-items: flex-start; flex-direction: column; } }
+
+/* ═══════════════════════════════════════════════════════════════
+   SHARED ADMIN MOTION SYSTEM
+   Áp dụng thống nhất cho toàn bộ trang nằm trong AdminLayout.
+═══════════════════════════════════════════════════════════════ */
+.admin-layout {
+  --admin-motion-fast: 180ms;
+  --admin-motion-normal: 360ms;
+  --admin-motion-slow: 520ms;
+  --admin-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.admin-sidebar {
+  animation: admin-sidebar-enter 0.5s var(--admin-motion-ease) both;
+}
+
+.sidebar-header {
+  animation: admin-fade-down 0.42s 60ms var(--admin-motion-ease) both;
+}
+
+.sidebar-nav li {
+  animation: admin-nav-enter 0.38s var(--admin-motion-ease) both;
+}
+
+.sidebar-nav li:nth-child(1) { animation-delay: 40ms; }
+.sidebar-nav li:nth-child(2) { animation-delay: 65ms; }
+.sidebar-nav li:nth-child(3) { animation-delay: 90ms; }
+.sidebar-nav li:nth-child(4) { animation-delay: 115ms; }
+.sidebar-nav li:nth-child(5) { animation-delay: 140ms; }
+.sidebar-nav li:nth-child(6) { animation-delay: 165ms; }
+.sidebar-nav li:nth-child(7) { animation-delay: 190ms; }
+.sidebar-nav li:nth-child(8) { animation-delay: 215ms; }
+.sidebar-nav li:nth-child(9) { animation-delay: 240ms; }
+.sidebar-nav li:nth-child(10) { animation-delay: 265ms; }
+.sidebar-nav li:nth-child(n + 11) { animation-delay: 290ms; }
+
+.sidebar-nav a,
+.sidebar-toggle,
+.header-menu-btn,
+.header-right .btn-logout {
+  transition: color var(--admin-motion-fast) ease,
+    background var(--admin-motion-fast) ease,
+    border-color var(--admin-motion-fast) ease,
+    transform var(--admin-motion-fast) var(--admin-motion-ease),
+    box-shadow var(--admin-motion-fast) ease;
+}
+
+.sidebar-nav a:hover {
+  transform: translateX(4px);
+}
+
+.sidebar-nav a:active,
+.sidebar-toggle:active,
+.header-menu-btn:active,
+.header-right .btn-logout:active {
+  transform: scale(0.95);
+}
+
+.sidebar-nav a.active {
+  animation: admin-nav-active 0.38s var(--admin-motion-ease);
+}
+
+.admin-header {
+  animation: admin-header-enter 0.46s var(--admin-motion-ease) both;
+}
+
+.admin-main {
+  animation: admin-page-enter 0.48s var(--admin-motion-ease) both;
+}
+
+.admin-main > * {
+  animation: admin-content-enter 0.5s 40ms var(--admin-motion-ease) both;
+}
+
+.admin-main :where(
+  [class$="-page-header"],
+  [class*="-page-header "],
+  .comments-header,
+  .blog-header,
+  .points-management-header,
+  .banner-management-header,
+  .statistics-header,
+  .dashboard-header
+) {
+  animation: admin-fade-up 0.46s var(--admin-motion-ease) both;
+}
+
+.admin-main :where(
+  .stats-grid,
+  [class$="-stats-row"],
+  [class*="-stats-row "],
+  .overview-cards,
+  .points-summary-grid,
+  .seat-stats-grid
+) > * {
+  animation: admin-card-enter 0.48s var(--admin-motion-ease) both;
+}
+
+.admin-main :where(
+  .stats-grid,
+  [class$="-stats-row"],
+  [class*="-stats-row "],
+  .overview-cards,
+  .points-summary-grid,
+  .seat-stats-grid
+) > *:nth-child(2) { animation-delay: 55ms; }
+
+.admin-main :where(
+  .stats-grid,
+  [class$="-stats-row"],
+  [class*="-stats-row "],
+  .overview-cards,
+  .points-summary-grid,
+  .seat-stats-grid
+) > *:nth-child(3) { animation-delay: 110ms; }
+
+.admin-main :where(
+  .stats-grid,
+  [class$="-stats-row"],
+  [class*="-stats-row "],
+  .overview-cards,
+  .points-summary-grid,
+  .seat-stats-grid
+) > *:nth-child(4) { animation-delay: 165ms; }
+
+.admin-main :where(
+  .stats-grid,
+  [class$="-stats-row"],
+  [class*="-stats-row "],
+  .overview-cards,
+  .points-summary-grid,
+  .seat-stats-grid
+) > *:nth-child(n + 5) { animation-delay: 220ms; }
+
+.admin-main :where(
+  [class$="-toolbar"],
+  [class*="-toolbar "],
+  .filter-controls,
+  .filters-row,
+  .search-filter,
+  .search-row
+) {
+  animation: admin-toolbar-enter 0.42s 80ms var(--admin-motion-ease) both;
+}
+
+.admin-main :where(
+  [class$="-tabs"],
+  [class*="-tabs "],
+  .tabs,
+  .period-tabs,
+  .chart-type-tabs
+) {
+  animation: admin-fade-up 0.44s 65ms var(--admin-motion-ease) both;
+}
+
+.admin-main :where(
+  [class$="-tab"],
+  [class*="-tab "],
+  .tabs > button,
+  .period-tabs > button,
+  .chart-type-tabs > button
+) {
+  transition: color var(--admin-motion-fast) ease,
+    background var(--admin-motion-fast) ease,
+    border-color var(--admin-motion-fast) ease,
+    transform var(--admin-motion-fast) var(--admin-motion-ease),
+    box-shadow var(--admin-motion-fast) ease;
+}
+
+.admin-main :where(
+  [class$="-tab"],
+  [class*="-tab "],
+  .tabs > button,
+  .period-tabs > button,
+  .chart-type-tabs > button
+):hover {
+  transform: translateY(-2px);
+}
+
+.admin-main :where(
+  [class$="-tab"],
+  [class*="-tab "],
+  .tabs > button,
+  .period-tabs > button,
+  .chart-type-tabs > button
+):active {
+  transform: translateY(0) scale(0.97);
+}
+
+.admin-main :where(
+  .table-card,
+  .chart-card,
+  .data-table-card,
+  [class$="-card"],
+  [class*="-card "]
+):not(.admin-pagination):not(.booking-seat) {
+  animation: admin-card-enter 0.46s var(--admin-motion-ease) both;
+}
+
+.admin-main :where(
+  .table-card,
+  .chart-card,
+  .data-table-card,
+  [class$="-card"],
+  [class*="-card "]
+):not(.admin-pagination):not(.booking-seat) {
+  transition: transform 0.24s var(--admin-motion-ease),
+    border-color 0.24s ease,
+    background-color 0.24s ease,
+    box-shadow 0.24s ease;
+}
+
+.admin-main :where(.table-card, .chart-card, .data-table-card) {
+  animation-delay: 90ms;
+}
+
+.admin-main table tbody tr {
+  animation: admin-row-enter 0.38s var(--admin-motion-ease) both;
+}
+
+.admin-main table tbody tr:nth-child(2) { animation-delay: 28ms; }
+.admin-main table tbody tr:nth-child(3) { animation-delay: 56ms; }
+.admin-main table tbody tr:nth-child(4) { animation-delay: 84ms; }
+.admin-main table tbody tr:nth-child(5) { animation-delay: 112ms; }
+.admin-main table tbody tr:nth-child(6) { animation-delay: 140ms; }
+.admin-main table tbody tr:nth-child(7) { animation-delay: 168ms; }
+.admin-main table tbody tr:nth-child(8) { animation-delay: 196ms; }
+.admin-main table tbody tr:nth-child(9) { animation-delay: 224ms; }
+.admin-main table tbody tr:nth-child(n + 10) { animation-delay: 252ms; }
+
+.admin-main table tbody td {
+  transition: background-color 0.22s ease, color 0.22s ease, opacity 0.22s ease;
+}
+
+.admin-main :where(
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"]
+):not(:disabled) {
+  transition: transform var(--admin-motion-fast) var(--admin-motion-ease),
+    background-color var(--admin-motion-fast) ease,
+    border-color var(--admin-motion-fast) ease,
+    color var(--admin-motion-fast) ease,
+    box-shadow var(--admin-motion-fast) ease,
+    opacity var(--admin-motion-fast) ease;
+}
+
+.admin-main :where(
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"]
+):not(:disabled):hover {
+  animation: admin-button-hover 0.26s var(--admin-motion-ease) both;
+}
+
+.admin-main :where(
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"]
+):not(:disabled):active {
+  transform: translateY(0) scale(0.96);
+}
+
+.admin-main :where(button, [role="button"], input, select, textarea):focus-visible,
+.sidebar-nav a:focus-visible,
+.sidebar-toggle:focus-visible,
+.header-menu-btn:focus-visible,
+.header-right .btn-logout:focus-visible {
+  outline: 2px solid rgba(167,139,250,0.92);
+  outline-offset: 3px;
+}
+
+.admin-main :where(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  transition: border-color var(--admin-motion-fast) ease,
+    background-color var(--admin-motion-fast) ease,
+    box-shadow var(--admin-motion-fast) ease,
+    transform var(--admin-motion-fast) var(--admin-motion-ease);
+}
+
+.admin-main :where(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus {
+  animation: admin-field-focus 0.28s var(--admin-motion-ease) both;
+}
+
+.admin-main :where(input[type="checkbox"], input[type="radio"]):not(:disabled) {
+  transition: transform var(--admin-motion-fast) var(--admin-motion-ease),
+    filter var(--admin-motion-fast) ease,
+    box-shadow var(--admin-motion-fast) ease;
+}
+
+.admin-main :where(input[type="checkbox"], input[type="radio"]):not(:disabled):hover {
+  transform: scale(1.1);
+  filter: brightness(1.16);
+}
+
+.admin-main :where(input[type="checkbox"], input[type="radio"]):checked {
+  animation: admin-check-pop 0.34s var(--admin-motion-ease);
+}
+
+.admin-main input[type="range"]:active::-webkit-slider-thumb {
+  animation: admin-range-pop 0.28s var(--admin-motion-ease);
+}
+
+.admin-main :where(
+  [class$="-modal-overlay"],
+  [class*="-modal-overlay "],
+  .pr-overlay,
+  .sf-overlay,
+  .nm-overlay,
+  .cn-modal-overlay
+) {
+  animation: admin-overlay-enter 0.26s ease both;
+}
+
+.admin-main :where(
+  [class$="-modal"],
+  [class*="-modal "],
+  .pr-modal,
+  .sf-modal,
+  .nm-modal,
+  .cn-modal
+) {
+  animation: admin-modal-enter 0.42s var(--admin-motion-ease) both;
+}
+
+.admin-main :where(
+  [class$="-modal-body"],
+  [class*="-modal-body "],
+  .pr-modal-body,
+  .sf-modal-body,
+  .nm-modal-body,
+  .cn-modal-body
+) > * {
+  animation: admin-fade-up 0.4s 70ms var(--admin-motion-ease) both;
+}
+
+.admin-main :where(
+  [class$="-modal-footer"],
+  [class*="-modal-footer "],
+  .pr-modal-footer,
+  .sf-modal-footer,
+  .nm-modal-footer,
+  .cn-modal-footer
+) > * {
+  animation: admin-action-enter 0.34s 110ms var(--admin-motion-ease) both;
+}
+
+.admin-pagination {
+  animation: admin-fade-up 0.38s 120ms var(--admin-motion-ease) both;
+}
+
+.admin-pagination-controls button.active {
+  animation: admin-pagination-active 0.3s var(--admin-motion-ease);
+}
+
+.admin-main :where(
+  .error-message,
+  .error-message-box,
+  .error-banner,
+  [class$="-error-banner"],
+  [class*="-error-banner "],
+  [class$="-alert"],
+  [class*="-alert "]
+) {
+  animation: admin-alert-enter 0.4s var(--admin-motion-ease) both;
+}
+
+@keyframes admin-sidebar-enter {
+  from { opacity: 0; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes admin-header-enter {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes admin-page-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes admin-content-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.994); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes admin-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes admin-fade-down {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes admin-nav-enter {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes admin-nav-active {
+  0% { transform: translateX(-3px) scale(0.98); }
+  60% { transform: translateX(2px) scale(1.01); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+@keyframes admin-card-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes admin-toolbar-enter {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes admin-row-enter {
+  from { opacity: 0; transform: translateX(-7px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes admin-button-hover {
+  from { transform: translateY(0); }
+  to { transform: translateY(-2px); }
+}
+
+@keyframes admin-field-focus {
+  0% { transform: translateY(0); }
+  60% { transform: translateY(-2px); }
+  100% { transform: translateY(-1px); }
+}
+
+@keyframes admin-check-pop {
+  0% { transform: scale(0.76); }
+  58% { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+
+@keyframes admin-range-pop {
+  0% { transform: scale(0.86); }
+  65% { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+
+@keyframes admin-overlay-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes admin-modal-enter {
+  from { opacity: 0; transform: translateY(22px) scale(0.965); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes admin-action-enter {
+  from { opacity: 0; transform: translateY(7px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes admin-pagination-active {
+  0% { transform: scale(0.9); }
+  65% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes admin-alert-enter {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.985); }
+  65% { opacity: 1; transform: translateY(2px) scale(1); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-layout *,
+  .admin-layout *::before,
+  .admin-layout *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

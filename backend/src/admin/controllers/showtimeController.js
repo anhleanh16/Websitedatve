@@ -95,6 +95,8 @@ export const createRecurringShowtime = async (req, res) => {
       room_id, roomId,
       time_slots, timeSlots,
       weekday_slots, weekend_slots,
+      weekday_template, weekdayTemplate,
+      weekend_template, weekendTemplate,
       start_date, startDate,
       end_date, endDate,
       release_date, releaseDate,
@@ -118,6 +120,8 @@ export const createRecurringShowtime = async (req, res) => {
       slotsPerDay,
       early_bias,
       earlyBias,
+      default_priority, defaultPriority,
+      default_slots_per_day, defaultSlotsPerDay,
     } = req.body;
 
     const result = await ShowtimeModel.createRecurring({
@@ -126,6 +130,8 @@ export const createRecurringShowtime = async (req, res) => {
       time_slots:     time_slots ?? timeSlots,
       weekday_slots:  weekday_slots ?? time_slots ?? timeSlots,
       weekend_slots:  weekend_slots ?? weekday_slots ?? time_slots ?? timeSlots,
+      weekday_template: weekday_template ?? weekdayTemplate,
+      weekend_template: weekend_template ?? weekendTemplate,
       start_date:     start_date ?? startDate ?? release_date ?? releaseDate,
       end_date:       end_date   ?? endDate ?? official_end_date ?? officialEndDate,
       release_date:   release_date ?? releaseDate ?? start_date ?? startDate,
@@ -146,6 +152,8 @@ export const createRecurringShowtime = async (req, res) => {
       priority,
       slots_per_day: slots_per_day ?? slotsPerDay,
       early_bias: early_bias ?? earlyBias,
+      default_priority: default_priority ?? defaultPriority,
+      default_slots_per_day: default_slots_per_day ?? defaultSlotsPerDay,
     });
 
     if (result.created.length === 0) {
@@ -244,7 +252,10 @@ export const deleteShowtime = async (req, res) => {
         });
     }
     console.error("Error in deleteShowtime:", err);
-    res.status(500).json({ message: "Failed to delete showtime" });
+    const statusCode = Number(err?.statusCode) || 500;
+    res.status(statusCode).json({
+      message: statusCode >= 500 ? "Failed to delete showtime" : err.message,
+    });
   }
 };
 

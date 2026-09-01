@@ -265,6 +265,84 @@
   .mobile-ai-page { display: none; }
 }
 
+.mobile-ai-page {
+  --mobile-ai-motion-ease: cubic-bezier(.22, 1, .36, 1);
+  animation: mobileAiPageEnter .4s var(--mobile-ai-motion-ease) both;
+}
+
+.mobile-ai-chat-header,
+.mobile-ai-voice-header {
+  animation: mobileAiHeaderEnter .42s var(--mobile-ai-motion-ease) both;
+}
+
+.mobile-ai-message-row {
+  animation: mobileAiMessageEnter .34s var(--mobile-ai-motion-ease) both;
+}
+
+.mobile-ai-message-row.user {
+  animation-name: mobileAiUserMessageEnter;
+}
+
+.mobile-ai-composer,
+.mobile-ai-voice-controls {
+  animation: mobileAiControlsEnter .42s .08s var(--mobile-ai-motion-ease) both;
+}
+
+.mobile-ai-voice-content > h1,
+.mobile-ai-voice-status,
+.mobile-ai-voice-transcript,
+.mobile-ai-voice-answer {
+  animation: mobileAiContentEnter .38s .08s var(--mobile-ai-motion-ease) both;
+}
+
+.mobile-ai-page button:not(:disabled) {
+  transition: transform .18s var(--mobile-ai-motion-ease), background-color .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+
+.mobile-ai-page button:not(:disabled):active {
+  transform: scale(.94);
+}
+
+.mobile-ai-composer-box {
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s var(--mobile-ai-motion-ease);
+}
+
+.mobile-ai-composer-box:focus-within {
+  transform: translateY(-2px);
+  border-color: rgba(139, 92, 246, .65);
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, .1), 0 14px 36px rgba(0, 0, 0, .26);
+}
+
+@keyframes mobileAiPageEnter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mobileAiHeaderEnter {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mobileAiMessageEnter {
+  from { opacity: 0; transform: translateX(-10px) translateY(5px); }
+  to { opacity: 1; transform: translateX(0) translateY(0); }
+}
+
+@keyframes mobileAiUserMessageEnter {
+  from { opacity: 0; transform: translateX(10px) translateY(5px); }
+  to { opacity: 1; transform: translateX(0) translateY(0); }
+}
+
+@keyframes mobileAiControlsEnter {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mobileAiContentEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mobile-ai-page *,
   .mobile-ai-page *::before,

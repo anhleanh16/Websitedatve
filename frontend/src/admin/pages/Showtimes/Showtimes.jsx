@@ -99,15 +99,15 @@ function getConflicts(showtimes, rooms, movies, newSt, excludeId = null) {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** 1. Quản lý Suất chiếu – bảng tổng hợp */
-function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete }) {
+function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, onDeleteMany }) {
   const [search, setSearch]     = useState("");
   const [filterCinema, setFC]   = useState("all");
   const [filterDate, setFD]     = useState("");
   const [filterStatus, setFS]   = useState("all");
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const filtered = showtimes.filter(s => {
     const movie   = movies.find(m => m.id === s.movieId);
-    const room    = rooms.find(r => r.id === s.roomId);
     const cinema  = cinemas.find(c => c.id === s.cinemaId);
     const q = search.toLowerCase();
     const matchQ  = (movie?.title || "").toLowerCase().includes(q) || (cinema?.name || "").toLowerCase().includes(q);
@@ -122,17 +122,63 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete }
     return new Date(a.startTime) - new Date(b.startTime);
   });
   const { page, setPage, totalPages, pageItems } = useAdminPagination(filtered);
+  const selectableShowtimes = filtered.filter((showtime) => showtime.status !== "ended");
+  const selectableIdSet = new Set(selectableShowtimes.map((showtime) => showtime.id));
+  const selectedShowtimes = filtered.filter((showtime) => selectableIdSet.has(showtime.id) && selectedIds.includes(showtime.id));
+  const allFilteredSelected = selectableShowtimes.length > 0 && selectedShowtimes.length === selectableShowtimes.length;
+
+  const resetSelectionAndPage = () => {
+    setSelectedIds([]);
+    setPage(1);
+  };
+
+  const toggleShowtime = (showtime) => {
+    if (showtime.status === "ended") return;
+    setSelectedIds((current) => current.includes(showtime.id)
+      ? current.filter((id) => id !== showtime.id)
+      : [...current, showtime.id]);
+  };
+
+  const toggleAllFiltered = () => {
+    setSelectedIds(allFilteredSelected ? [] : selectableShowtimes.map((showtime) => showtime.id));
+  };
 
   return (
     <div className="sh-section">
       <div className="sh-toolbar">
-        <input className="sh-search" placeholder="Tìm phim, rạp…" value={search} onChange={e => setSearch(e.target.value)} />
-        <select className="sh-select" value={filterCinema} onChange={e => setFC(e.target.value)}>
+        <label className={`sh-select-all${selectableShowtimes.length === 0 ? " disabled" : ""}`}>
+          <input
+            type="checkbox"
+            checked={allFilteredSelected}
+            disabled={selectableShowtimes.length === 0}
+            onChange={toggleAllFiltered}
+          />
+          <span>Chọn tất cả</span>
+        </label>
+        <input
+          className="sh-search"
+          placeholder="Tìm phim, rạp…"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            resetSelectionAndPage();
+          }}
+        />
+        {selectedShowtimes.length > 0 && (
+          <button
+            type="button"
+            className="sh-btn sh-btn-delete sh-bulk-delete"
+            onClick={() => onDeleteMany(selectedShowtimes)}
+          >
+            Xóa đã chọn ({selectedShowtimes.length})
+          </button>
+        )}
+        <select className="sh-select" value={filterCinema} onChange={(event) => { setFC(event.target.value); resetSelectionAndPage(); }}>
           <option value="all">Tất cả rạp</option>
           {cinemas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <input type="date" className="sh-select" value={filterDate} onChange={e => setFD(e.target.value)} />
-        <select className="sh-select" value={filterStatus} onChange={e => setFS(e.target.value)}>
+        <input type="date" className="sh-select" value={filterDate} onChange={(event) => { setFD(event.target.value); resetSelectionAndPage(); }} />
+        <select className="sh-select" value={filterStatus} onChange={(event) => { setFS(event.target.value); resetSelectionAndPage(); }}>
           <option value="all">Tất cả trạng thái</option>
           <option value="active">Đang hoạt động</option>
           <option value="ended">Đã kết thúc</option>
@@ -143,6 +189,7 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete }
         <table>
           <thead>
             <tr>
+              <th className="sh-select-column"><span className="sh-visually-hidden">Chọn</span></th>
               <th>Phim</th>
               <th>Rạp / Phòng</th>
               <th>Loại phòng</th>
@@ -156,15 +203,28 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete }
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={9} style={{ textAlign: "center", color: "#8fa6ff", padding: 32 }}>Không có suất chiếu nào.</td></tr>
+              <tr><td colSpan={10} style={{ textAlign: "center", color: "#8fa6ff", padding: 32 }}>Không có suất chiếu nào.</td></tr>
             ) : pageItems.map(s => {
               const movie  = movies.find(m => m.id === s.movieId);
               const room   = rooms.find(r => r.id === s.roomId);
               const cinema = cinemas.find(c => c.id === s.cinemaId);
               const st     = STATUS_SHOW[s.status] || STATUS_SHOW.active;
               const rtColor = ROOM_TYPE_COLOR[room?.type] || "#8fa6ff";
+              const isEnded = s.status === "ended";
+              const isSelected = !isEnded && selectedIds.includes(s.id);
               return (
-                <tr key={s.id}>
+                <tr key={s.id} className={`${isSelected ? "sh-row-selected" : ""}${isEnded ? " sh-row-ended" : ""}`}>
+                  <td className="sh-select-column">
+                    <input
+                      className="sh-row-checkbox"
+                      type="checkbox"
+                      checked={isSelected}
+                      disabled={isEnded}
+                      title={isEnded ? "Lịch đã kết thúc không thể chọn hoặc xóa" : "Chọn suất chiếu"}
+                      aria-label={isEnded ? `Không thể chọn ${movie?.title || "suất chiếu đã kết thúc"}` : `Chọn ${movie?.title || "suất chiếu"}`}
+                      onChange={() => toggleShowtime(s)}
+                    />
+                  </td>
                   <td><span style={{ color: "#eef4ff", fontWeight: 500 }}>{movie?.title || "—"}</span></td>
                   <td>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -195,7 +255,14 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete }
                   <td>
                     <div className="sh-actions">
                       <button className="sh-btn sh-btn-edit" onClick={() => onEdit(s)}>Sửa</button>
-                      <button className="sh-btn sh-btn-delete" onClick={() => onDelete(s)}>Xóa</button>
+                      <button
+                        className="sh-btn sh-btn-delete"
+                        disabled={isEnded}
+                        title={isEnded ? "Lịch đã kết thúc không thể xóa" : "Xóa suất chiếu"}
+                        onClick={() => onDelete(s)}
+                      >
+                        Xóa
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -433,37 +500,54 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
   );
 }
 
-/** 4a. Tạo lịch chiếu lặp lại theo khung giờ cố định */
-function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
-  const today = new Date().toISOString().slice(0, 10);
+const RECURRING_TEMPLATE_PRESETS = {
+  balanced: { label: "Cân bằng", slots: [{ hour: "09", minute: "00" }, { hour: "12", minute: "00" }, { hour: "15", minute: "00" }, { hour: "18", minute: "00" }, { hour: "21", minute: "00" }] },
+  premium: { label: "Khung giờ cao điểm", slots: [{ hour: "10", minute: "30" }, { hour: "13", minute: "30" }, { hour: "16", minute: "30" }, { hour: "19", minute: "30" }, { hour: "22", minute: "30" }] },
+  weekend: { label: "Cuối tuần tập trung", slots: [{ hour: "08", minute: "30" }, { hour: "11", minute: "00" }, { hour: "14", minute: "00" }, { hour: "17", minute: "30" }, { hour: "20", minute: "30" }] },
+  compact: { label: "Mật độ cao", slots: [{ hour: "10", minute: "00" }, { hour: "13", minute: "30" }, { hour: "17", minute: "00" }, { hour: "20", minute: "30" }] },
+};
 
-  const TEMPLATE_PRESETS = {
-    balanced: { label: "Cân bằng", slots: [{ hour: "09", minute: "00" }, { hour: "12", minute: "00" }, { hour: "15", minute: "00" }, { hour: "18", minute: "00" }, { hour: "21", minute: "00" }] },
-    premium: { label: "Khung giờ cao điểm", slots: [{ hour: "10", minute: "30" }, { hour: "13", minute: "30" }, { hour: "16", minute: "30" }, { hour: "19", minute: "30" }, { hour: "22", minute: "30" }] },
-    weekend: { label: "Cuối tuần tập trung", slots: [{ hour: "08", minute: "30" }, { hour: "11", minute: "00" }, { hour: "14", minute: "00" }, { hour: "17", minute: "30" }, { hour: "20", minute: "30" }] },
-    compact: { label: "Mật độ cao", slots: [{ hour: "10", minute: "00" }, { hour: "13", minute: "30" }, { hour: "17", minute: "00" }, { hour: "20", minute: "30" }] },
-  };
+/** 4a. Tạo lịch chiếu lặp lại theo khung giờ cố định */
+function RecurringForm({ movies, cinemas, onClose, onSave }) {
 
   const [selectedMovieIds, setSelectedMovieIds] = useState([]);
   const [selectedCinemaIds, setSelectedCinemaIds] = useState([]);
-  const [form, setForm] = useState({
-    campaignType: "new_release",
-    campaignReason: "",
-    releaseDate: today,
-    officialEndDate: today,
-    earlyShowEnabled: false,
-    earlyShowDays: 3,
-    earlyShowDurationDays: 7,
-    weekdayTemplate: "balanced",
-    weekendTemplate: "weekend",
-    defaultPriority: 3,
-    defaultSlotsPerDay: 2,
+  const [form, setForm] = useState(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+      campaignType: "new_release",
+      campaignReason: "",
+      releaseDate: today,
+      officialEndDate: today,
+      earlyShowEnabled: false,
+      earlyShowDays: 3,
+      earlyShowDurationDays: 7,
+      weekdayTemplate: "balanced",
+      weekendTemplate: "weekend",
+      defaultPriority: 3,
+      defaultSlotsPerDay: 2,
+    };
   });
   const [errors, setErrors] = useState({});
 
   const set = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
+  };
+
+  const setReleaseDate = (value) => {
+    setForm((prev) => {
+      let officialEndDate = prev.officialEndDate;
+      if (value && (!officialEndDate || officialEndDate < value)) {
+        const end = new Date(value);
+        if (!Number.isNaN(end.getTime())) {
+          end.setDate(end.getDate() + 6);
+          officialEndDate = end.toISOString().slice(0, 10);
+        }
+      }
+      return { ...prev, releaseDate: value, officialEndDate };
+    });
+    setErrors((prev) => ({ ...prev, releaseDate: undefined, officialEndDate: undefined }));
   };
 
   const toggleMovie = (movieId) => {
@@ -480,20 +564,7 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
     });
   };
 
-  const movieConfigs = useMemo(() => {
-    return selectedMovieIds.reduce((acc, movieId) => {
-      acc[movieId] = {
-        priority: form.defaultPriority,
-        slotsPerDay: form.defaultSlotsPerDay,
-        earlyBias: 0,
-        ...acc[movieId],
-      };
-      return acc;
-    }, {});
-  }, [selectedMovieIds, form.defaultPriority, form.defaultSlotsPerDay]);
-
   const updateMovieConfig = (movieId, field, value) => {
-    setSelectedMovieIds((prev) => prev);
     setForm((prev) => ({
       ...prev,
       movieConfig: {
@@ -506,33 +577,19 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
     }));
   };
 
-  const weekdaySlots = TEMPLATE_PRESETS[form.weekdayTemplate]?.slots || TEMPLATE_PRESETS.balanced.slots;
-  const weekendSlots = TEMPLATE_PRESETS[form.weekendTemplate]?.slots || TEMPLATE_PRESETS.weekend.slots;
+  const weekdaySlots = RECURRING_TEMPLATE_PRESETS[form.weekdayTemplate]?.slots || RECURRING_TEMPLATE_PRESETS.balanced.slots;
+  const weekendSlots = RECURRING_TEMPLATE_PRESETS[form.weekendTemplate]?.slots || RECURRING_TEMPLATE_PRESETS.weekend.slots;
 
-  useEffect(() => {
-    if (!form.releaseDate) return;
-    const start = new Date(form.releaseDate);
-    if (Number.isNaN(start.getTime())) return;
-    if (!form.officialEndDate || form.officialEndDate < form.releaseDate) {
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
-      setForm((prev) => ({
-        ...prev,
-        officialEndDate: end.toISOString().slice(0, 10),
-      }));
-    }
-  }, [form.releaseDate, form.officialEndDate]);
-
-  const calcDays = () => {
+  const days = useMemo(() => {
     if (!form.releaseDate || !form.officialEndDate) return 0;
     const start = new Date(form.releaseDate);
     const end = new Date(form.officialEndDate);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
     return Math.floor((end - start) / 86400000) + 1;
-  };
+  }, [form.releaseDate, form.officialEndDate]);
 
   const totalEstimate = useMemo(() => {
-    const dayCount = calcDays();
+    const dayCount = days;
     if (!dayCount || selectedMovieIds.length === 0) return 0;
     return selectedMovieIds.reduce((sum, movieId) => {
       const config = (form.movieConfig && form.movieConfig[movieId]) || {};
@@ -544,7 +601,7 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
       const estimated = dayCount * ((effectiveSlots > weekdayCount ? weekdayCount : effectiveSlots) + (effectiveSlots > weekendCount ? weekendCount : effectiveSlots)) / 2;
       return sum + Math.ceil(estimated);
     }, 0) * selectedCinemaIds.length;
-  }, [calcDays, selectedMovieIds, selectedCinemaIds, form, weekdaySlots, weekendSlots]);
+  }, [days, selectedMovieIds, selectedCinemaIds, form, weekdaySlots, weekendSlots]);
 
   const validate = () => {
     const e = {};
@@ -568,9 +625,9 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
       const config = (form.movieConfig && form.movieConfig[movieId]) || {};
       return {
         movie_id: Number(movieId),
-        priority: Number(config.priority || form.defaultPriority || 1),
-        slots_per_day: Number(config.slotsPerDay || form.defaultSlotsPerDay || 1),
-        early_bias: Number(config.earlyBias || 0),
+        priority: Math.min(5, Math.max(1, Number(config.priority || form.defaultPriority || 1))),
+        slots_per_day: Math.min(8, Math.max(1, Number(config.slotsPerDay || form.defaultSlotsPerDay || 1))),
+        early_bias: Math.min(120, Math.max(0, Number(config.earlyBias || 0))),
       };
     });
 
@@ -590,13 +647,13 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
       end_date: form.officialEndDate,
       weekday_slots: weekdaySlots,
       weekend_slots: weekendSlots,
+      weekday_template: form.weekdayTemplate,
+      weekend_template: form.weekendTemplate,
       weeks: 1,
       default_priority: Number(form.defaultPriority || 1),
       default_slots_per_day: Number(form.defaultSlotsPerDay || 1),
     });
   };
-
-  const days = calcDays();
 
   return (
     <div className="sh-modal-overlay" onClick={onClose}>
@@ -678,7 +735,7 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
                 <div className="sh-field-row">
                   <div className="sh-field">
                     <label>Ngày phát hành *</label>
-                    <input type="date" value={form.releaseDate} onChange={(event) => set("releaseDate", event.target.value)} />
+                    <input type="date" value={form.releaseDate} onChange={(event) => setReleaseDate(event.target.value)} />
                     {errors.releaseDate && <span className="sh-error">{errors.releaseDate}</span>}
                   </div>
                   <div className="sh-field">
@@ -697,9 +754,28 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
                       <option value="special_event">Sự kiện đặc biệt</option>
                     </select>
                   </div>
-                  <div className="sh-field">
-                    <label>Ưu tiên mặc định</label>
-                    <input type="number" min={1} max={5} value={form.defaultPriority} onChange={(event) => set("defaultPriority", Math.min(5, Math.max(1, Number(event.target.value || 1))))} />
+                  <div className="sh-field sh-priority-slider-field">
+                    <div className="sh-priority-slider-label">
+                      <label htmlFor="default-priority">Ưu tiên mặc định</label>
+                      <span>Mức {form.defaultPriority}/5</span>
+                    </div>
+                    <div className={`sh-priority-slider sh-priority-level-${form.defaultPriority}`}>
+                      <input
+                        id="default-priority"
+                        type="range"
+                        min={1}
+                        max={5}
+                        step={1}
+                        value={form.defaultPriority}
+                        aria-label={`Mức ưu tiên mặc định ${form.defaultPriority} trên 5`}
+                        onChange={(event) => set("defaultPriority", Number(event.target.value))}
+                      />
+                      <div className="sh-priority-scale" aria-hidden="true">
+                        <span>Thấp</span>
+                        <span>Trung bình</span>
+                        <span>Rất cao</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -724,7 +800,7 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
                   <div className="sh-field">
                     <label>Khung giờ chiếu chính thức</label>
                     <select value={form.weekdayTemplate} onChange={(event) => set("weekdayTemplate", event.target.value)}>
-                      {Object.entries(TEMPLATE_PRESETS).map(([key, preset]) => (
+                      {Object.entries(RECURRING_TEMPLATE_PRESETS).map(([key, preset]) => (
                         <option key={key} value={key}>{preset.label}</option>
                       ))}
                     </select>
@@ -732,7 +808,7 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
                   <div className="sh-field">
                     <label>Khung giờ cuối tuần</label>
                     <select value={form.weekendTemplate} onChange={(event) => set("weekendTemplate", event.target.value)}>
-                      {Object.entries(TEMPLATE_PRESETS).map(([key, preset]) => (
+                      {Object.entries(RECURRING_TEMPLATE_PRESETS).map(([key, preset]) => (
                         <option key={key} value={key}>{preset.label}</option>
                       ))}
                     </select>
@@ -741,7 +817,14 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
 
                 <div className="sh-field">
                   <label>Suất chiếu / ngày mặc định</label>
-                  <input type="number" min={1} max={8} value={form.defaultSlotsPerDay} onChange={(event) => set("defaultSlotsPerDay", Math.max(1, Number(event.target.value || 1)))} />
+                  <input
+                    type="number"
+                    min={1}
+                    max={8}
+                    value={form.defaultSlotsPerDay}
+                    onChange={(event) => set("defaultSlotsPerDay", event.target.value)}
+                    onBlur={() => set("defaultSlotsPerDay", Math.min(8, Math.max(1, Number(form.defaultSlotsPerDay) || 1)))}
+                  />
                 </div>
               </div>
 
@@ -762,12 +845,26 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
                   <div className="sh-field-row">
                     <div className="sh-field">
                       <label>Bắt đầu sớm bao nhiêu ngày</label>
-                      <input type="number" min={0} max={30} value={form.earlyShowDays} onChange={(event) => set("earlyShowDays", Number(event.target.value || 0))} />
+                      <input
+                        type="number"
+                        min={0}
+                        max={30}
+                        value={form.earlyShowDays}
+                        onChange={(event) => set("earlyShowDays", event.target.value)}
+                        onBlur={() => set("earlyShowDays", Math.min(30, Math.max(0, Number(form.earlyShowDays) || 0)))}
+                      />
                       {errors.earlyShowDays && <span className="sh-error">{errors.earlyShowDays}</span>}
                     </div>
                     <div className="sh-field">
                       <label>Số ngày chiếu sớm</label>
-                      <input type="number" min={1} max={30} value={form.earlyShowDurationDays} onChange={(event) => set("earlyShowDurationDays", Math.max(1, Number(event.target.value || 1)))} />
+                      <input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={form.earlyShowDurationDays}
+                        onChange={(event) => set("earlyShowDurationDays", event.target.value)}
+                        onBlur={() => set("earlyShowDurationDays", Math.min(30, Math.max(1, Number(form.earlyShowDurationDays) || 1)))}
+                      />
                     </div>
                   </div>
                 )}
@@ -794,24 +891,27 @@ function RecurringForm({ rooms, movies, cinemas, onClose, onSave }) {
                             min={1}
                             max={5}
                             title="Mức ưu tiên xếp lịch: phim hot sẽ được ưu tiên phòng, suất và khung giờ tốt hơn"
-                            value={config.priority || form.defaultPriority}
-                            onChange={(event) => updateMovieConfig(movieId, "priority", Number(event.target.value || 1))}
+                            value={config.priority ?? form.defaultPriority}
+                            onChange={(event) => updateMovieConfig(movieId, "priority", event.target.value)}
+                            onBlur={() => updateMovieConfig(movieId, "priority", Math.min(5, Math.max(1, Number(config.priority) || Number(form.defaultPriority) || 1)))}
                           />
                           <input
                             type="number"
                             min={1}
-                            max={6}
+                            max={8}
                             title="Số suất chiếu mỗi ngày để phân bổ lịch cho phim này"
-                            value={config.slotsPerDay || form.defaultSlotsPerDay}
-                            onChange={(event) => updateMovieConfig(movieId, "slotsPerDay", Number(event.target.value || 1))}
+                            value={config.slotsPerDay ?? form.defaultSlotsPerDay}
+                            onChange={(event) => updateMovieConfig(movieId, "slotsPerDay", event.target.value)}
+                            onBlur={() => updateMovieConfig(movieId, "slotsPerDay", Math.min(8, Math.max(1, Number(config.slotsPerDay) || Number(form.defaultSlotsPerDay) || 1)))}
                           />
                           <input
                             type="number"
                             min={0}
                             max={120}
                             title="Đẩy khung giờ chiếu sớm theo phút để phim bắt đầu sớm hơn khi có suất chiếu sớm"
-                            value={config.earlyBias || 0}
-                            onChange={(event) => updateMovieConfig(movieId, "earlyBias", Number(event.target.value || 0))}
+                            value={config.earlyBias ?? 0}
+                            onChange={(event) => updateMovieConfig(movieId, "earlyBias", event.target.value)}
+                            onBlur={() => updateMovieConfig(movieId, "earlyBias", Math.min(120, Math.max(0, Number(config.earlyBias) || 0)))}
                           />
                         </div>
                       );
@@ -897,7 +997,7 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
     const room = rooms.find(r => r.id === Number(form.roomId));
     onSave({
       ...(showtime || {}),
-      id: showtime?.id || Date.now(),
+      id: showtime?.id,
       movieId: Number(form.movieId),
       cinemaId: Number(form.cinemaId),
       roomId: Number(form.roomId),
@@ -1155,7 +1255,10 @@ export default function AdminShowtimes() {
     }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(fetchAll, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchAll]);
 
   // ── Handlers ──
   const handleSave = async (data) => {
@@ -1198,6 +1301,15 @@ export default function AdminShowtimes() {
         end_date: data.end_date || data.endDate,
         weekday_slots: data.weekday_slots || data.timeSlots,
         weekend_slots: data.weekend_slots || data.timeSlots,
+        weekday_template: data.weekday_template,
+        weekend_template: data.weekend_template,
+        campaign_type: data.campaign_type,
+        campaign_reason: data.campaign_reason,
+        release_date: data.release_date,
+        official_end_date: data.official_end_date,
+        early_show_enabled: data.early_show_enabled,
+        early_show_days: data.early_show_days,
+        early_show_duration_days: data.early_show_duration_days,
         weeks: data.weeks,
         default_priority: data.default_priority,
         default_slots_per_day: data.default_slots_per_day,
@@ -1218,17 +1330,40 @@ export default function AdminShowtimes() {
   };
 
   const handleDelete = (s) => setConfirmTarget({ type: "delete", data: s });
+  const handleDeleteMany = (items) => {
+    const deletableItems = items.filter((item) => item.status !== "ended");
+    if (deletableItems.length > 0) {
+      setConfirmTarget({ type: "delete-many", data: deletableItems });
+    }
+  };
 
   const handleConfirm = async () => {
-    const { data } = confirmTarget;
+    const { type, data } = confirmTarget;
     try {
-      await adminShowtimeService.delete(data.id);
-      showToast("Đã xóa suất chiếu.");
+      if (type === "delete-many") {
+        const results = await Promise.allSettled(
+          data.map((showtime) => adminShowtimeService.delete(showtime.id)),
+        );
+        const deletedCount = results.filter((result) => result.status === "fulfilled").length;
+        const failedCount = results.length - deletedCount;
+
+        if (deletedCount > 0 && failedCount === 0) {
+          showToast(`Đã xóa ${deletedCount} suất chiếu.`);
+        } else if (deletedCount > 0) {
+          showToast(`Đã xóa ${deletedCount} suất chiếu, ${failedCount} suất không thể xóa do đã có vé hoặc không còn hợp lệ.`);
+        } else {
+          showToast("Không thể xóa các suất chiếu đã chọn vì đã có vé hoặc không còn hợp lệ.");
+        }
+      } else {
+        await adminShowtimeService.delete(data.id);
+        showToast("Đã xóa suất chiếu.");
+      }
       await fetchAll();
     } catch (err) {
-      const msg = err.message?.includes('400')
+      const rawMessage = err?.message || "";
+      const msg = rawMessage.includes("associated bookings")
         ? "Không thể xóa: suất chiếu đã có vé đặt."
-        : "Lỗi thực hiện. Vui lòng thử lại.";
+        : rawMessage || "Lỗi thực hiện. Vui lòng thử lại.";
       showToast(msg);
     }
     setConfirmTarget(null);
@@ -1302,6 +1437,7 @@ export default function AdminShowtimes() {
               showtimes={showtimes} rooms={rooms} movies={movies} cinemas={cinemas}
               onEdit={s => setEditSt(s)}
               onDelete={handleDelete}
+              onDeleteMany={handleDeleteMany}
             />
           )}
           {activeTab === "allocation" && (
@@ -1316,7 +1452,6 @@ export default function AdminShowtimes() {
       {/* Modals */}
       {showRecurring && (
         <RecurringForm
-          rooms={rooms}
           movies={movies}
           cinemas={cinemas}
           onClose={() => setShowRecurring(false)}
@@ -1337,7 +1472,9 @@ export default function AdminShowtimes() {
       {confirmTarget && (
         <Confirm
           title="Xác nhận xóa"
-          message="Xóa suất chiếu này? Dữ liệu sẽ bị xóa vĩnh viễn."
+          message={confirmTarget.type === "delete-many"
+            ? `Xóa ${confirmTarget.data.length} suất chiếu đã chọn? Dữ liệu sẽ bị xóa vĩnh viễn.`
+            : "Xóa suất chiếu này? Dữ liệu sẽ bị xóa vĩnh viễn."}
           danger
           onClose={() => setConfirmTarget(null)}
           onConfirm={handleConfirm}

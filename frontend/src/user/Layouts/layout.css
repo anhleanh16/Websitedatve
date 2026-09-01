@@ -207,3 +207,524 @@
     padding-inline: 14px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   SHARED USER MOTION SYSTEM
+   Áp dụng thống nhất cho toàn bộ trang nằm trong UserLayout.
+═══════════════════════════════════════════════════════════════ */
+.user-layout {
+  --user-motion-fast: 180ms;
+  --user-motion-normal: 360ms;
+  --user-motion-slow: 540ms;
+  --user-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.navbar-container {
+  animation: user-navbar-enter 0.5s var(--user-motion-ease) both;
+}
+
+.nav-logo {
+  animation: user-logo-enter 0.48s 60ms var(--user-motion-ease) both;
+}
+
+.nav-links > li {
+  animation: user-nav-item-enter 0.38s var(--user-motion-ease) both;
+}
+
+.nav-links > li:nth-child(1) { animation-delay: 70ms; }
+.nav-links > li:nth-child(2) { animation-delay: 110ms; }
+.nav-links > li:nth-child(3) { animation-delay: 150ms; }
+.nav-links > li:nth-child(4) { animation-delay: 190ms; }
+.nav-links > li:nth-child(5) { animation-delay: 230ms; }
+.nav-links > li:nth-child(n + 6) { animation-delay: 270ms; }
+
+.nav-right > *:not(.email-link-alert) {
+  animation: user-nav-action-enter 0.38s 170ms var(--user-motion-ease) both;
+}
+
+.nav-link,
+.nav-admin-btn,
+.region-btn,
+.search-toggle,
+.nav-icon-btn,
+.account-btn,
+.hamburger,
+.mobile-link,
+.mobile-auth-btn {
+  transition: color var(--user-motion-fast) ease,
+    background-color var(--user-motion-fast) ease,
+    border-color var(--user-motion-fast) ease,
+    transform var(--user-motion-fast) var(--user-motion-ease),
+    box-shadow var(--user-motion-fast) ease,
+    opacity var(--user-motion-fast) ease;
+}
+
+.nav-link:hover,
+.nav-admin-btn:hover,
+.region-btn:hover,
+.search-toggle:hover,
+.nav-icon-btn:hover,
+.account-btn:hover {
+  transform: translateY(-2px);
+}
+
+.nav-link:active,
+.nav-admin-btn:active,
+.region-btn:active,
+.search-toggle:active,
+.nav-icon-btn:active,
+.account-btn:active,
+.hamburger:active,
+.mobile-link:active,
+.mobile-auth-btn:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.nav-link.active {
+  animation: user-nav-active 0.36s var(--user-motion-ease);
+}
+
+.main-content {
+  animation: user-page-fade 0.34s ease both;
+}
+
+.main-content > * {
+  animation: user-page-enter 0.52s var(--user-motion-ease) both;
+}
+
+.main-content :where(
+  [class$='-page-header'],
+  [class*='-page-header '],
+  [class$='-detail-header'],
+  [class*='-detail-header '],
+  .booking-header,
+  .movie-detail-header,
+  .auth-header,
+  .sec-header,
+  .rewards-header,
+  .notif-page-header,
+  .pc-header
+) {
+  animation: user-fade-up 0.46s var(--user-motion-ease) both;
+}
+
+.main-content :where(
+  [class$='-section'],
+  [class*='-section '],
+  .schedule-main,
+  .booking-layout,
+  .film-main,
+  .cinema-main,
+  .news-main,
+  .blog-main,
+  .profile-content,
+  .payment-container
+) {
+  animation: user-section-enter 0.48s var(--user-motion-ease) both;
+}
+
+.main-content :where(
+  .movie-grid,
+  .movies-grid,
+  .news-grid,
+  .blog-grid,
+  .home-blog-grid,
+  .overview-grid,
+  .rewards-grid,
+  .vouchers-grid,
+  .benefits-grid,
+  .cinema-list,
+  .room-list,
+  .notif-list,
+  .support-grid,
+  .showtime-grid-blocks
+) > * {
+  animation: user-card-enter 0.46s var(--user-motion-ease) both;
+}
+
+.main-content :where(
+  .movie-grid,
+  .movies-grid,
+  .news-grid,
+  .blog-grid,
+  .home-blog-grid,
+  .overview-grid,
+  .rewards-grid,
+  .vouchers-grid,
+  .benefits-grid,
+  .cinema-list,
+  .room-list,
+  .notif-list,
+  .support-grid,
+  .showtime-grid-blocks
+) > *:nth-child(2) { animation-delay: 45ms; }
+
+.main-content :where(
+  .movie-grid,
+  .movies-grid,
+  .news-grid,
+  .blog-grid,
+  .home-blog-grid,
+  .overview-grid,
+  .rewards-grid,
+  .vouchers-grid,
+  .benefits-grid,
+  .cinema-list,
+  .room-list,
+  .notif-list,
+  .support-grid,
+  .showtime-grid-blocks
+) > *:nth-child(3) { animation-delay: 90ms; }
+
+.main-content :where(
+  .movie-grid,
+  .movies-grid,
+  .news-grid,
+  .blog-grid,
+  .home-blog-grid,
+  .overview-grid,
+  .rewards-grid,
+  .vouchers-grid,
+  .benefits-grid,
+  .cinema-list,
+  .room-list,
+  .notif-list,
+  .support-grid,
+  .showtime-grid-blocks
+) > *:nth-child(4) { animation-delay: 135ms; }
+
+.main-content :where(
+  .movie-grid,
+  .movies-grid,
+  .news-grid,
+  .blog-grid,
+  .home-blog-grid,
+  .overview-grid,
+  .rewards-grid,
+  .vouchers-grid,
+  .benefits-grid,
+  .cinema-list,
+  .room-list,
+  .notif-list,
+  .support-grid,
+  .showtime-grid-blocks
+) > *:nth-child(n + 5) { animation-delay: 180ms; }
+
+.main-content :where(
+  [class$='-card'],
+  [class*='-card '],
+  .card-glass,
+  .auth-card,
+  .summary-card,
+  .points-card,
+  .pc-section
+) {
+  animation: user-card-enter 0.46s var(--user-motion-ease) both;
+  transition: transform 0.24s var(--user-motion-ease),
+    border-color 0.24s ease,
+    background-color 0.24s ease,
+    box-shadow 0.24s ease,
+    opacity 0.24s ease;
+}
+
+.main-content :where(
+  .movie-card,
+  .news-card,
+  .blog-card,
+  .home-blog-card,
+  .cinema-card,
+  .room-card,
+  .reward-card,
+  .voucher-card,
+  .benefit-card,
+  .notif-card,
+  .setting-card,
+  .suggest-card
+):hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.28);
+}
+
+.main-content :where(
+  [class$='-toolbar'],
+  [class*='-toolbar '],
+  [class$='-filters'],
+  [class*='-filters '],
+  .filter-controls,
+  .filter-row,
+  .tabs,
+  [class$='-tabs'],
+  [class*='-tabs ']
+) {
+  animation: user-toolbar-enter 0.42s 60ms var(--user-motion-ease) both;
+}
+
+.main-content :where(
+  button,
+  [role='button'],
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'],
+  a[class*='btn'],
+  a[class*='button']
+):not(:disabled) {
+  transition: transform var(--user-motion-fast) var(--user-motion-ease),
+    background-color var(--user-motion-fast) ease,
+    border-color var(--user-motion-fast) ease,
+    color var(--user-motion-fast) ease,
+    box-shadow var(--user-motion-fast) ease,
+    opacity var(--user-motion-fast) ease;
+}
+
+.main-content :where(
+  button,
+  [role='button'],
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'],
+  a[class*='btn'],
+  a[class*='button']
+):not(:disabled):hover {
+  animation: user-button-hover 0.26s var(--user-motion-ease) both;
+}
+
+.main-content :where(
+  button,
+  [role='button'],
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'],
+  a[class*='btn'],
+  a[class*='button']
+):not(:disabled):active {
+  transform: translateY(0) scale(0.96);
+}
+
+.user-layout :where(button, [role='button'], a, input, select, textarea):focus-visible {
+  outline: 2px solid rgba(167, 139, 250, 0.95);
+  outline-offset: 3px;
+}
+
+.main-content :where(input, select, textarea):not([type='checkbox']):not([type='radio']):not([type='range']) {
+  transition: transform var(--user-motion-fast) var(--user-motion-ease),
+    border-color var(--user-motion-fast) ease,
+    background-color var(--user-motion-fast) ease,
+    box-shadow var(--user-motion-fast) ease;
+}
+
+.main-content :where(input, select, textarea):not([type='checkbox']):not([type='radio']):not([type='range']):focus {
+  animation: user-field-focus 0.28s var(--user-motion-ease) both;
+}
+
+.main-content :where(input[type='checkbox'], input[type='radio']):not(:disabled) {
+  transition: transform var(--user-motion-fast) var(--user-motion-ease),
+    filter var(--user-motion-fast) ease,
+    box-shadow var(--user-motion-fast) ease;
+}
+
+.main-content :where(input[type='checkbox'], input[type='radio']):not(:disabled):hover {
+  transform: scale(1.1);
+  filter: brightness(1.16);
+}
+
+.main-content :where(input[type='checkbox'], input[type='radio']):checked {
+  animation: user-check-pop 0.34s var(--user-motion-ease);
+}
+
+.main-content input[type='range']:active::-webkit-slider-thumb {
+  animation: user-range-pop 0.28s var(--user-motion-ease);
+}
+
+.main-content table tbody tr,
+.main-content :where(.history-list, .tickets-list, .notifs-list, .detail-list) > * {
+  animation: user-row-enter 0.36s var(--user-motion-ease) both;
+}
+
+.main-content table tbody tr:nth-child(2),
+.main-content :where(.history-list, .tickets-list, .notifs-list, .detail-list) > *:nth-child(2) { animation-delay: 35ms; }
+
+.main-content table tbody tr:nth-child(3),
+.main-content :where(.history-list, .tickets-list, .notifs-list, .detail-list) > *:nth-child(3) { animation-delay: 70ms; }
+
+.main-content table tbody tr:nth-child(4),
+.main-content :where(.history-list, .tickets-list, .notifs-list, .detail-list) > *:nth-child(4) { animation-delay: 105ms; }
+
+.main-content table tbody tr:nth-child(n + 5),
+.main-content :where(.history-list, .tickets-list, .notifs-list, .detail-list) > *:nth-child(n + 5) { animation-delay: 140ms; }
+
+.main-content :where(
+  [class$='-modal-overlay'],
+  [class*='-modal-overlay '],
+  .booking-age-overlay,
+  .booking-alert-overlay,
+  .movie-age-overlay,
+  .trailer-modal-overlay,
+  .redeem-modal-overlay,
+  .qr-modal-overlay
+) {
+  animation: user-overlay-enter 0.25s ease both;
+}
+
+.main-content :where(
+  [class$='-modal'],
+  [class*='-modal '],
+  .trailer-modal-content,
+  .redeem-modal-card,
+  .qr-modal
+) {
+  animation: user-modal-enter 0.42s var(--user-motion-ease) both;
+}
+
+.main-content :where(
+  [class$='-modal-actions'],
+  [class*='-modal-actions '],
+  [class$='-modal-footer'],
+  [class*='-modal-footer ']
+) > * {
+  animation: user-action-enter 0.34s 90ms var(--user-motion-ease) both;
+}
+
+.main-content :where(
+  .error-message,
+  .error-banner,
+  [class$='-alert'],
+  [class*='-alert '],
+  [class$='-error'],
+  [class*='-error ']
+) {
+  animation: user-alert-enter 0.4s var(--user-motion-ease) both;
+}
+
+.footer {
+  animation: user-footer-enter 0.5s var(--user-motion-ease) both;
+}
+
+.footer-col {
+  animation: user-fade-up 0.44s var(--user-motion-ease) both;
+}
+
+.footer-col:nth-child(2) { animation-delay: 55ms; }
+.footer-col:nth-child(3) { animation-delay: 110ms; }
+.footer-col:nth-child(4) { animation-delay: 165ms; }
+
+@keyframes user-navbar-enter {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes user-logo-enter {
+  from { opacity: 0; transform: translateX(-10px) scale(0.92); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes user-nav-item-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes user-nav-action-enter {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes user-nav-active {
+  0% { transform: translateY(2px) scale(0.97); }
+  60% { transform: translateY(-1px) scale(1.015); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes user-page-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes user-page-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes user-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes user-section-enter {
+  from { opacity: 0; transform: translateY(13px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes user-card-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes user-toolbar-enter {
+  from { opacity: 0; transform: translateX(-9px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes user-button-hover {
+  from { transform: translateY(0); }
+  to { transform: translateY(-2px); }
+}
+
+@keyframes user-field-focus {
+  0% { transform: translateY(0); }
+  60% { transform: translateY(-2px); }
+  100% { transform: translateY(-1px); }
+}
+
+@keyframes user-check-pop {
+  0% { transform: scale(0.76); }
+  58% { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+
+@keyframes user-range-pop {
+  0% { transform: scale(0.86); }
+  65% { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+
+@keyframes user-row-enter {
+  from { opacity: 0; transform: translateX(-7px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes user-overlay-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes user-modal-enter {
+  from { opacity: 0; transform: translateY(22px) scale(0.965); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes user-action-enter {
+  from { opacity: 0; transform: translateY(7px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes user-alert-enter {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.985); }
+  65% { opacity: 1; transform: translateY(2px) scale(1); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes user-footer-enter {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-layout *,
+  .user-layout *::before,
+  .user-layout *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
