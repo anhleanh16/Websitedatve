@@ -55,6 +55,7 @@ function mapBookingFromApi(item) {
     id: String(item?.booking_id || item?.id || `B${Date.now()}`),
     orderId: String(item?.booking_id || item?.order_id || item?.id || ""),
     user: item?.full_name || item?.user || "Khách hàng",
+    customerType: item?.customer_type || item?.customerType || "account",
     email: item?.email || "",
     phone: item?.phone || item?.phone_number || "",
     movie: item?.movie_title || item?.movie || "",
@@ -68,7 +69,7 @@ function mapBookingFromApi(item) {
     paymentStatus: item?.payment_status || "pending",
     status: item?.status || "pending",
     bookingCode: item?.booking_code || "",
-    qrCode: item?.primary_qr_code || item?.booking_code || "",
+    qrCode: "",
     qrCodes: Array.isArray(item?.qr_codes) ? item.qr_codes.filter(Boolean) : [],
     combos: Array.isArray(item?.combos) ? item.combos : [],
     checkInTime: item?.check_in_time ? new Date(item.check_in_time).toLocaleString("vi-VN") : null,
@@ -158,7 +159,7 @@ function BookingList({ bookings, onView, onCheck }) {
                     <td>
                       <div className="bk-user-cell">
                         <strong>{b.user}</strong>
-                        <span>{b.phone}</span>
+                        <span>{b.phone}{b.customerType === "guest" ? " · Khách vãng lai" : ""}</span>
                       </div>
                     </td>
                     <td>{b.movie}</td>
@@ -177,8 +178,8 @@ function BookingList({ bookings, onView, onCheck }) {
                           Chi tiết
                         </button>
                         {b.status === "confirmed" && (
-                          <button className="bk-btn bk-btn-check" onClick={() => onCheck(b)} title="Kiểm tra vé">
-                            Kiểm tra
+                          <button className="bk-btn bk-btn-check" onClick={() => onCheck(b)} title={b.customerType === "guest" ? "Hoàn thành vé" : "Kiểm tra vé"}>
+                            {b.customerType === "guest" ? "Hoàn thành" : "Kiểm tra"}
                           </button>
                         )}
                       </div>
@@ -234,6 +235,7 @@ function BookingDetail({ booking, onClose, onCheck }) {
             {/* Khách hàng */}
             <div className="bk-detail-card">
               <h4>Thông tin khách hàng</h4>
+              <div className="bk-detail-row"><span>Loại khách</span><strong>{booking.customerType === "guest" ? "Khách vãng lai" : "Có tài khoản"}</strong></div>
               <div className="bk-detail-row"><span>Họ tên</span><strong>{booking.user}</strong></div>
               <div className="bk-detail-row"><span>Email</span><strong>{booking.email}</strong></div>
               <div className="bk-detail-row"><span>Điện thoại</span><strong>{booking.phone}</strong></div>
@@ -260,20 +262,6 @@ function BookingDetail({ booking, onClose, onCheck }) {
               <div className="bk-detail-row"><span>Ngày đặt</span><strong>{booking.createdAt}</strong></div>
             </div>
 
-            {/* QR Code */}
-            <div className="bk-detail-card bk-qr-card">
-              <h4>Mã QR vé</h4>
-              <div className="bk-qr-box">
-                <div className="bk-qr-real">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(booking.qrCode)}&bgcolor=ffffff&color=1a1a2e&margin=2`}
-                    alt="QR vé"
-                    className="bk-qr-img"
-                  />
-                </div>
-                <p className="bk-qr-label">{booking.qrCode}</p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -281,10 +269,10 @@ function BookingDetail({ booking, onClose, onCheck }) {
         <div className="bk-modal-footer">
           {booking.status === "confirmed" && (
             <button className="bk-btn bk-btn-check bk-btn-lg" onClick={() => onCheck(booking)}>
-              Kiểm tra vé
+              {booking.customerType === "guest" ? "Đánh dấu hoàn thành" : "Kiểm tra vé"}
             </button>
           )}
-          {booking.checkInTime && (
+          {(booking.checkInTime || booking.customerType === "guest" || booking.status === "completed") && (
             <button className="bk-btn bk-btn-view bk-btn-lg" onClick={() => printTicketPdf(booking)}>
               In vé / Lưu PDF
             </button>
@@ -318,19 +306,18 @@ function CheckModal({ booking, onClose, onConfirm }) {
 
   if (!booking) return null;
 
-  const verifyCode = (value) => {
+  const verifyCode = async (value) => {
     const normalizedCode = String(value || "").trim().toUpperCase();
-    const isValid =
-      normalizedCode === String(booking.bookingCode || "").toUpperCase() ||
-      normalizedCode === String(booking.qrCode || "").toUpperCase();
-
-    setCheckResult({
-      valid: isValid,
-      alreadyUsed: Boolean(booking.checkInTime),
-    });
+    if (!normalizedCode) return;
+    try {
+      const response = await adminBookingService.verifyCode(normalizedCode);
+      const verifiedBooking = response?.booking || response;
+      const isValid = String(verifiedBooking?.booking_id || verifiedBooking?.order_id) === String(booking.orderId || booking.id);
+      setCheckResult({ valid: isValid, alreadyUsed: Boolean(verifiedBooking?.check_in_time || booking.checkInTime) });
+    } catch {
+      setCheckResult({ valid: false, alreadyUsed: false });
+    }
   };
-
-  const handleVerify = () => verifyCode(code);
 
   const stopScanner = () => {
     scanCancelledRef.current = true;
@@ -384,7 +371,7 @@ function CheckModal({ booking, onClose, onConfirm }) {
 
           scanResolvedRef.current = true;
           setCode(scannedCode);
-          verifyCode(scannedCode);
+          void verifyCode(scannedCode);
           activeControls.stop();
           scannerControlsRef.current = null;
           stopCameraStream(videoRef.current);
@@ -410,19 +397,23 @@ function CheckModal({ booking, onClose, onConfirm }) {
   };
 
   const handleCheckIn = () => {
-    onConfirm(booking);
+    onConfirm({ ...booking, scannedQrToken: code, qrCode: code, qrCodes: [code] });
+  };
+
+  const handleGuestDirectCheckIn = () => {
+    onConfirm({ ...booking, scannedQrToken: "", qrCode: "", qrCodes: [] });
   };
 
   const st = STATUS_MAP[booking.status] || { label: booking.status, cls: "pending" };
   const isCheckedIn = Boolean(booking.checkInTime);
+  const isGuestBooking = booking.customerType === "guest";
 
   return (
     <div className="bk-modal-overlay" onClick={handleClose}>
       <div className="bk-modal bk-modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="bk-modal-header">
           <div>
-            <h2>Kiểm tra vé</h2>
-            <span className="bk-booking-code">{booking.bookingCode}</span>
+            <h2>{isGuestBooking ? "Hoàn thành vé khách vãng lai" : "Kiểm tra vé"}</h2>
           </div>
           <button className="bk-modal-close" onClick={handleClose}>✕</button>
         </div>
@@ -446,22 +437,18 @@ function CheckModal({ booking, onClose, onConfirm }) {
             )}
           </div>
 
-          {/* Nhập mã kiểm tra */}
-          {!isCheckedIn && (
+          {/* Riêng khách vãng lai */}
+          {isGuestBooking && !isCheckedIn && (
+            <div className="bk-check-result valid" style={{ marginTop: 20 }}>
+              ℹ️ Vé khách vãng lai: không cần quét QR. Nhấn nút bên dưới để hoàn thành.
+            </div>
+          )}
+
+          {/* Chỉ quét QR để kiểm tra (tài khoản thường) */}
+          {!isGuestBooking && !isCheckedIn && (
             <div className="field-group" style={{ marginTop: 18 }}>
-              <label>Nhập mã vé hoặc quét QR</label>
+              <label>Quét mã QR vé</label>
               <div className="bk-check-input-row">
-                <input
-                  className="bk-search"
-                  style={{ flex: 1 }}
-                  placeholder="Mã vé hoặc mã QR…"
-                  value={code}
-                  onChange={(e) => { setCode(e.target.value); setCheckResult(null); }}
-                  onKeyDown={(e) => e.key === "Enter" && handleVerify()}
-                />
-                <button className="bk-btn bk-btn-view" onClick={handleVerify}>
-                  Xác minh
-                </button>
                 <button
                   type="button"
                   className="bk-btn bk-btn-scan"
@@ -492,7 +479,7 @@ function CheckModal({ booking, onClose, onConfirm }) {
               {checkResult.alreadyUsed ? (
                 <>⚠️ Vé này đã được sử dụng vào lúc <strong>{booking.checkInTime}</strong>.</>
               ) : checkResult.valid ? (
-                <>✓ Vé hợp lệ! Có thể tiến hành check-in.</>
+                <>✓ QR hợp lệ: <strong>{code}</strong>. Có thể tiến hành check-in.</>
               ) : (
                 <>✗ Mã không khớp. Vui lòng kiểm tra lại.</>
               )}
@@ -501,7 +488,12 @@ function CheckModal({ booking, onClose, onConfirm }) {
         </div>
 
         <div className="bk-modal-footer">
-          {checkResult?.valid && !checkResult?.alreadyUsed && !isCheckedIn && (
+          {isGuestBooking && !isCheckedIn && (
+            <button className="bk-btn bk-btn-check bk-btn-lg" onClick={handleGuestDirectCheckIn}>
+              Xác nhận hoàn thành vé
+            </button>
+          )}
+          {!isGuestBooking && checkResult?.valid && !checkResult?.alreadyUsed && !isCheckedIn && (
             <button className="bk-btn bk-btn-check bk-btn-lg" onClick={handleCheckIn}>
               Xác nhận Check-in
             </button>
@@ -585,7 +577,7 @@ export default function AdminBookings() {
   // Xác nhận check-in
   const handleConfirmCheckIn = async (booking) => {
     try {
-      const res = await adminBookingService.checkInBooking(booking.orderId || booking.id);
+      const res = await adminBookingService.checkInBooking(booking.orderId || booking.id, { qrToken: booking.scannedQrToken });
       const updatedBooking = res?.booking ? mapBookingFromApi(res.booking) : {
         ...booking,
         status: "completed",
@@ -598,7 +590,7 @@ export default function AdminBookings() {
             : b
         )
       );
-      showToast(`Check-in vé ${booking.bookingCode} thành công!`, "success");
+      showToast("Check-in vé thành công!", "success");
       setSelectedBooking(updatedBooking);
     } catch (error) {
       console.error("Check-in failed", error);
@@ -689,9 +681,10 @@ export default function AdminBookings() {
             const newItem = {
               id: `B${Date.now()}`,
               orderId: `ORD_${Date.now()}`,
-              user: b.full_name || (r?.new_user?.full_name) || "Khách hàng",
-              email: b.email || r?.new_user?.email || "",
-              phone: b.phone || r?.new_user?.phone || "",
+              user: b.full_name || r?.new_user?.full_name || r?.guest_customer?.full_name || "Khách hàng",
+              customerType: b.customer_type || (r?.guest_customer ? "guest" : "account"),
+              email: b.email || r?.new_user?.email || r?.guest_customer?.email || "",
+              phone: b.phone || b.phone_number || r?.new_user?.phone || r?.guest_customer?.phone || "",
               movie: b.movie_title || "",
               cinema: b.cinema_name || "",
               room: b.room_name || "",

@@ -5,22 +5,38 @@ import { setUser } from './redux/slices/userSlice'
 import store from './redux/store'
 import { clearStoredSession, getValidStoredToken, parseJwt } from './utils/auth'
 
-// Khôi phục session từ localStorage khi tải lại trang
-const token = getValidStoredToken()
-if (token) {
-  const payload = parseJwt(token)
-  if (payload?.userId) {
-    const savedUser = localStorage.getItem('user')
-    const user = savedUser ? JSON.parse(savedUser) : {
-      id:    payload.userId,
-      name:  payload.name  || '',
-      email: payload.email || '',
-      role:  String(payload.role || 'user').toLowerCase(),
+try {
+  const token = getValidStoredToken()
+  if (token) {
+    const payload = parseJwt(token)
+    if (payload?.userId) {
+      const savedUser = localStorage.getItem('user')
+      let user = {
+        id:    payload.userId,
+        name:  payload.name  || '',
+        email: payload.email || '',
+        role:  String(payload.role || 'user').toLowerCase(),
+      }
+      if (savedUser) {
+        try {
+          user = JSON.parse(savedUser)
+        } catch {
+          try { localStorage.removeItem('user') } catch {}
+        }
+      }
+      try {
+        store.dispatch(setUser({ token, user }))
+      } catch (_dispatchErr) {}
     }
-    store.dispatch(setUser({ token, user }))
+  } else {
+    try { clearStoredSession() } catch {}
   }
-} else {
-  clearStoredSession()
+} catch (_topErr) {
+  try { clearStoredSession() } catch {}
+  try {
+    localStorage.removeItem('user')
+    localStorage.removeItem('token')
+  } catch {}
 }
 
 function App() {

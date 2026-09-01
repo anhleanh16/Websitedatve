@@ -2,6 +2,7 @@ import { BookingModel } from "../models/bookingModel.js";
 import bcrypt from "bcryptjs";
 import { BIRTH_DATE_ERROR, isValidBirthDate } from "../../utils/birthDate.js";
 import { db } from "../../../config/db.js";
+import { sendTicketQrEmail } from "../../user/services/ticketEmailService.js";
 import {
   emailExists,
   getRoleIdByName,
@@ -22,6 +23,7 @@ export const staffCreateBooking = async (req, res) => {
       mode = "existing_user",
       user_id,
       new_user,
+      guest_customer,
       showtimeId,
       showtime_id,
       seatUnits,
@@ -49,6 +51,27 @@ export const staffCreateBooking = async (req, res) => {
 
     let finalUserId = Number(user_id || 0);
     let newUserCreated = null;
+    let guestCustomer = null;
+
+    if (mode === "guest") {
+      const info = guest_customer || {};
+      const full_name = String(info.full_name || "").trim();
+      const phone = String(info.phone || "").trim();
+      const email = String(info.email || "").trim();
+
+      if (!full_name) {
+        return res.status(400).json({ message: "Vui lòng nhập họ tên khách vãng lai." });
+      }
+      if (!phone) {
+        return res.status(400).json({ message: "Vui lòng nhập số điện thoại khách vãng lai." });
+      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ message: "Email không hợp lệ." });
+      }
+
+      finalUserId = 0;
+      guestCustomer = { full_name, phone, email: email || null };
+    }
 
     if (mode === "new_user") {
       const info = new_user || {};
@@ -110,22 +133,32 @@ export const staffCreateBooking = async (req, res) => {
       };
     }
 
-    if (!finalUserId || finalUserId <= 0) {
+    if (mode !== "guest" && (!finalUserId || finalUserId <= 0)) {
       return res.status(400).json({ message: "Chưa xác định được khách hàng." });
     }
 
     const bookingResult = await BookingModel.createUserBooking({
-      userId: finalUserId,
+      userId: finalUserId || null,
+      guestCustomer,
       showtimeId: normalizedShowtimeId,
       seatUnits: normalizedSeatUnits,
       foodItems: normalizedFoodItems,
       paymentMethod: finalPaymentMethod,
     });
 
+    if (mode !== 'guest' && bookingResult?.payment_status === 'paid') {
+      try {
+        await sendTicketQrEmail(bookingResult);
+      } catch (mailError) {
+        console.warn('Ticket email send failed (staff booking):', mailError.message);
+      }
+    }
+
     return res.status(201).json({
       message: "Đặt vé thành công.",
       booking: bookingResult,
       new_user: newUserCreated,
+      guest_customer: guestCustomer,
     });
   } catch (err) {
     console.error("Error in staffCreateBooking:", err);
@@ -170,7 +203,7 @@ export const verifyBookingCode = async (req, res) => {
     const { code } = req.params;
     const booking = await BookingModel.findByCode(code);
     if (booking) {
-      res.json(booking);
+      res.json({ booking });
     } else {
       res.status(404).json({ message: "Booking code not found" });
     }
@@ -189,15 +222,32 @@ export const refundBooking = async (req, res) => {
 export const checkInBooking = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const success = await BookingModel.checkIn(orderId);
+    const qrToken = String(req.body?.qrToken || '').trim();
+
+    const [[orderInfo]] = await db.query(
+      "SELECT user_id, status FROM Orders WHERE order_id = ? LIMIT 1",
+      [Number(orderId || 0)],
+    );
+
+    if (!orderInfo) {
+      return res.status(404).json({ message: "Không tìm thấy vé này." });
+    }
+
+    const isGuestBooking = !orderInfo.user_id;
+    if (!isGuestBooking && !qrToken) {
+      return res.status(400).json({ message: "Chỉ có thể check-in bằng mã QR đã quét." });
+    }
+
+    const success = await BookingModel.checkIn(orderId, qrToken);
     if (success) {
       const booking = await BookingModel.findById(orderId);
-      res.json({ message: "Check-in successful", booking });
+      res.json({ message: isGuestBooking ? "Hoàn thành vé khách vãng lai." : "Check-in successful", booking });
     } else {
       res.status(404).json({ message: "Booking not found" });
     }
   } catch (err) {
     console.error("Error in checkInBooking:", err);
-    res.status(500).json({ message: "Failed to check-in booking" });
+    const statusCode = err.statusCode || 500;
+    res.status(statusCode).json({ message: err.message || "Failed to check-in booking" });
   }
 };

@@ -1235,6 +1235,11 @@ export const userCreateBooking = async (req, res) => {
       } catch (notifyError) {
         console.warn('Booking notification send failed (create booking):', notifyError.message);
       }
+      try {
+        await sendTicketQrEmail(booking);
+      } catch (mailError) {
+        console.warn('Ticket email send failed (create booking):', mailError.message);
+      }
     }
 
     res.status(201).json({

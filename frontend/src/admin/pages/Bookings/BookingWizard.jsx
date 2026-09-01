@@ -197,6 +197,10 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     full_name: "", email: "", phone: "", birthday: "", sex: "male",
   });
   const [newCustomerErrors, setNewCustomerErrors] = useState({});
+  const [guestCustomerForm, setGuestCustomerForm] = useState({
+    full_name: "", phone: "", email: "",
+  });
+  const [guestCustomerErrors, setGuestCustomerErrors] = useState({});
 
   // Step 2: Movie
   const [movieList, setMovieList] = useState([]);
@@ -418,8 +422,26 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     return e;
   };
 
+  const validateGuestCustomer = () => {
+    const e = {};
+    if (!guestCustomerForm.full_name.trim()) e.full_name = "Nhập họ tên.";
+    if (!guestCustomerForm.phone.trim()) e.phone = "Nhập số điện thoại.";
+    if (
+      guestCustomerForm.email.trim()
+      && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestCustomerForm.email.trim())
+    ) {
+      e.email = "Email không hợp lệ.";
+    }
+    return e;
+  };
+
   const canGoStep2 = () => {
     if (customerMode === "existing_user") return !!selectedCustomer;
+    if (customerMode === "guest") {
+      const e = validateGuestCustomer();
+      setGuestCustomerErrors(e);
+      return Object.keys(e).length === 0;
+    }
     const e = validateNewCustomer();
     setNewCustomerErrors(e);
     return Object.keys(e).length === 0;
@@ -593,9 +615,16 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     try {
       const customerPayload = customerMode === "existing_user"
         ? { user_id: selectedCustomer.user_id }
-        : {
+        : customerMode === "new_user" ? {
             mode: "new_user",
             new_user: { ...newCustomerForm, phone: newCustomerForm.phone.trim() },
+          } : {
+            mode: "guest",
+            guest_customer: {
+              full_name: guestCustomerForm.full_name.trim(),
+              phone: guestCustomerForm.phone.trim(),
+              email: guestCustomerForm.email.trim() || null,
+            },
           };
 
       const seatUnits = selectedSeatUnits.map((unit) => ({
@@ -614,9 +643,10 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
         .filter(c => c.quantity > 0);
 
       const payload = {
-        ...(customerMode === "new_user" ? { mode: "new_user" } : {}),
+        mode: customerPayload.mode || "existing_user",
         user_id: customerPayload.user_id,
         new_user: customerPayload.new_user,
+        guest_customer: customerPayload.guest_customer,
         showtimeId: selectedShowtime?.showtime_id || selectedShowtime?.id,
         seatUnits,
         foodItems,
@@ -641,6 +671,9 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     setSearchResults([]);
     setNewCustomerForm({ full_name: "", email: "", phone: "", birthday: "", sex: "male" });
     setSelectedMovieId("");
+    setNewCustomerErrors({});
+    setGuestCustomerForm({ full_name: "", phone: "", email: "" });
+    setGuestCustomerErrors({});
     setSelectedCinemaId("");
     setSelectedShowtime(null);
     setSelectedSeats([]);
@@ -683,8 +716,8 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
             <h3 style={{ color: "#4ade80", marginTop: 8 }}>Đặt vé thành công!</h3>
           </div>
           <div className="sf-detail-row"><span>Mã đặt vé</span><strong style={{ color: "#7c61ff", fontSize: 18 }}>{b.booking_code || "—"}</strong></div>
-          <div className="sf-detail-row"><span>Khách hàng</span><strong>{b.full_name || selectedCustomer?.full_name || newCustomerForm.full_name}</strong></div>
-          <div className="sf-detail-row"><span>Phim</span><strong>{b.movie_title || selectedShowtime?.movie_title || selectedMovie?.title || "—"}</strong></div>
+          <div className="sf-detail-row"><span>Khách hàng</span><strong>{b.full_name || selectedCustomer?.full_name || (customerMode === "guest" ? guestCustomerForm.full_name : newCustomerForm.full_name)}</strong></div>
+          <div className="sf-detail-row"><span>Phim</span><strong>{b.movie_title || selectedShowtime?.movie_title || selectedMovie?.title || selectedShowtime?.title || "—"}</strong></div>
           <div className="sf-detail-row"><span>Suất</span><strong>
             {b.start_time ? new Date(b.start_time).toLocaleString("vi-VN") : (selectedShowtime?.start_time ? new Date(selectedShowtime.start_time).toLocaleString("vi-VN") : "—")}
           </strong></div>
@@ -696,6 +729,11 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
               <div className="sf-detail-row" style={{ marginTop: 8 }}><span>Email</span><strong>{nu.email}</strong></div>
               <div className="sf-detail-row"><span>Mật khẩu tạm</span><strong style={{ color: "#fbbf24" }}>{nu.temporary_password}</strong></div>
               <div style={{ fontSize: 12, color: "#93c5fd", marginTop: 6 }}>Khách hàng nên đổi mật khẩu sau khi đăng nhập.</div>
+            </div>
+          )}
+          {customerMode === "guest" && (
+            <div style={{ marginTop: 16, padding: 14, borderRadius: 8, background: "rgba(74,222,128,0.1)", border: "1px dashed #4ade80", color: "#86efac" }}>
+              Khách vãng lai — vé đã được lưu mà không tạo tài khoản.
             </div>
           )}
           <div style={{ marginTop: 24, display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
@@ -734,14 +772,20 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
         {step === 1 && (
           <div>
             <h3 style={{ marginBottom: 16 }}>Bước 1: Chọn khách hàng</h3>
-            <div style={{ display: "flex", gap: 16, marginBottom: 18 }}>
-              <label className={`sf-role-chip ${customerMode === "existing_user" ? " checked" : ""}`} style={{ cursor: "pointer", padding: "10px 14px" }}>
+            <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+              <label className={`sf-role-chip ${customerMode === "existing_user" ? " checked" : ""}`}
+                style={{ cursor: "pointer", padding: "10px 14px" }}>
                 <input type="radio" checked={customerMode === "existing_user"} onChange={() => { setCustomerMode("existing_user"); setSelectedCustomer(null); }} style={{ marginRight: 6 }} />
                 ✅ Đã có tài khoản
               </label>
               <label className={`sf-role-chip ${customerMode === "new_user" ? " checked" : ""}`} style={{ cursor: "pointer", padding: "10px 14px" }}>
                 <input type="radio" checked={customerMode === "new_user"} onChange={() => { setCustomerMode("new_user"); setSelectedCustomer(null); }} style={{ marginRight: 6 }} />
                 ➕ Chưa có tài khoản (tạo mới)
+              </label>
+              <label className={`sf-role-chip ${customerMode === "guest" ? " checked" : ""}`}
+                style={{ cursor: "pointer", padding: "10px 14px" }}>
+                <input type="radio" checked={customerMode === "guest"} onChange={() => { setCustomerMode("guest"); setSelectedCustomer(null); }} style={{ marginRight: 6 }} />
+                🎟️ Khách vãng lai
               </label>
             </div>
 
@@ -795,7 +839,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                   )}
                 </div>
               </div>
-            ) : (
+            ) : customerMode === "new_user" ? (
               <div className="sf-form-grid">
                 <div className="sf-form-col">
                   <div className="sf-field-row">
@@ -854,6 +898,47 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                   </div>
                   <div style={{ fontSize: 12, color: "#93c5fd", marginTop: 8, padding: 10, borderRadius: 8, background: "rgba(147,197,253,0.12)" }}>
                     ℹ️ Hệ thống sẽ tự tạo mật khẩu tạm thời cho khách hàng. Khách có thể đổi sau.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="sf-form-grid">
+                <div className="sf-form-col">
+                  <div className="sf-field-row">
+                    <div className="sf-field">
+                      <label>Họ và tên *</label>
+                      <input
+                        className={guestCustomerErrors.full_name ? "error" : ""}
+                        value={guestCustomerForm.full_name}
+                        onChange={(e) => setGuestCustomerForm((previous) => ({ ...previous, full_name: e.target.value }))}
+                        placeholder="Nguyễn Văn A"
+                      />
+                      {guestCustomerErrors.full_name && <span className="sf-error">{guestCustomerErrors.full_name}</span>}
+                    </div>
+                    <div className="sf-field">
+                      <label>Số điện thoại *</label>
+                      <input
+                        className={guestCustomerErrors.phone ? "error" : ""}
+                        value={guestCustomerForm.phone}
+                        onChange={(e) => setGuestCustomerForm((previous) => ({ ...previous, phone: e.target.value }))}
+                        placeholder="09xxxxxxxx"
+                      />
+                      {guestCustomerErrors.phone && <span className="sf-error">{guestCustomerErrors.phone}</span>}
+                    </div>
+                  </div>
+                  <div className="sf-field">
+                    <label>Email (không bắt buộc)</label>
+                    <input
+                      type="email"
+                      className={guestCustomerErrors.email ? "error" : ""}
+                      value={guestCustomerForm.email}
+                      onChange={(e) => setGuestCustomerForm((previous) => ({ ...previous, email: e.target.value }))}
+                      placeholder="khach@email.com"
+                    />
+                    {guestCustomerErrors.email && <span className="sf-error">{guestCustomerErrors.email}</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#86efac", marginTop: 8, padding: 10, borderRadius: 8, background: "rgba(74,222,128,0.1)" }}>
+                    Vé được bán trực tiếp tại quầy. Hệ thống không tạo tài khoản, không yêu cầu mật khẩu và không cộng điểm thành viên.
                   </div>
                 </div>
               </div>
@@ -1218,12 +1303,19 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                     <div className="sf-detail-row"><span>Điện thoại</span><strong>{selectedCustomer.phone_number || "—"}</strong></div>
                     <div className="sf-detail-row"><span>Điểm</span><strong>{selectedCustomer.points || 0}</strong></div>
                   </>
-                ) : (
+                ) : customerMode === "new_user" ? (
                   <>
                     <div className="sf-detail-row"><span>Tên</span><strong>{newCustomerForm.full_name}</strong></div>
                     <div className="sf-detail-row"><span>Email</span><strong>{newCustomerForm.email}</strong></div>
                     <div className="sf-detail-row"><span>Điện thoại</span><strong>{newCustomerForm.phone}</strong></div>
                     <div className="sf-detail-row"><span>Ghi chú</span><strong style={{ color: "#fbbf24", fontSize: 12 }}>Sẽ tạo tài khoản mới + mật khẩu tạm</strong></div>
+                  </>
+                ) : (
+                  <>
+                    <div className="sf-detail-row"><span>Tên</span><strong>{guestCustomerForm.full_name}</strong></div>
+                    <div className="sf-detail-row"><span>Điện thoại</span><strong>{guestCustomerForm.phone}</strong></div>
+                    <div className="sf-detail-row"><span>Email</span><strong>{guestCustomerForm.email || "—"}</strong></div>
+                    <div className="sf-detail-row"><span>Loại khách</span><strong style={{ color: "#86efac", fontSize: 12 }}>Khách vãng lai · không tạo tài khoản</strong></div>
                   </>
                 )}
               </div>

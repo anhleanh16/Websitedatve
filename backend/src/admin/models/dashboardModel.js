@@ -1,4 +1,5 @@
 import { db } from "../../../config/db.js";
+import { ensureBookingSchema } from "./bookingModel.js";
 
 let movieColumnsCache = null;
 
@@ -20,6 +21,7 @@ export const DashboardModel = {
    * @returns {Promise<Object>} Một đối tượng chứa các số liệu thống kê.
    */
   async getStats() {
+    await ensureBookingSchema();
     const movieColumns = await getMovieColumns();
     const movieFilter = movieColumns.hasIsDeleted ? " WHERE is_deleted = 0" : "";
 
@@ -64,16 +66,16 @@ export const DashboardModel = {
       SELECT
         o.order_id AS booking_id,
         o.booking_code,
-        u.full_name,
+        COALESCE(NULLIF(TRIM(u.full_name), ''), NULLIF(TRIM(o.guest_name), ''), 'Khách vãng lai') AS full_name,
         MIN(m.title) AS title,
         o.total_amount AS total_price,
         o.created_at
       FROM Orders o
-      JOIN User u ON o.user_id = u.id
+      LEFT JOIN User u ON o.user_id = u.id
       LEFT JOIN Tickets t ON t.order_id = o.order_id
       LEFT JOIN Showtimes s ON t.showtime_id = s.showtime_id
       LEFT JOIN Movies m ON s.movie_id = m.movie_id
-      GROUP BY o.order_id, o.booking_code, u.full_name, o.total_amount, o.created_at
+      GROUP BY o.order_id, o.booking_code, o.guest_name, u.full_name, o.total_amount, o.created_at
       ORDER BY o.created_at DESC
       LIMIT 5
     `);

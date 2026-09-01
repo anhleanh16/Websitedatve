@@ -24,7 +24,15 @@ import { getValidStoredToken } from "../../utils/auth";
 export function AdminRoutes() {
   const profile = useSelector((state) => state.user.profile);
   const token = getValidStoredToken();
-  const storedUser = profile || JSON.parse(localStorage.getItem('user') || '{}');
+  let storedUser = profile;
+  if (!storedUser) {
+    try {
+      storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    } catch {
+      storedUser = {};
+      localStorage.removeItem('user');
+    }
+  }
   const userRole = String(storedUser?.role || '').toLowerCase();
   const canAccessAdmin = token && ['admin', 'employee'].includes(userRole);
 

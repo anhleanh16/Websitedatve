@@ -640,6 +640,29 @@
   font-size: 14px;
 }
 
+.chart-week-total {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 9px 13px;
+  border: 1px solid rgba(124, 97, 255, 0.2);
+  border-radius: 13px;
+  background: rgba(124, 97, 255, 0.09);
+}
+
+.chart-week-total span {
+  color: #8fa1cc;
+  font-size: 11px;
+}
+
+.chart-week-total strong {
+  color: #e9e5ff;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
 .chart-badge {
   padding: 10px 14px;
   border-radius: 999px;
@@ -664,6 +687,53 @@
   height: 100%;
 }
 
+.revenue-chart-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  min-height: 250px;
+}
+
+.revenue-chart-axis {
+  height: 220px;
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  box-sizing: border-box;
+}
+
+.revenue-chart-axis span {
+  color: #7182ad;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.revenue-chart-main {
+  min-width: 0;
+}
+
+.revenue-chart-plot {
+  width: 100%;
+  height: 220px;
+}
+
+.revenue-chart-plot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.revenue-grid-line {
+  stroke: rgba(148, 163, 184, 0.12);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
 .admin-dashboard .chart-labels {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -679,6 +749,27 @@
   white-space: nowrap;
 }
 
+@media (max-width: 640px) {
+  .chart-panel-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .chart-week-total {
+    align-items: flex-start;
+  }
+
+  .revenue-chart-layout {
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .revenue-chart-axis span,
+  .admin-dashboard .chart-labels span {
+    font-size: 10px;
+  }
+}
+
 .chart-line-path {
   stroke-dasharray: 1000;
   stroke-dashoffset: 1000;
@@ -690,60 +781,135 @@
   font-size: 12px;
 }
 
-.chart-bar-grid {
-  display: flex;
-  align-items: flex-end;
-  gap: 16px;
+.booking-chart-layout {
   flex: 1;
-  min-height: 220px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.booking-chart-axis {
+  height: 210px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  color: #8fa1cc;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.booking-chart-main {
+  min-width: 0;
+}
+
+.booking-chart-plot {
+  position: relative;
+  height: 210px;
+  min-width: 0;
+}
+
+.booking-chart-grid-line {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(148, 163, 184, 0.14);
 }
 
 .admin-dashboard .chart-bar-grid {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   align-items: end;
-  gap: clamp(6px, 1vw, 16px);
+  gap: clamp(8px, 1vw, 18px);
   width: 100%;
+  height: 100%;
   min-width: 0;
-  overflow: hidden;
 }
 
 .chart-bar-item {
-  flex: 1;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   align-items: center;
-  gap: 10px;
-}
-
-.admin-dashboard .chart-bar-item {
+  gap: 6px;
   min-width: 0;
 }
 
+.chart-bar-value {
+  color: #eef2ff !important;
+  font-size: 12px !important;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(5, 8, 25, 0.9);
+}
+
 .chart-bar-fill {
-  width: 100%;
-  max-width: 40px;
-  background: linear-gradient(180deg, #7c61ff, #4b49db);
-  border-radius: 16px 16px 0 0;
+  width: min(38px, 72%);
+  min-height: 4px;
+  background: linear-gradient(180deg, #8068ff 0%, #5148dc 100%);
+  border: 1px solid rgba(171, 157, 255, 0.42);
+  border-bottom: 0;
+  border-radius: 10px 10px 2px 2px;
+  box-shadow: 0 8px 22px rgba(94, 75, 235, 0.24);
   transform: scaleY(0);
   transform-origin: bottom;
   animation: chart-bar-grow 1s ease forwards;
+}
+
+.chart-bar-fill.empty {
+  min-height: 2px;
+  background: rgba(124, 97, 255, 0.22);
+  border-color: rgba(124, 97, 255, 0.18);
+  box-shadow: none;
 }
 
 .chart-bar-item:hover .chart-bar-fill {
   filter: brightness(1.15);
 }
 
-.chart-bar-item span {
-  color: #b8c6ff;
+.booking-chart-labels {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: clamp(8px, 1vw, 18px);
+  margin-top: 10px;
+}
+
+.booking-chart-labels > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 2px;
+  border-radius: 8px;
+  color: #aebced;
+  text-align: center;
+}
+
+.booking-chart-labels strong {
   font-size: 12px;
 }
 
-.chart-bar-values {
-  display: flex;
-  justify-content: space-between;
-  color: #8f9fff;
-  font-size: 12px;
+.booking-chart-labels small {
+  color: #7182ad;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.booking-chart-labels .current {
+  background: rgba(124, 97, 255, 0.14);
+  color: #c9beff;
+}
+
+.booking-chart-labels .current small {
+  color: #9e8cff;
 }
 
 @keyframes chart-line-draw {

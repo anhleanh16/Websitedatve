@@ -93,12 +93,11 @@ const buildTicketEmailHtml = ({ booking, qrCidByCode, concessionQrCid, comboLine
   const total = toVnd(booking.total_price)
 
   const seats = Array.isArray(booking.seats) ? booking.seats : []
-  const qrCodes = Array.isArray(booking.qr_codes) ? booking.qr_codes : []
+  const qrCodes = booking.primary_qr_code ? [booking.primary_qr_code] : []
 
   const qrItemsHtml = qrCodes
     .map((qrCode, index) => {
-      const safeQr = escapeHtml(qrCode)
-      const seatCode = escapeHtml(seats[index] || `Ghế ${index + 1}`)
+      const seatCode = escapeHtml(seats.join(', ') || `Ghế ${index + 1}`)
       const cid = qrCidByCode.get(qrCode)
       if (!cid) return ''
 
@@ -106,7 +105,7 @@ const buildTicketEmailHtml = ({ booking, qrCidByCode, concessionQrCid, comboLine
         <div style="width:240px;display:inline-block;vertical-align:top;margin:10px;padding:14px;border:1px solid #e5e7eb;border-radius:12px;background:#f8fafc;">
           <p style="margin:0 0 8px;font-size:13px;color:#111827;font-weight:700;">${seatCode}</p>
           <img src="cid:${cid}" alt="QR ${seatCode}" style="width:180px;height:180px;display:block;margin:0 auto 10px;border-radius:8px;background:#fff;" />
-          <p style="margin:0;font-size:11px;line-height:1.5;color:#4b5563;word-break:break-all;">Mã QR: ${safeQr}</p>
+          <p style="margin:0;font-size:11px;line-height:1.5;color:#4b5563;">Quét mã này tại cổng check-in.</p>
         </div>
       `
     })
@@ -200,7 +199,6 @@ const buildTicketEmailHtml = ({ booking, qrCidByCode, concessionQrCid, comboLine
 
 const buildTicketEmailText = ({ booking }) => {
   const seats = Array.isArray(booking.seats) ? booking.seats.join(', ') : ''
-  const qrCodes = Array.isArray(booking.qr_codes) ? booking.qr_codes.join('\n') : ''
   const comboLines = (Array.isArray(booking.combos) ? booking.combos : [])
     .map(formatComboLabel)
     .filter(Boolean)
@@ -217,8 +215,7 @@ const buildTicketEmailText = ({ booking }) => {
     `Tổng thanh toán: ${toVnd(booking.total_price)}đ`,
     comboLines.length ? `Combo/Bắp nước: ${comboLines.join(' | ')}` : '',
     '',
-    'Mã QR vé:',
-    qrCodes,
+    'Mã QR vé được đính kèm trong email HTML.',
     comboLines.length ? 'Mã QR quầy combo/bắp nước: có trong email (tách riêng QR vé).' : '',
     '',
     `Xem vé của tôi: ${FRONTEND_URL}/profile`,
@@ -231,7 +228,7 @@ export const sendTicketQrEmail = async (booking) => {
   const toEmail = String(booking?.email || '').trim()
   if (!toEmail) return { sent: false, reason: 'missing_email' }
 
-  const qrCodes = Array.isArray(booking?.qr_codes) ? booking.qr_codes.filter(Boolean) : []
+  const qrCodes = booking?.primary_qr_code ? [booking.primary_qr_code] : []
   if (qrCodes.length === 0) return { sent: false, reason: 'missing_qr' }
 
   const mailTransporter = getTransporter()
