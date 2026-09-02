@@ -414,19 +414,38 @@ export default function AdminCombos() {
     }
   };
 
-  const handleDelete = async (combo) => {
+  const handleToggleStatus = async (combo) => {
+    const nextStatus = !combo.is_active;
     const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa/ngừng bán combo "${combo.combo_name}" không?`,
+      nextStatus
+        ? `Bạn có chắc muốn bán lại combo "${combo.combo_name}" không?`
+        : `Bạn có chắc muốn ngừng bán combo "${combo.combo_name}" không?`,
     );
     if (!confirmed) return;
 
     try {
-      const result = await adminComboService.delete(combo.combo_id);
-      showToast(result?.message || "Đã xử lý combo.");
+      const payload = new FormData();
+      payload.append("is_active", String(nextStatus));
+      payload.append("combo_name", combo.combo_name || "");
+      payload.append("description", combo.description || "");
+      payload.append("price", String(combo.price ?? 0));
+      payload.append("category", combo.category || "combo");
+      payload.append("popcorn_quantity", String(combo.popcorn_quantity ?? 0));
+      payload.append("drink_quantity", String(combo.drink_quantity ?? 0));
+      payload.append("popcorn_options", JSON.stringify(combo.popcorn_options || []));
+      payload.append("drink_options", JSON.stringify(combo.drink_options || []));
+      payload.append("sort_order", String(combo.sort_order ?? 0));
+      payload.append("image", combo.image || "");
+
+      await adminComboService.update(combo.combo_id, payload);
+      showToast(
+        nextStatus ? "Đã chuyển combo sang trạng thái đang bán." : "Đã chuyển combo sang trạng thái ngừng bán.",
+        nextStatus ? "success" : "warning",
+      );
       await loadCombos();
-    } catch (deleteError) {
-      console.error(deleteError);
-      showToast(deleteError.message || "Không thể xóa combo.", "error");
+    } catch (toggleError) {
+      console.error(toggleError);
+      showToast(toggleError.message || "Không thể cập nhật trạng thái combo.", "error");
     }
   };
 
@@ -565,8 +584,8 @@ export default function AdminCombos() {
                         <button className="bk-btn bk-btn-view" onClick={() => setEditingCombo(combo)}>
                           Sửa
                         </button>
-                        <button className="bk-btn bk-btn-refund" onClick={() => handleDelete(combo)}>
-                          {combo.usage_count > 0 ? "Ngừng bán" : "Xóa"}
+                        <button className="bk-btn bk-btn-refund" onClick={() => handleToggleStatus(combo)}>
+                          {combo.is_active ? "Ngừng bán" : "Bán lại"}
                         </button>
                       </div>
                     </td>
