@@ -578,7 +578,10 @@ export default function AdminCombos() {
                         <button className="bk-btn bk-btn-view" onClick={() => setEditingCombo(combo)}>
                           Sửa
                         </button>
-                        <button className="bk-btn bk-btn-refund" onClick={() => handleToggleStatus(combo)}>
+                        <button
+                          className={`bk-btn ${combo.is_active ? "bk-btn-refund-warning" : "bk-btn-refund"}`}
+                          onClick={() => handleToggleStatus(combo)}
+                        >
                           {combo.is_active ? "Ngừng bán" : "Bán lại"}
                         </button>
                       </div>

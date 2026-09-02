@@ -26,8 +26,10 @@
 .bk-btn:hover { transform: translateY(-1px); }
 .bk-btn-view { background: rgba(124,97,255,0.2); color: #d4c8ff; }
 .bk-btn-view:hover { background: rgba(124,97,255,0.35); }
-.bk-btn-refund { background: rgba(251,191,36,0.18); color: #ffe7a9; }
-.bk-btn-refund:hover { background: rgba(251,191,36,0.3); }
+.bk-btn-refund-warning { background: rgba(251,191,36,0.18); color: #ffe7a9; }
+.bk-btn-refund-warning:hover { background: rgba(251,191,36,0.3); }
+.bk-btn-refund { background: rgba(74,222,128,0.18); color: #c8f7d3; }
+.bk-btn-refund:hover { background: rgba(74,222,128,0.32); }
 .bk-btn-check { background: rgba(74,222,128,0.15); color: #b7f5c8; }
 .bk-btn-check:hover { background: rgba(74,222,128,0.28); }
 .bk-btn-secondary { background: rgba(255,255,255,0.07); color: #ccd8ff; }
