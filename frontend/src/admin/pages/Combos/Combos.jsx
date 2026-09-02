@@ -414,25 +414,8 @@ export default function AdminCombos() {
     }
   };
 
-<<<<<<< HEAD
-  const handleDelete = async (combo) => {
-    if (Number(combo?.usage_count || 0) > 0) {
-      showToast("Combo đã được sử dụng trong khu vực đơn hàng nên không thể ngừng bán hoặc xóa.", "error");
-      return;
-    }
-
-    try {
-      const result = await adminComboService.delete(combo.combo_id);
-      showToast(result?.message || "Đã xóa combo.");
-=======
   const handleToggleStatus = async (combo) => {
     const nextStatus = !combo.is_active;
-    const confirmed = window.confirm(
-      nextStatus
-        ? `Bạn có chắc muốn bán lại combo "${combo.combo_name}" không?`
-        : `Bạn có chắc muốn ngừng bán combo "${combo.combo_name}" không?`,
-    );
-    if (!confirmed) return;
 
     try {
       const payload = new FormData();
@@ -453,7 +436,6 @@ export default function AdminCombos() {
         nextStatus ? "Đã chuyển combo sang trạng thái đang bán." : "Đã chuyển combo sang trạng thái ngừng bán.",
         nextStatus ? "success" : "warning",
       );
->>>>>>> efc00ff2b78dac988db386def94f1fdaf41c6f9b
       await loadCombos();
     } catch (toggleError) {
       console.error(toggleError);
@@ -596,13 +578,8 @@ export default function AdminCombos() {
                         <button className="bk-btn bk-btn-view" onClick={() => setEditingCombo(combo)}>
                           Sửa
                         </button>
-<<<<<<< HEAD
-                        <button className="bk-btn bk-btn-refund" onClick={() => handleDelete(combo)}>
-                          {combo.usage_count > 0 ? "Không thể xóa" : "Xóa"}
-=======
                         <button className="bk-btn bk-btn-refund" onClick={() => handleToggleStatus(combo)}>
                           {combo.is_active ? "Ngừng bán" : "Bán lại"}
->>>>>>> efc00ff2b78dac988db386def94f1fdaf41c6f9b
                         </button>
                       </div>
                     </td>
@@ -624,7 +601,7 @@ export default function AdminCombos() {
       )}
 
       {toast && (
-        <div className={`bk-toast bk-toast-${toast.type === "error" ? "error" : "success"}`}>
+        <div className={`bk-toast bk-toast-${toast.type || "success"}`}>
           {toast.message}
         </div>
       )}
