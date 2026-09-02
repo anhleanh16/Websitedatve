@@ -24,19 +24,19 @@ export const authMiddleware = (req, res, next) => {
 const hasRole = (req, roles) => roles.includes(req.userRole);
 
 export const adminOnly = (req, res, next) => {
-  if (!hasRole(req, ['admin', 'employee']))
+  if (!hasRole(req, ['admin', 'employee', 'manager']))
     return res.status(403).json({ message: 'Không có quyền truy cập.' });
   next();
 };
 
 export const adminManagerOnly = (req, res, next) => {
-  if (!hasRole(req, ['admin', 'employee']))
+  if (!hasRole(req, ['admin', 'employee', 'manager']))
     return res.status(403).json({ message: 'Không có quyền truy cập.' });
   next();
 };
 
 export const staffBasicOnly = (req, res, next) => {
-  if (!hasRole(req, ['admin', 'employee']))
+  if (!hasRole(req, ['admin', 'employee', 'manager']))
     return res.status(403).json({ message: 'Không có quyền truy cập.' });
   next();
 };

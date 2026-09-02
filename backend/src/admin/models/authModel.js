@@ -31,6 +31,7 @@ const mapEmployeePositionToRole = (position) => {
 const deriveRoleFromEmployee = (user) => {
   const storedRole = String(user.role_name || '').trim().toLowerCase();
   if (Number(user.id) === 1 || storedRole === 'admin') return 'admin';
+  if (mapEmployeePositionToRole(user.employee_position) === 'manager') return 'manager';
   if (storedRole === 'employee' || user.employee_position) return 'employee';
   return 'user';
 };

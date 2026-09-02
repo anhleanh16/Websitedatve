@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { useSelector } from "react-redux";
 import './bookings.css';
 import BookingWizard from "./BookingWizard.jsx";
-import { adminBookingService } from "../../services/adminApi";
+import { adminBookingService, adminEmployeeService } from "../../services/adminApi";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 import { printTicketPdf } from "../../../utils/ticketPrint.js";
@@ -74,6 +75,7 @@ function mapBookingFromApi(item) {
     email: item?.email || "",
     phone: item?.phone || item?.phone_number || "",
     movie: item?.movie_title || item?.movie || "",
+    cinemaId: item?.cinema_id || item?.cinemaId || null,
     cinema: item?.cinema_name || item?.cinema || "",
     room: item?.room_name || item?.room || "",
     showtime: item?.start_time ? new Date(item.start_time).toLocaleString("vi-VN") : "",
@@ -669,6 +671,14 @@ function Toast({ message, type, onClose }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminBookings() {
+  const reduxProfile = useSelector((state) => state.user.profile);
+  const profile = { ...(() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+  })(), ...(reduxProfile || {}) };
+  const role = String(profile.role || "").toLowerCase();
+  const isManager = role === "manager" || (role === "employee" && /quản lý|quan ly|manager/i.test(String(profile.employee_position || profile.position || "")));
+  const isCinemaScopedStaff = role === "employee" || role === "manager";
+  const currentUserId = profile.id || profile.userId || profile.user_id;
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("list"); // "list" | "detail" | "refund" | "check"
@@ -685,9 +695,18 @@ export default function AdminBookings() {
     const fetchBookings = async () => {
       try {
         setLoading(true);
-        const res = await adminBookingService.getAllBookings();
-        const list = Array.isArray(res?.bookings) ? res.bookings : [];
-        setBookings(list.map(mapBookingFromApi));
+        const [bookingResult, employeeResult] = await Promise.all([
+          adminBookingService.getAllBookings(),
+          isCinemaScopedStaff ? adminEmployeeService.getAll() : Promise.resolve(null),
+        ]);
+        const list = Array.isArray(bookingResult?.bookings) ? bookingResult.bookings : [];
+        const staffCinemaId = isCinemaScopedStaff
+          ? (employeeResult?.employees || []).find((employee) => Number(employee.userId || employee.user_id) === Number(currentUserId))?.cinemaId
+            || (employeeResult?.employees || []).find((employee) => Number(employee.userId || employee.user_id) === Number(currentUserId))?.cinema_id
+          : null;
+        setBookings(list
+          .filter((booking) => !isCinemaScopedStaff || Number(booking.cinema_id || booking.cinemaId) === Number(staffCinemaId))
+          .map(mapBookingFromApi));
       } catch (error) {
         console.error("Failed to load admin bookings", error);
         showToast(error.message || "Không thể tải danh sách vé", "error");
@@ -698,7 +717,7 @@ export default function AdminBookings() {
     };
 
     fetchBookings();
-  }, []);
+  }, [currentUserId, isCinemaScopedStaff]);
 
   // Mở chi tiết
   const handleView = async (b) => {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
 import './staff.css';
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 import AdminModalPortal from "../../components/AdminModalPortal.jsx";
@@ -53,6 +54,10 @@ const ATT_STATUS = {
   present: { label: "Có mặt", cls: "att-present", icon: "✓" },
   late:    { label: "Đi trễ", cls: "att-late",    icon: "!" },
   absent:  { label: "Vắng",   cls: "att-absent",  icon: "✗" },
+};
+const ATTENDANCE_RECORDS_KEY = "admin_attendance_records";
+const readAttendanceRecords = () => {
+  try { return JSON.parse(localStorage.getItem(ATTENDANCE_RECORDS_KEY) || "[]"); } catch { return []; }
 };
 
 const getInitials = (name) => name.split(" ").slice(-2).map(w => w[0]).join("").toUpperCase();
@@ -166,9 +171,12 @@ function Confirm({ message, onClose, onConfirm }) {
 }
 
 // ─── Staff Form ───────────────────────────────────────────────────────────────
-function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
+function StaffForm({ staff, customerAccounts = [], onClose, onSave, canCreateManager = true, allowedCinemaId = null }) {
   const isEdit = !!staff;
-  const [form, setForm] = useState(staff ? { ...staff } : { ...EMPTY_STAFF });
+  const [form, setForm] = useState(() => {
+    const initial = staff ? { ...staff } : { ...EMPTY_STAFF };
+    return !isEdit && allowedCinemaId !== null ? { ...initial, cinemaId: allowedCinemaId } : initial;
+  });
   const [errors, setErrors] = useState({});
   const [avatarFile, setAvatarFile] = useState(null);
   const [idCardFrontFile, setIdCardFrontFile] = useState(null);
@@ -450,9 +458,9 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
               <div className="sf-field-row">
                 <div className="sf-field">
                   <label>Rạp phụ trách *</label>
-                  <select className={errors.cinemaId ? "error" : ""} value={form.cinemaId} onChange={e => set("cinemaId", Number(e.target.value))}>
+                  <select className={errors.cinemaId ? "error" : ""} value={form.cinemaId} onChange={e => set("cinemaId", Number(e.target.value))} disabled={allowedCinemaId !== null}>
                     <option value="">-- Chọn rạp --</option>
-                    {CINEMAS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {CINEMAS.filter(c => allowedCinemaId === null || c.id === Number(allowedCinemaId)).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                   {errors.cinemaId && <span className="sf-error">{errors.cinemaId}</span>}
                 </div>
@@ -472,7 +480,7 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
                   <select value={form.role} onChange={e => set("role", e.target.value)}>
                     <option value="staff">Nhân viên</option>
                     <option value="technician">Kỹ thuật viên</option>
-                    <option value="manager">Quản lý</option>
+                    {canCreateManager && <option value="manager">Quản lý</option>}
                   </select>
                 </div>
                 <div className="sf-field">
@@ -724,7 +732,7 @@ function AttendanceModal({ staff, onClose, onSave }) {
 }
 
 // ─── Staff Detail Modal ───────────────────────────────────────────────────────
-function StaffDetail({ staff, onClose, onEdit, onTask }) {
+function StaffDetail({ staff, onClose, onEdit, onTask, canManage = true }) {
   if (!staff) return null;
   const st  = STATUS_MAP[staff.status] || STATUS_MAP.active;
   const rl  = ROLE_MAP[staff.role]     || ROLE_MAP.staff;
@@ -836,8 +844,8 @@ function StaffDetail({ staff, onClose, onEdit, onTask }) {
           )}
         </div>
         <div className="sf-modal-footer">
-          <button className="sf-btn sf-btn-edit sf-btn-lg"   onClick={() => onEdit(staff)}>Sửa thông tin</button>
-          <button className="sf-btn sf-btn-task sf-btn-lg"   onClick={() => onTask(staff)}>Phân công</button>
+          {canManage && <button className="sf-btn sf-btn-edit sf-btn-lg"   onClick={() => onEdit(staff)}>Sửa thông tin</button>}
+          {canManage && <button className="sf-btn sf-btn-task sf-btn-lg"   onClick={() => onTask(staff)}>Phân công</button>}
           <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={onClose}>Đóng</button>
         </div>
       </div>
@@ -848,7 +856,7 @@ function StaffDetail({ staff, onClose, onEdit, onTask }) {
 
 
 // ─── Staff List Tab ───────────────────────────────────────────────────────────
-function StaffList({ staff, onView, onEdit, onTask, onDelete }) {
+function StaffList({ staff, onView, onEdit, onTask, onDelete, canManage = true }) {
   const [search, setSearch]   = useState("");
   const [filterCinema, setFC] = useState("all");
   const [filterType,   setFT] = useState("all");
@@ -948,9 +956,9 @@ function StaffList({ staff, onView, onEdit, onTask, onDelete }) {
                   <td>
                     <div className="sf-actions">
                       <button className="sf-btn sf-btn-view"   onClick={() => onView(s)}>Xem</button>
-                      <button className="sf-btn sf-btn-edit"   onClick={() => onEdit(s)}>Sửa</button>
-                      <button className="sf-btn sf-btn-task"   onClick={() => onTask(s)}>Việc</button>
-                      <button className="sf-btn sf-btn-delete" onClick={() => onDelete(s)}>Xóa</button>
+                      {canManage && <button className="sf-btn sf-btn-edit"   onClick={() => onEdit(s)}>Sửa</button>}
+                      {canManage && <button className="sf-btn sf-btn-task"   onClick={() => onTask(s)}>Việc</button>}
+                      {canManage && <button className="sf-btn sf-btn-delete" onClick={() => onDelete(s)}>Xóa</button>}
                     </div>
                   </td>
                 </tr>
@@ -966,25 +974,26 @@ function StaffList({ staff, onView, onEdit, onTask, onDelete }) {
 }
 
 // ─── Attendance Overview Tab ──────────────────────────────────────────────────
-function AttendanceOverview({ staff, onAttend }) {
-  const [filterCinema, setFC] = useState("all");
-  const [today, setToday] = useState(getToday);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setToday(getToday()), 60000);
-    return () => window.clearInterval(timer);
-  }, []);
+function AttendanceOverview({ staff, onAttend, currentUserId, canAttendSelf = true, fixedCinemaId = null }) {
+  const [filterCinema, setFC] = useState(fixedCinemaId == null ? "all" : String(fixedCinemaId));
+  const [filterDate, setFD] = useState(getToday);
 
   const filtered = staff.filter(s => filterCinema === "all" || String(s.cinemaId) === filterCinema);
 
   return (
     <div className="sf-section">
       <div className="sf-toolbar">
-        <select className="sf-select" value={filterCinema} onChange={e => setFC(e.target.value)}>
-          <option value="all">Tất cả rạp</option>
+        <select className="sf-select" value={filterCinema} onChange={e => setFC(e.target.value)} disabled={fixedCinemaId != null}>
+          {fixedCinemaId == null && <option value="all">Tất cả rạp</option>}
           {CINEMAS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <input type="date" className="sf-select" value={today} readOnly aria-label="Ngày chấm công hôm nay" />
+        <input
+          type="date"
+          className="sf-select"
+          value={filterDate}
+          onChange={event => setFD(event.target.value)}
+          aria-label="Xem ngày chấm công"
+        />
       </div>
 
       <div className="table-card">
@@ -1003,7 +1012,9 @@ function AttendanceOverview({ staff, onAttend }) {
           </thead>
           <tbody>
             {filtered.map(s => {
-              const att = s.attendance.filter(a => a.date === today);
+              const att = filterDate
+                ? s.attendance.filter(a => a.date === filterDate)
+                : s.attendance;
               const total   = att.length;
               const present = att.filter(a => a.status === "present").length;
               const late    = att.filter(a => a.status === "late").length;
@@ -1038,7 +1049,11 @@ function AttendanceOverview({ staff, onAttend }) {
                     </div>
                   </td>
                   <td>
-                    <button className="sf-btn sf-btn-attend sm" onClick={() => onAttend(s)}>Chấm công</button>
+                    {(!canAttendSelf && Number(s.userId) === Number(currentUserId)) ? (
+                      <span className="sf-att-self-label">Tài khoản của bạn</span>
+                    ) : (
+                      <button className="sf-btn sf-btn-attend sm" onClick={() => onAttend(s)}>Chấm công</button>
+                    )}
                   </td>
                 </tr>
               );
@@ -1095,9 +1110,18 @@ function TaskOverview({ staff }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminStaff() {
+  const reduxProfile = useSelector((state) => state.user.profile);
+  const profile = { ...(() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+  })(), ...(reduxProfile || {}) };
+  const role = String(profile.role || "").toLowerCase();
+  const isAdmin = role === "admin";
+  const isManager = role === "manager" || (role === "employee" && /quản lý|quan ly|manager/i.test(String(profile.employee_position || profile.position || "")));
+  const canManageStaff = isAdmin || isManager;
   const [staffList, setStaffList] = useState(() => {
     return [];
   });
+  const [managerCinemaId, setManagerCinemaId] = useState(isManager ? undefined : null);
   const [customerAccounts, setCustomerAccounts] = useState([]);
   const [activeTab,  setActiveTab]  = useState("list");
 
@@ -1114,6 +1138,10 @@ export default function AdminStaff() {
       const response = await adminEmployeeService.getAll();
       const serverEmployees = (response?.employees || []).map(mapEmployeeToStaff);
       setStaffList(serverEmployees);
+      if (isManager) {
+        const currentManager = serverEmployees.find((staff) => Number(staff.userId) === Number(profile.id || profile.userId));
+        setManagerCinemaId(currentManager?.cinemaId ?? null);
+      }
     } catch (err) {
       showToast(`Không thể tải dữ liệu nhân viên: ${err.message}`);
     }
@@ -1129,6 +1157,14 @@ export default function AdminStaff() {
   }, []);
 
   const handleSave = async (data) => {
+    const isManagedStaff = staffList.some((staff) => staff.id === data.id
+      && Number(staff.userId) !== Number(profile.id || profile.userId)
+      && staff.role !== "manager"
+      && Number(staff.cinemaId) === Number(managerCinemaId));
+    if (isManager && (managerCinemaId === null || managerCinemaId === undefined || (data.id && !isManagedStaff) || data.role === "manager")) {
+      showToast("Quản lý chỉ được thêm hoặc sửa nhân viên cấp dưới.");
+      return;
+    }
     try {
       const { id, avatarFile, idCardFrontFile, idCardBackFile, ...rest } = data;
       let payload = { ...rest };
@@ -1141,13 +1177,14 @@ export default function AdminStaff() {
       payload.name = (payload.name || "").trim();
       payload.email = (payload.email || "").trim();
       payload.phone = (payload.phone || "").trim();
+      if (isManager) payload.role = payload.role === "technician" ? "technician" : "staff";
       payload.position = payload.role === "manager"
         ? "Quản lý"
         : payload.role === "technician"
           ? "Kỹ thuật viên"
           : "Nhân viên";
       payload.department = DEPARTMENTS.find((item) => item.id === Number(payload.departmentId))?.name || "";
-      payload.cinemaId = payload.cinemaId ? Number(payload.cinemaId) : null;
+      payload.cinemaId = isManager ? Number(managerCinemaId) : (payload.cinemaId ? Number(payload.cinemaId) : null);
       payload.type = payload.type || "full_time";
       payload.status = payload.status || "active";
       payload.salary = Number(payload.salary || 0);
@@ -1185,6 +1222,11 @@ export default function AdminStaff() {
 
   const handleConfirmDelete = async () => {
     try {
+      if (isManager && (!deleteTarget || Number(deleteTarget.userId) === Number(profile.id || profile.userId) || deleteTarget.role === "manager" || Number(deleteTarget.cinemaId) !== Number(managerCinemaId))) {
+        showToast("Quản lý không được xóa tài khoản quản lý.");
+        setDeleteTarget(null);
+        return;
+      }
       await adminEmployeeService.delete(deleteTarget.id);
       await loadEmployees();
       showToast(`Đã xóa nhân viên "${deleteTarget.name}".`);
@@ -1194,14 +1236,25 @@ export default function AdminStaff() {
     }
   };
 
-  const openEdit = (s) => { setViewStaff(null); setEditStaff(s); };
+  const openEdit = (s) => {
+    if (isManager && (Number(s.userId) === Number(profile.id || profile.userId) || s.role === "manager" || Number(s.cinemaId) !== Number(managerCinemaId))) return;
+    setViewStaff(null);
+    setEditStaff(s);
+  };
   const openTask = (s) => { setViewStaff(null); setTaskStaff(s); };
 
+  const visibleStaffList = isManager
+    ? staffList.filter((staff) => managerCinemaId !== undefined
+      && Number(staff.cinemaId) === Number(managerCinemaId)
+      && Number(staff.userId) !== Number(profile.id || profile.userId)
+      && staff.role !== "manager")
+    : staffList;
+
   const stats = [
-    { label: "Tổng nhân viên",   value: staffList.length,                                          color: "#7c61ff" },
-    { label: "Đang làm việc",    value: staffList.filter(s => s.status === "active").length,        color: "#4ade80" },
-    { label: "Toàn thời gian",   value: staffList.filter(s => s.type === "full_time").length,       color: "#5bcad4" },
-    { label: "Bán thời gian",    value: staffList.filter(s => s.type === "part_time").length,       color: "#fbbf24" },
+    { label: "Tổng nhân viên",   value: visibleStaffList.length,                                      color: "#7c61ff" },
+    { label: "Đang làm việc",    value: visibleStaffList.filter(s => s.status === "active").length,  color: "#4ade80" },
+    { label: "Toàn thời gian",   value: visibleStaffList.filter(s => s.type === "full_time").length, color: "#5bcad4" },
+    { label: "Bán thời gian",    value: visibleStaffList.filter(s => s.type === "part_time").length, color: "#fbbf24" },
   ];
 
   const TABS = [
@@ -1216,7 +1269,7 @@ export default function AdminStaff() {
           <h2>Quản lý nhân viên</h2>
           <p>Quản lý tài khoản, phân công, chấm công ca và mức lương nhân viên</p>
         </div>
-        <button className="sf-btn sf-btn-add sf-btn-lg" onClick={() => setEditStaff(null)}>+ Thêm nhân viên</button>
+        {canManageStaff && <button className="sf-btn sf-btn-add sf-btn-lg" onClick={() => setEditStaff(null)}>+ Thêm nhân viên</button>}
       </div>
 
       <div className="sf-stats-row">
@@ -1236,11 +1289,11 @@ export default function AdminStaff() {
         ))}
       </div>
 
-      {activeTab === "list"       && <StaffList staffList={staffList} staff={staffList} onView={setViewStaff} onEdit={openEdit} onTask={openTask} onDelete={setDeleteTarget} />}
-      {activeTab === "tasks"      && <TaskOverview staff={staffList} />}
+      {activeTab === "list"       && <StaffList staffList={visibleStaffList} staff={visibleStaffList} onView={setViewStaff} onEdit={openEdit} onTask={openTask} onDelete={setDeleteTarget} canManage={canManageStaff} />}
+      {activeTab === "tasks"      && <TaskOverview staff={visibleStaffList} />}
 
-      {viewStaff   && <StaffDetail staff={viewStaff} onClose={() => setViewStaff(null)} onEdit={openEdit} onTask={openTask} />}
-      {editStaff  !== undefined && <StaffForm  staff={editStaff} customerAccounts={customerAccounts} onClose={() => setEditStaff(undefined)} onSave={handleSave} />}
+      {viewStaff   && <StaffDetail staff={viewStaff} onClose={() => setViewStaff(null)} onEdit={openEdit} onTask={openTask} canManage={canManageStaff} />}
+      {editStaff  !== undefined && <StaffForm  staff={editStaff} customerAccounts={customerAccounts} onClose={() => setEditStaff(undefined)} onSave={handleSave} canCreateManager={isAdmin} allowedCinemaId={isManager ? managerCinemaId : null} />}
       {taskStaff   && <TaskModal   staff={taskStaff}   onClose={() => setTaskStaff(null)}   onSave={handleSaveTasks} />}
       {deleteTarget && <Confirm message={`Xóa nhân viên "${deleteTarget.name}"? Hành động này không thể hoàn tác.`} onClose={() => setDeleteTarget(null)} onConfirm={handleConfirmDelete} />}
 
@@ -1251,8 +1304,14 @@ export default function AdminStaff() {
 
 export function AdminAttendance() {
   const [staffList, setStaffList] = useState([]);
+  const [managerCinemaId, setManagerCinemaId] = useState(undefined);
   const [attendStaff, setAttendStaff] = useState(null);
   const [toast, setToast] = useState("");
+  const [profile] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+  });
+  const role = String(profile.role || "").toLowerCase();
+  const isManager = role === "manager" || (role === "employee" && /quản lý|quan ly|manager/i.test(String(profile.employee_position || profile.position || "")));
 
   const showToast = (message) => {
     setToast(message);
@@ -1266,10 +1325,33 @@ export function AdminAttendance() {
   };
 
   useEffect(() => {
-    adminEmployeeService.getAll()
-      .then((response) => setStaffList((response?.employees || []).map(mapEmployeeToStaff)))
+    const loadAttendance = () => adminEmployeeService.getAll()
+      .then((response) => {
+        const records = readAttendanceRecords();
+        const employees = (response?.employees || []).map((employee) => {
+          const staff = mapEmployeeToStaff(employee);
+          return {
+            ...staff,
+            attendance: records
+              .filter((record) => Number(record.employeeId) === Number(staff.userId) || Number(record.employeeId) === Number(staff.id))
+              .map(({ id, employeeId, ...record }) => ({ id, ...record })),
+          };
+        });
+        if (isManager) {
+          const currentManager = employees.find((staff) => Number(staff.userId) === Number(profile.id || profile.userId || profile.user_id));
+          setManagerCinemaId(currentManager?.cinemaId ?? null);
+        }
+        setStaffList(employees);
+      });
+    loadAttendance()
       .catch((err) => showToast(`Không thể tải dữ liệu chấm công: ${err.message}`));
-  }, []);
+    const timer = window.setInterval(loadAttendance, 30000);
+    window.addEventListener("storage", loadAttendance);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("storage", loadAttendance);
+    };
+  }, [isManager, profile.id, profile.userId, profile.user_id]);
 
   return (
     <div className="admin-staff-page">
@@ -1279,7 +1361,17 @@ export function AdminAttendance() {
           <p>Theo dõi chấm công theo ngày hôm nay và theo từng rạp</p>
         </div>
       </div>
-      <AttendanceOverview staff={staffList} onAttend={setAttendStaff} />
+      <AttendanceOverview
+        staff={isManager
+          ? staffList.filter((staff) => Number(staff.cinemaId) === Number(managerCinemaId)
+            && Number(staff.userId) !== Number(profile.id || profile.userId || profile.user_id)
+            && staff.role !== "manager")
+          : staffList}
+        onAttend={setAttendStaff}
+        currentUserId={profile.id || profile.userId || profile.user_id}
+        canAttendSelf={String(profile.role || "").toLowerCase() === "admin"}
+        fixedCinemaId={isManager ? managerCinemaId : null}
+      />
       {attendStaff && (
         <AttendanceModal
           staff={attendStaff}

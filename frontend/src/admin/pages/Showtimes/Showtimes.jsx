@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { adminShowtimeService, adminMovieService } from "../../services/adminApi";
+import { useSelector } from "react-redux";
+import { adminShowtimeService, adminMovieService, adminEmployeeService } from "../../services/adminApi";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 import './showtimes.css';
@@ -110,9 +111,9 @@ function getConflicts(showtimes, rooms, movies, newSt, excludeId = null) {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** 1. Quản lý Suất chiếu – bảng tổng hợp */
-function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, onDeleteMany }) {
+function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, onDeleteMany, fixedCinemaId = null }) {
   const [search, setSearch]     = useState("");
-  const [filterCinema, setFC]   = useState("all");
+  const [filterCinema, setFC]   = useState(fixedCinemaId === null ? "all" : String(fixedCinemaId));
   const [filterDate, setFD]     = useState("");
   const [filterStatus, setFS]   = useState("all");
   const [selectedIds, setSelectedIds] = useState([]);
@@ -185,7 +186,7 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, 
           </button>
         )}
         <select className="sh-select" value={filterCinema} onChange={(event) => { setFC(event.target.value); resetSelectionAndPage(); }}>
-          <option value="all">Tất cả rạp</option>
+          {fixedCinemaId === null && <option value="all">Tất cả rạp</option>}
           {cinemas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <input type="date" className="sh-select" value={filterDate} onChange={(event) => { setFD(event.target.value); resetSelectionAndPage(); }} />
@@ -289,8 +290,8 @@ function ShowtimeManager({ showtimes, rooms, movies, cinemas, onEdit, onDelete, 
 }
 
 /** 2. Phân bổ phòng chiếu – timeline theo phòng */
-function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
-  const [selectedCinema, setSC] = useState(String(cinemas[0]?.id || ""));
+function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = null }) {
+  const [selectedCinema, setSC] = useState(String(fixedCinemaId ?? (cinemas[0]?.id || "")));
   const [selectedDate, setSD]   = useState(() => new Date().toISOString().slice(0, 10));
 
   const cinemaRooms = rooms.filter(r => String(r.cinemaId) === selectedCinema);
@@ -327,7 +328,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
   return (
     <div className="sh-section">
       <div className="sh-toolbar">
-        <select className="sh-select" value={selectedCinema} onChange={e => setSC(e.target.value)}>
+        <select className="sh-select" value={selectedCinema} onChange={e => setSC(e.target.value)} disabled={fixedCinemaId !== null}>
           {cinemas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <input type="date" className="sh-select" value={selectedDate} onChange={e => setSD(e.target.value)} />
@@ -437,10 +438,10 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
 }
 
 /** 3. Danh sách lịch chiếu – theo ngày dạng card */
-function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
+function ShowtimeSchedule({ showtimes, rooms, movies, cinemas, fixedCinemaId = null }) {
   const [filterDate, setFD]       = useState("");
   const [filterMovie, setFM]      = useState("all");
-  const [filterCinema, setFC]     = useState("all");
+  const [filterCinema, setFC]     = useState(fixedCinemaId === null ? "all" : String(fixedCinemaId));
   const dayCapacity = 12;
 
   const filteredShows = useMemo(() => showtimes
@@ -531,7 +532,7 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
           {movies.map(movie => <option key={movie.id} value={movie.id}>{movie.title}</option>)}
         </select>
         <select className="sh-select" value={filterCinema} onChange={event => changeFilter(setFC, event.target.value)}>
-          <option value="all">Tất cả rạp</option>
+          {fixedCinemaId === null && <option value="all">Tất cả rạp</option>}
           {cinemas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
@@ -622,10 +623,10 @@ const RECURRING_TEMPLATE_PRESETS = {
 };
 
 /** 4a. Tạo lịch chiếu lặp lại theo khung giờ cố định */
-function RecurringForm({ movies, cinemas, showtimes = [], onClose, onSave }) {
+function RecurringForm({ movies, cinemas, showtimes = [], onClose, onSave, fixedCinemaId = null }) {
   const modalBodyRef = useRef(null);
   const [selectedMovieIds, setSelectedMovieIds] = useState([]);
-  const [selectedCinemaIds, setSelectedCinemaIds] = useState([]);
+  const [selectedCinemaIds, setSelectedCinemaIds] = useState(() => fixedCinemaId === null ? [] : [Number(fixedCinemaId)]);
   const [openSelectionDropdown, setOpenSelectionDropdown] = useState(null);
   const [form, setForm] = useState(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -684,6 +685,7 @@ function RecurringForm({ movies, cinemas, showtimes = [], onClose, onSave }) {
   };
 
   const toggleCinema = (cinemaId) => {
+    if (fixedCinemaId !== null) return;
     setSelectedCinemaIds((prev) => {
       const next = prev.includes(cinemaId) ? prev.filter((id) => id !== cinemaId) : [...prev, cinemaId];
       return next;
@@ -929,6 +931,7 @@ function RecurringForm({ movies, cinemas, showtimes = [], onClose, onSave }) {
                                 type="checkbox"
                                 checked={selectedCinemaIds.includes(cinema.id)}
                                 onChange={() => toggleCinema(cinema.id)}
+                                disabled={fixedCinemaId !== null}
                               />
                               <span>{cinema.name}</span>
                             </label>
@@ -1202,7 +1205,7 @@ function RecurringForm({ movies, cinemas, showtimes = [], onClose, onSave }) {
 }
 
 /** 4. Tạo / Sửa lịch chiếu */
-function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, onSave }) {
+function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, onSave, fixedCinemaId = null }) {
   const isEdit = !!showtime;
   const modalBodyRef = useRef(null);
   const [form, setForm] = useState(showtime
@@ -1217,7 +1220,7 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
         availableSeats: showtime.availableSeats,
         status: "active",
       }
-    : { ...EMPTY_FORM }
+    : { ...EMPTY_FORM, cinemaId: fixedCinemaId === null ? "" : String(fixedCinemaId) }
   );
   const [errors, setErrors] = useState({});
 
@@ -1294,7 +1297,7 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
 
               <div className="sh-field">
                 <label>Rạp chiếu *</label>
-                <select className={errors.cinemaId ? "error" : ""} value={form.cinemaId} onChange={e => { set("cinemaId", e.target.value); set("roomId", ""); }}>
+                <select className={errors.cinemaId ? "error" : ""} value={form.cinemaId} onChange={e => { set("cinemaId", e.target.value); set("roomId", ""); }} disabled={fixedCinemaId !== null}>
                   <option value="">-- Chọn rạp --</option>
                   {cinemas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -1433,11 +1436,19 @@ function Toast({ message, onClose }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminShowtimes() {
+  const reduxProfile = useSelector((state) => state.user.profile);
+  const profile = { ...(() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+  })(), ...(reduxProfile || {}) };
+  const role = String(profile.role || "").toLowerCase();
+  const isManager = role === "manager" || (role === "employee" && /quản lý|quan ly|manager/i.test(String(profile.employee_position || profile.position || "")));
+  const currentUserId = profile.id || profile.userId;
   // ── State ──
   const [showtimes,  setShowtimes]  = useState([]);
   const [movies,     setMovies]     = useState([]);
   const [cinemas,    setCinemas]    = useState([]);
   const [rooms,      setRooms]      = useState([]);
+  const [managerCinemaId, setManagerCinemaId] = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState("");
 
@@ -1469,6 +1480,11 @@ export default function AdminShowtimes() {
         adminShowtimeService.getRooms(),
         adminMovieService.getAllMovies(false),
       ]);
+      const employeeRes = isManager ? await adminEmployeeService.getAll() : null;
+      const managerCinemaId = isManager
+        ? (employeeRes?.employees || []).find((employee) => Number(employee.userId) === Number(currentUserId))?.cinemaId
+        : null;
+      setManagerCinemaId(isManager ? managerCinemaId ?? null : null);
 
       // Chuẩn hoá dữ liệu từ DB sang format component cần
       const normalizedSt = (stRes.showtimes || []).map(s => ({
@@ -1513,9 +1529,13 @@ export default function AdminShowtimes() {
         releaseDate: normalizeDateInputValue(m.release_date),
       }));
 
-      setShowtimes(normalizedSt);
-      setCinemas(normalizedCinemas);
-      setRooms(normalizedRooms);
+      const scopedCinemas = isManager
+        ? normalizedCinemas.filter((cinema) => Number(cinema.id) === Number(managerCinemaId))
+        : normalizedCinemas;
+      const scopedCinemaIds = new Set(scopedCinemas.map((cinema) => Number(cinema.id)));
+      setShowtimes(normalizedSt.filter((showtime) => !isManager || scopedCinemaIds.has(Number(showtime.cinemaId))));
+      setCinemas(scopedCinemas);
+      setRooms(normalizedRooms.filter((room) => !isManager || scopedCinemaIds.has(Number(room.cinemaId))));
       setMovies(normalizedMovies);
     } catch (err) {
       console.error(err);
@@ -1523,7 +1543,7 @@ export default function AdminShowtimes() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUserId, isManager]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(fetchAll, 0);
@@ -1705,16 +1725,17 @@ export default function AdminShowtimes() {
           {activeTab === "manager" && (
             <ShowtimeManager
               showtimes={showtimes} rooms={rooms} movies={movies} cinemas={cinemas}
+              fixedCinemaId={isManager ? managerCinemaId : null}
               onEdit={s => setEditSt(s)}
               onDelete={handleDelete}
               onDeleteMany={handleDeleteMany}
             />
           )}
           {activeTab === "allocation" && (
-            <RoomAllocation showtimes={showtimes} rooms={rooms} movies={movies} cinemas={cinemas} />
+            <RoomAllocation showtimes={showtimes} rooms={rooms} movies={movies} cinemas={cinemas} fixedCinemaId={isManager ? managerCinemaId : null} />
           )}
           {activeTab === "schedule" && (
-            <ShowtimeSchedule showtimes={showtimes} rooms={rooms} movies={movies} cinemas={cinemas} />
+            <ShowtimeSchedule showtimes={showtimes} rooms={rooms} movies={movies} cinemas={cinemas} fixedCinemaId={isManager ? managerCinemaId : null} />
           )}
         </>
       )}
@@ -1728,6 +1749,7 @@ export default function AdminShowtimes() {
             showtimes={showtimes}
             onClose={() => setShowRecurring(false)}
             onSave={handleSaveRecurring}
+            fixedCinemaId={isManager ? managerCinemaId : null}
           />
         )}
         {editSt !== undefined && (
@@ -1739,6 +1761,7 @@ export default function AdminShowtimes() {
             cinemas={cinemas}
             onClose={() => setEditSt(undefined)}
             onSave={handleSave}
+            fixedCinemaId={isManager ? managerCinemaId : null}
           />
         )}
       </div>

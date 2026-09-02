@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useSelector } from "react-redux";
 import { FaCheckCircle, FaCreditCard, FaMobileAlt, FaMoneyBillWave, FaSearch, FaUniversity, FaWifi } from "react-icons/fa";
 import {
   adminBookingService,
@@ -8,6 +9,7 @@ import {
   adminSeatService,
   adminComboService,
   adminMovieService,
+  adminEmployeeService,
 } from "../../services/adminApi.js";
 import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../../utils/birthDate.js";
 import { toAbsoluteAssetUrl } from "../../../utils/api.js";
@@ -53,12 +55,24 @@ const MOVIE_STATUS_GROUPS = [
 ];
 
 const normalizeCinemaList = (payload) => {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.cinemas)) return payload.cinemas;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.data?.cinemas)) return payload.data.cinemas;
-  if (Array.isArray(payload?.items)) return payload.items;
-  return [];
+  const list = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.cinemas)
+      ? payload.cinemas
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.data?.cinemas)
+          ? payload.data.cinemas
+          : Array.isArray(payload?.items)
+            ? payload.items
+            : [];
+  return list
+    .map((cinema) => ({
+      ...cinema,
+      id: cinema.id ?? cinema.cinema_id ?? cinema.cinemas_id,
+      name: cinema.name ?? cinema.cinema_name,
+    }))
+    .filter((cinema) => cinema.id != null);
 };
 
 /** Trả về ngày theo giờ VN (UTC+7) dạng "YYYY-MM-DD" */
@@ -206,6 +220,13 @@ function FoodItemCard({ item, quantity, onChange }) {
 }
 
 export default function BookingWizard({ onToast, onBookingSuccess }) {
+  const reduxProfile = useSelector((state) => state.user.profile);
+  const profile = { ...(() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+  })(), ...(reduxProfile || {}) };
+  const role = String(profile.role || "").toLowerCase();
+  const isCinemaScopedStaff = role === "employee" || role === "manager";
+  const currentUserId = profile.id || profile.userId || profile.user_id;
   const [step, setStep] = useState(1);
   // Step 1: Customer
   const [customerMode, setCustomerMode] = useState("existing_user");
@@ -276,11 +297,12 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     let ignore = false;
     (async () => {
       try {
-        const [movieResult, cinemaResult, comboResult, showtimeCinemaResult] = await Promise.allSettled([
+        const [movieResult, cinemaResult, comboResult, showtimeCinemaResult, employeeResult] = await Promise.allSettled([
           adminMovieService.getAllMovies(false),
           adminCinemaService.getAllCinemas(),
           adminComboService.getAll(),
           adminShowtimeService.getCinemas(),
+          isCinemaScopedStaff ? adminEmployeeService.getAll() : Promise.resolve(null),
         ]);
 
         if (ignore) return;
@@ -298,13 +320,22 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
           showtimeCinemaResult.status === "fulfilled" ? showtimeCinemaResult.value : null,
         );
         const finalCinemas = listC.length > 0 ? listC : fromShowtimeCinemas;
+        const staffCinemaId = isCinemaScopedStaff
+          ? (employeeResult.status === "fulfilled" ? employeeResult.value?.employees || [] : [])
+            .find((employee) => Number(employee.userId || employee.user_id) === Number(currentUserId))?.cinemaId
+            || (employeeResult.status === "fulfilled" ? (employeeResult.value?.employees || []).find((employee) => Number(employee.userId || employee.user_id) === Number(currentUserId))?.cinema_id : null)
+          : null;
+        const scopedCinemas = isCinemaScopedStaff
+          ? finalCinemas.filter((cinema) => Number(cinema.id) === Number(staffCinemaId))
+          : finalCinemas;
 
         const comboData = comboResult.status === "fulfilled" ? comboResult.value : null;
         const listCombo = Array.isArray(comboData?.combos)
           ? comboData.combos
           : (Array.isArray(comboData) ? comboData : []);
 
-        setCinemas(finalCinemas);
+        setCinemas(scopedCinemas);
+        if (scopedCinemas.length === 1) setSelectedCinemaId(String(scopedCinemas[0].id));
         setComboList(listCombo);
         setComboCounts(
           listCombo.reduce((acc, c) => {
@@ -320,7 +351,13 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [currentUserId, isCinemaScopedStaff]);
+
+  useEffect(() => {
+    if (isCinemaScopedStaff && cinemas.length === 1) {
+      setSelectedCinemaId(String(cinemas[0].id));
+    }
+  }, [cinemas, isCinemaScopedStaff]);
 
   useEffect(() => () => {
     if (seatRuleTimerRef.current) clearTimeout(seatRuleTimerRef.current);
@@ -838,7 +875,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     setNewCustomerErrors({});
     setGuestCustomerForm({ full_name: "", phone: "", email: "" });
     setGuestCustomerErrors({});
-    setSelectedCinemaId("");
+    setSelectedCinemaId(isCinemaScopedStaff ? String(cinemas[0]?.id || "") : "");
     setSelectedShowtime(null);
     setSelectedSeats([]);
     setComboCounts(comboList.reduce((acc, c) => ({ ...acc, [c.combo_id]: 0 }), {}));
@@ -1265,7 +1302,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
               </div>
               <div className="sf-field" style={{ marginBottom: 14 }}>
                 <label>Rạp chiếu</label>
-                <select value={selectedCinemaId} onChange={(e) => { setSelectedCinemaId(e.target.value); setSelectedShowtime(null); }}>
+                <select value={selectedCinemaId} onChange={(e) => { setSelectedCinemaId(e.target.value); setSelectedShowtime(null); }} disabled={isCinemaScopedStaff}>
                   <option value="">-- Chọn rạp --</option>
                   {cinemas.map((c) => (
                     <option key={c.cinemas_id || c.id || c.cinema_id} value={c.cinemas_id || c.id || c.cinema_id}>

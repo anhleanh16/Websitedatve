@@ -23,26 +23,22 @@ import { getValidStoredToken } from "../../utils/auth";
 export function AdminRoutes() {
   const profile = useSelector((state) => state.user.profile);
   const token = getValidStoredToken();
-  let storedUser = profile;
-  if (!storedUser) {
-    try {
-      storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    } catch {
-      storedUser = {};
-      localStorage.removeItem('user');
-    }
+  let localUser = {};
+  try {
+    localUser = JSON.parse(localStorage.getItem('user') || '{}');
+  } catch {
+    localStorage.removeItem('user');
   }
+  const storedUser = { ...localUser, ...(profile || {}) };
   const userRole = String(storedUser?.role || '').toLowerCase();
-  const canAccessAdmin = token && ['admin', 'employee'].includes(userRole);
+  const canAccessAdmin = token && ['admin', 'employee', 'manager'].includes(userRole);
 
-  const isEmployee = userRole === 'employee';
+  const isManager = userRole === 'manager'
+    || (userRole === 'employee' && /quản lý|quan ly|manager/i.test(
+      String(storedUser?.employee_position || storedUser?.position || ''),
+    ));
+  const isEmployee = userRole === 'employee' && !isManager;
 
-  const employeeRoutes = [
-    <Route key="users" path="users" element={<AdminLayout><Users /></AdminLayout>} />,
-    <Route key="bookings" path="bookings" element={<AdminLayout><Bookings /></AdminLayout>} />,
-    <Route key="statistics" path="statistics" element={<AdminLayout><Statistics /></AdminLayout>} />,
-    <Route key="index" path="" element={<AdminLayout><Bookings /></AdminLayout>} />,
-  ];
   const fullAdminRoutes = [
     <Route key="dashboard" path="dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />,
     <Route key="roles" path="roles" element={<Navigate to="/admin/dashboard" replace />} />,
@@ -64,13 +60,19 @@ export function AdminRoutes() {
     <Route key="settings" path="settings" element={<AdminLayout><Settings /></AdminLayout>} />,
     <Route key="index" path="" element={<AdminLayout><Dashboard /></AdminLayout>} />,
   ];
+  const managerRoutes = fullAdminRoutes.map((route) => (
+    route.key === "dashboard" || route.key === "index"
+      ? <Route key={route.key} path={route.props.path} element={<Navigate to="/admin/bookings" replace />} />
+      : route
+  ));
+  const employeeRoutes = managerRoutes.filter((route) => ["bookings", "index"].includes(String(route.key)));
 
   return (
     <Routes>
       <Route path="login" element={<AdminLogin />} />
       {canAccessAdmin && (
         <>
-          {isEmployee ? employeeRoutes : fullAdminRoutes}
+          {isManager ? managerRoutes : isEmployee ? employeeRoutes : fullAdminRoutes}
           <Route
             path="*"
             element={<Navigate to={isEmployee ? "/admin/bookings" : "/admin/dashboard"} replace />}
