@@ -166,7 +166,11 @@ const sanitizePayload = (payload = {}) => {
   const drink_quantity = Math.max(0, Number(payload.drink_quantity || 0) || 0);
   const popcorn_options = normalizeOptionList(payload.popcorn_options);
   const drink_options = normalizeOptionList(payload.drink_options);
-  const is_active = payload.is_active === false || payload.is_active === 0 ? 0 : 1;
+  const rawIsActive = payload.is_active;
+  const is_active =
+    rawIsActive === false || rawIsActive === 0 || rawIsActive === "0" || rawIsActive === "false"
+      ? 0
+      : 1;
   const sort_order = Number(payload.sort_order || 0) || 0;
 
   if (!combo_name) {

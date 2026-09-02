@@ -288,14 +288,24 @@ export const searchAdminUsers = async (req, res) => {
         u.birthday,
         u.sex,
         u.point as points,
-        ml.level_name as membership_level,
-        COALESCE(ml.discount_percent, 0) as membership_discount,
+        (
+          SELECT ml.level_name
+          FROM Membership_Levels ml
+          WHERE u.point >= ml.min_points AND u.point <= ml.max_points
+          ORDER BY ml.min_points DESC, ml.max_points DESC
+          LIMIT 1
+        ) AS membership_level,
+        (
+          SELECT COALESCE(ml.discount_percent, 0)
+          FROM Membership_Levels ml
+          WHERE u.point >= ml.min_points AND u.point <= ml.max_points
+          ORDER BY ml.min_points DESC, ml.max_points DESC
+          LIMIT 1
+        ) AS membership_discount,
         u.created_at
       FROM User u
       LEFT JOIN Roles r ON u.role_id = r.role_id
       LEFT JOIN Employees e ON e.user_id = u.id
-      LEFT JOIN Membership_Levels ml
-        ON u.point >= ml.min_points AND u.point <= ml.max_points
       WHERE u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
       ORDER BY u.created_at DESC
       LIMIT 20`,
