@@ -7,7 +7,17 @@ const SMTP_SECURE = String(process.env.SMTP_SECURE || 'false').toLowerCase() ===
 const SMTP_USER = process.env.SMTP_USER || ''
 const SMTP_PASS = process.env.SMTP_PASS || ''
 const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_USER || ''
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173'
+const FALLBACK_FRONTEND_URL = 'https://sweetstarcinemar.qlinterior.shop'
+
+const normalizeFrontendUrl = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return FALLBACK_FRONTEND_URL
+
+  const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+  return url.replace(/\/+$/, '')
+}
+
+const FRONTEND_URL = normalizeFrontendUrl(process.env.FRONTEND_URL || FALLBACK_FRONTEND_URL)
 
 let transporter = null
 

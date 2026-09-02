@@ -415,14 +415,14 @@ export default function AdminCombos() {
   };
 
   const handleDelete = async (combo) => {
-    const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa/ngừng bán combo "${combo.combo_name}" không?`,
-    );
-    if (!confirmed) return;
+    if (Number(combo?.usage_count || 0) > 0) {
+      showToast("Combo đã được sử dụng trong khu vực đơn hàng nên không thể ngừng bán hoặc xóa.", "error");
+      return;
+    }
 
     try {
       const result = await adminComboService.delete(combo.combo_id);
-      showToast(result?.message || "Đã xử lý combo.");
+      showToast(result?.message || "Đã xóa combo.");
       await loadCombos();
     } catch (deleteError) {
       console.error(deleteError);
@@ -566,7 +566,7 @@ export default function AdminCombos() {
                           Sửa
                         </button>
                         <button className="bk-btn bk-btn-refund" onClick={() => handleDelete(combo)}>
-                          {combo.usage_count > 0 ? "Ngừng bán" : "Xóa"}
+                          {combo.usage_count > 0 ? "Không thể xóa" : "Xóa"}
                         </button>
                       </div>
                     </td>
@@ -588,7 +588,7 @@ export default function AdminCombos() {
       )}
 
       {toast && (
-        <div className={`bk-toast ${toast.type === "error" ? "error" : ""}`}>
+        <div className={`bk-toast bk-toast-${toast.type === "error" ? "error" : "success"}`}>
           {toast.message}
         </div>
       )}

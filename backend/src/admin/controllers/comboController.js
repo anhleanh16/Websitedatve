@@ -7,6 +7,16 @@ const normalizeUploadedComboImage = (file) => {
   return `/uploads/combos/${file.filename}`.replace(/\\/g, "/");
 };
 
+const normalizeComboImageValue = (uploadedFile, bodyImage, fallbackImage = "") => {
+  const uploadedPath = normalizeUploadedComboImage(uploadedFile);
+  if (uploadedPath) return uploadedPath;
+
+  const bodyValue = typeof bodyImage === "string" ? bodyImage.trim() : "";
+  if (bodyValue) return bodyValue;
+
+  return fallbackImage || "";
+};
+
 export const getAdminCombos = async (req, res) => {
   try {
     const combos = await ComboModel.findAll({
@@ -42,7 +52,7 @@ export const createAdminCombo = async (req, res) => {
   try {
     const payload = {
       ...(req.body || {}),
-      image: normalizeUploadedComboImage(req.file) || req.body?.image || "",
+      image: normalizeComboImageValue(req.file, req.body?.image),
     };
     const combo = await ComboModel.create(payload);
     res.status(201).json({ message: "Tạo combo thành công", combo });
@@ -59,9 +69,7 @@ export const updateAdminCombo = async (req, res) => {
     const currentCombo = await ComboModel.findById(req.params.id);
     const payload = {
       ...(req.body || {}),
-      image:
-        normalizeUploadedComboImage(req.file) ||
-        (typeof req.body?.image === "string" && req.body.image.trim() ? req.body.image.trim() : currentCombo?.image || ""),
+      image: normalizeComboImageValue(req.file, req.body?.image, currentCombo?.image || ""),
     };
     const combo = await ComboModel.update(req.params.id, payload);
     if (!combo) {

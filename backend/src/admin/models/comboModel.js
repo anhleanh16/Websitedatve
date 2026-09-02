@@ -524,8 +524,7 @@ export const ComboModel = {
     );
 
     if (Number(usage?.total || 0) > 0) {
-      await db.query("UPDATE Combos SET is_active = 0 WHERE combo_id = ?", [id]);
-      return { deleted: false, deactivated: true };
+      throw buildAppError("Combo đã được sử dụng trong đơn hàng nên không thể ngừng bán hoặc xóa.", 409);
     }
 
     const [result] = await db.query("DELETE FROM Combos WHERE combo_id = ?", [id]);
