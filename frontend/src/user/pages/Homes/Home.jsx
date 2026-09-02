@@ -269,7 +269,7 @@ const groupShowtimesByMovie = (items) => {
       grouped.set(key, {
         id: key,
         movieId: item.movie_id,
-        title: item.movie_title,
+        title: formatMovieTitle(item.movie_title),
         format: item.room_type || '2D',
         roomId: item.room_id,
         roomName: item.room_name,

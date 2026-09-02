@@ -69,6 +69,10 @@ const getYouTubeEmbedUrl = (url, options = {}) => {
   const params = new URLSearchParams({
     rel: '0',
     playsinline: '1',
+    modestbranding: '1',
+    showinfo: '0',
+    autohide: '1',
+    enablejsapi: '1',
   });
 
   if (options.autoplay) params.set('autoplay', '1');
@@ -81,9 +85,10 @@ const getYouTubeEmbedUrl = (url, options = {}) => {
     params.set('controls', '0');
     params.set('disablekb', '1');
     params.set('iv_load_policy', '3');
+    params.set('fs', '0');
   }
 
-  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+  return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`;
 };
 
 export default function MovieDetail() {
@@ -121,6 +126,8 @@ export default function MovieDetail() {
   const videoRef = useRef(null); // For hero banner trailer
   const pageSmallTrailerRef = useRef(null); // For small trailer in page
   const modalSmallTrailerRef = useRef(null); // For small trailer in modal
+  const pageYoutubeTrailerRef = useRef(null);
+  const modalYoutubeTrailerRef = useRef(null);
   const trailerContainerRef = useRef(null);
   const bookBarRef = useRef(null);
   const [bannerOpacity, setBannerOpacity] = useState(1);
@@ -155,7 +162,12 @@ export default function MovieDetail() {
   const posterSrc = movie?.poster || '';
   const trailerSrc = movie?.trailer || '';
   const hasTrailer = Boolean(trailerSrc);
-  const youtubeTrailerUrl = getYouTubeEmbedUrl(trailerSrc);
+  const youtubeTrailerUrl = getYouTubeEmbedUrl(trailerSrc, {
+    autoplay: true,
+    muted: true,
+    loop: true,
+    controls: false,
+  });
   const heroYoutubeTrailerUrl = getYouTubeEmbedUrl(trailerSrc, {
     autoplay: true,
     muted: true,
@@ -282,6 +294,14 @@ export default function MovieDetail() {
     const modalVideo = modalSmallTrailerRef.current;
     if (pageVideo) pageVideo.muted = newMuted;
     if (modalVideo) modalVideo.muted = newMuted;
+    const command = newMuted ? 'mute' : 'unMute';
+    [pageYoutubeTrailerRef.current, modalYoutubeTrailerRef.current].forEach((iframe) => {
+      iframe?.contentWindow?.postMessage(JSON.stringify({
+        event: 'command',
+        func: command,
+        args: [],
+      }), 'https://www.youtube-nocookie.com');
+    });
     setSmallTrailerMuted(newMuted);
   };
 
@@ -759,12 +779,21 @@ export default function MovieDetail() {
                     <>
                       <iframe
                         className="trailer-video"
+                        ref={pageYoutubeTrailerRef}
                         src={youtubeTrailerUrl}
                         title="Trailer"
                         frameBorder="0"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />
+                      <button
+                        type="button"
+                        className="trailer-mute-btn small-trailer-mute-btn"
+                        onClick={handleSmallTrailerToggleMute}
+                        aria-label={smallTrailerMuted ? 'Bật tiếng' : 'Tắt tiếng'}
+                      >
+                        {smallTrailerMuted ? '🔇' : '🔊'}
+                      </button>
                       <button
                         type="button"
                         className="trailer-fullscreen-btn"
@@ -987,14 +1016,25 @@ export default function MovieDetail() {
                 <div className="trailer-modal-video-container">
                   {youtubeTrailerUrl ? (
                     // YouTube/link trailer in modal
-                    <iframe
-                      className="trailer-modal-video"
-                      src={youtubeTrailerUrl}
-                      title="Trailer"
-                      frameBorder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
+                    <>
+                      <iframe
+                        className="trailer-modal-video"
+                        ref={modalYoutubeTrailerRef}
+                        src={youtubeTrailerUrl}
+                        title="Trailer"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                      <button
+                        type="button"
+                        className="trailer-mute-btn small-trailer-mute-btn"
+                        onClick={handleSmallTrailerToggleMute}
+                        aria-label={smallTrailerMuted ? 'Bật tiếng' : 'Tắt tiếng'}
+                      >
+                        {smallTrailerMuted ? '🔇' : '🔊'}
+                      </button>
+                    </>
                   ) : (
                     // Local video file in modal
                     <>

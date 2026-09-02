@@ -164,6 +164,7 @@
   position: relative;
   width: 100%;
   max-width: 100%;
+  animation: none !important;
   background: transparent;
   color: #ffffff;
   padding: 0;
@@ -773,6 +774,11 @@ h1.movie-detail-title,
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.trailer-video-container iframe.trailer-video,
+.trailer-modal-video-container iframe.trailer-modal-video {
+  pointer-events: none;
 }
 
 .trailer-play-button {
