@@ -441,7 +441,7 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
   const [filterDate, setFD]       = useState("");
   const [filterMovie, setFM]      = useState("all");
   const [filterCinema, setFC]     = useState("all");
-  const pageSize = 12;
+  const dayCapacity = 12;
 
   const filteredShows = useMemo(() => showtimes
     .filter(showtime => (
@@ -452,11 +452,9 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
     .sort((a, b) => new Date(a.startTime) - new Date(b.startTime)),
   [showtimes, filterDate, filterMovie, filterCinema]);
 
-  const { page, setPage, totalPages, pageItems } = useAdminPagination(filteredShows, pageSize);
-
-  const scheduleGroups = useMemo(() => {
+  const dayGroups = useMemo(() => {
     const dates = new Map();
-    pageItems.forEach(showtime => {
+    filteredShows.forEach(showtime => {
       const dateKey = showtime.startTime.slice(0, 10);
       if (!dates.has(dateKey)) dates.set(dateKey, new Map());
       const movieGroups = dates.get(dateKey);
@@ -465,7 +463,35 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
       movieGroups.get(movieKey).push(showtime);
     });
     return [...dates.entries()].map(([dateKey, movieGroups]) => [dateKey, [...movieGroups.entries()]]);
-  }, [pageItems]);
+  }, [filteredShows]);
+
+  const schedulePages = useMemo(() => {
+    const pages = [];
+    let currentPage = [];
+    let currentCount = 0;
+
+    dayGroups.forEach(([dateKey, movieGroups]) => {
+      const dayCount = movieGroups.reduce((count, [, shows]) => count + shows.length, 0);
+      if (currentPage.length > 0 && currentCount + dayCount > dayCapacity) {
+        pages.push(currentPage);
+        currentPage = [];
+        currentCount = 0;
+      }
+      currentPage.push([dateKey, movieGroups]);
+      currentCount += dayCount;
+      if (dayCount > dayCapacity) {
+        pages.push(currentPage);
+        currentPage = [];
+        currentCount = 0;
+      }
+    });
+
+    if (currentPage.length > 0) pages.push(currentPage);
+    return pages;
+  }, [dayGroups]);
+
+  const { page, setPage, totalPages, pageItems } = useAdminPagination(schedulePages, 1);
+  const scheduleGroups = pageItems[0] || [];
 
   const groupCounts = useMemo(() => {
     const dates = new Map();
@@ -576,8 +602,9 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
       <AdminPagination
         page={page}
         totalPages={totalPages}
-        totalItems={filteredShows.length}
-        pageSize={pageSize}
+        totalItems={schedulePages.length}
+        pageSize={1}
+        summaryLabel={`Trang ngày ${page} / ${totalPages}`}
         onPageChange={setPage}
       />
       <div className="sh-footer-count">

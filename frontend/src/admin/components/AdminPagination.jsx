@@ -17,7 +17,7 @@ export const useAdminPagination = (items, pageSize = 10) => {
   return { page: currentPage, setPage, totalPages, pageItems };
 };
 
-export default function AdminPagination({ page, totalPages, totalItems, pageSize, onPageChange }) {
+export default function AdminPagination({ page, totalPages, totalItems, pageSize, onPageChange, summaryLabel }) {
   if (totalItems <= pageSize) return null;
 
   const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1)
@@ -31,7 +31,7 @@ export default function AdminPagination({ page, totalPages, totalItems, pageSize
   return (
     <nav className="admin-pagination" aria-label="Phân trang">
       <span className="admin-pagination-summary">
-        Hiển thị {Math.min((page - 1) * pageSize + 1, totalItems)}–{Math.min(page * pageSize, totalItems)} / {totalItems}
+        {summaryLabel || `Hiển thị ${Math.min((page - 1) * pageSize + 1, totalItems)}–${Math.min(page * pageSize, totalItems)} / ${totalItems}`}
       </span>
       <div className="admin-pagination-controls">
         <button type="button" onClick={() => onPageChange(page - 1)} disabled={page === 1} aria-label="Trang trước">‹</button>

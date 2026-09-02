@@ -57,6 +57,11 @@ const ATT_STATUS = {
 
 const getInitials = (name) => name.split(" ").slice(-2).map(w => w[0]).join("").toUpperCase();
 const fmtSalary   = (type, n) => type === "part_time" ? `${n.toLocaleString()} ₫/giờ` : `${n.toLocaleString()} ₫/tháng`;
+const getToday = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+};
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^(?:\+84|0)(?:3|5|7|8|9)\d{8}$/;
 const EMPLOYEE_CODE_PATTERN = /^[A-Za-z0-9_-]{2,30}$/;
@@ -616,11 +621,21 @@ function TaskModal({ staff, onClose, onSave }) {
 // ─── Attendance Modal ─────────────────────────────────────────────────────────
 function AttendanceModal({ staff, onClose, onSave }) {
   const [records, setRecords] = useState(staff ? [...staff.attendance] : []);
-  const [form, setForm] = useState({ date: "", shiftId: "morning", status: "present" });
+  const [today, setToday] = useState(getToday);
+  const [form, setForm] = useState({ date: getToday(), shiftId: "morning", status: "present" });
   const [err,  setErr]  = useState("");
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setToday(getToday()), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    setForm((prev) => ({ ...prev, date: today }));
+  }, [today]);
+
   const addRecord = () => {
-    if (!form.date) { setErr("Chọn ngày."); return; }
+    if (form.date !== today) { setErr("Chỉ được chấm công trong ngày hôm nay."); return; }
     if (records.find(r => r.date === form.date && r.shiftId === form.shiftId)) {
       setErr("Đã có bản ghi cho ca này trong ngày."); return;
     }
@@ -651,8 +666,8 @@ function AttendanceModal({ staff, onClose, onSave }) {
           {/* Add record */}
           <div className="sf-task-add-form">
             <div className="sf-field">
-              <label>Ngày *</label>
-              <input type="date" value={form.date} onChange={e => { setForm(p => ({ ...p, date: e.target.value })); setErr(""); }} />
+              <label>Ngày hôm nay</label>
+              <input type="date" value={today} readOnly aria-label="Ngày chấm công hôm nay" />
             </div>
             <div className="sf-field">
               <label>Ca làm việc</label>
@@ -955,7 +970,12 @@ function StaffList({ staff, onView, onEdit, onTask, onAttend, onDelete }) {
 // ─── Attendance Overview Tab ──────────────────────────────────────────────────
 function AttendanceOverview({ staff }) {
   const [filterCinema, setFC] = useState("all");
-  const [filterDate,   setFD] = useState("");
+  const [today, setToday] = useState(getToday);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setToday(getToday()), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const filtered = staff.filter(s => filterCinema === "all" || String(s.cinemaId) === filterCinema);
 
@@ -966,7 +986,7 @@ function AttendanceOverview({ staff }) {
           <option value="all">Tất cả rạp</option>
           {CINEMAS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <input type="date" className="sf-select" value={filterDate} onChange={e => setFD(e.target.value)} />
+        <input type="date" className="sf-select" value={today} readOnly aria-label="Ngày chấm công hôm nay" />
       </div>
 
       <div className="table-card">
@@ -984,9 +1004,7 @@ function AttendanceOverview({ staff }) {
           </thead>
           <tbody>
             {filtered.map(s => {
-              const att = filterDate
-                ? s.attendance.filter(a => a.date === filterDate)
-                : s.attendance;
+              const att = s.attendance.filter(a => a.date === today);
               const total   = att.length;
               const present = att.filter(a => a.status === "present").length;
               const late    = att.filter(a => a.status === "late").length;
