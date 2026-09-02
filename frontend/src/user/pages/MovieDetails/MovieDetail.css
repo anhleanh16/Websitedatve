@@ -1331,6 +1331,51 @@ h1.movie-detail-title,
   color: #fff;
 }
 
+.region-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.region-selector .label-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.region-dropdown {
+  padding: 0.7rem 0.9rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.region-dropdown:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.region-dropdown:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(154, 124, 255, 0.5);
+  box-shadow: 0 0 0 3px rgba(154, 124, 255, 0.1);
+}
+
+.region-dropdown option {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
 .cinema-list {
   list-style: none;
   padding: 0;
@@ -1657,6 +1702,11 @@ h1.movie-detail-title,
   /* Hide schedule sidebar on mobile */
   .schedule-sidebar {
     display: none;
+  }
+  
+  .region-selector {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
   }
   
   /* Make schedule-main full width on mobile */
