@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toAbsoluteAssetUrl } from "../../../utils/api";
+import { formatMovieTitle } from "../../../utils/movieTitle";
 import "./QuickBookWidget.css";
 
 const BASE = import.meta.env.VITE_API_URL || "/api";
@@ -57,7 +58,10 @@ export default function QuickBookWidget({ defaultCinemaId = null, defaultMovieId
 
   useEffect(() => {
     fetchJSON("/user/movies?status=now_showing")
-      .then((d) => setMovies(d.movies || []))
+      .then((d) => setMovies((d.movies || []).map((movie) => ({
+        ...movie,
+        title: formatMovieTitle(movie.title),
+      }))))
       .catch(() => {});
     fetchJSON("/user/cinemas")
       .then((d) => setCinemas(d.cinemas || []))

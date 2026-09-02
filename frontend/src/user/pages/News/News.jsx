@@ -9,6 +9,7 @@ import {
   FaTag,
   FaFire,
   FaClock,
+  FaArrowRight,
 } from "react-icons/fa";
 import { userNewsService } from "../../services/userApi";
 import { toAbsoluteAssetUrl } from "../../../utils/api";
@@ -267,7 +268,8 @@ export default function News() {
                         </button>
                       </div>
                       <Link className="btn-read-card" to={`/news/${item.slug}`}>
-                        Đọc thêm
+                        <span>Đọc thêm</span>
+                        <FaArrowRight aria-hidden="true" />
                       </Link>
                     </div>
                   </div>

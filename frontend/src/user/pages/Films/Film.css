@@ -602,7 +602,10 @@
 
 .suggest {
   min-height: 170px;
+  min-width: 0;
+  width: 100%;
   display: flex;
+  align-items: stretch;
   flex-direction: column;
   gap: 16px;
   padding: 18px;
@@ -622,6 +625,9 @@
 }
 
 .suggest-list {
+  min-width: 0;
+  width: 100%;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -629,6 +635,9 @@
 
 .suggest-card {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  align-self: stretch;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -796,7 +805,7 @@
 
 @media (max-width: 800px) {
   .film-main {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 24px;
   }
   .film-right {
