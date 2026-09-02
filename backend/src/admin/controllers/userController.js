@@ -306,7 +306,25 @@ export const searchAdminUsers = async (req, res) => {
       FROM User u
       LEFT JOIN Roles r ON u.role_id = r.role_id
       LEFT JOIN Employees e ON e.user_id = u.id
-      WHERE u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
+      WHERE (
+        u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
+      )
+        AND COALESCE(u.email_verified, 0) = 1
+        AND TRIM(COALESCE(u.email, '')) <> ''
+        AND LOWER(COALESCE(u.email, '')) NOT LIKE '%@unlinked.local'
+        AND CASE
+          WHEN u.id = 1 THEN 'admin'
+          WHEN LOWER(COALESCE(e.position, '')) LIKE '%quản lý%'
+            OR LOWER(COALESCE(e.position, '')) LIKE '%manager%'
+            OR LOWER(COALESCE(r.role_name, '')) IN ('manager', 'quan ly', 'quản lý') THEN 'manager'
+          WHEN LOWER(COALESCE(e.position, '')) LIKE '%kỹ thuật%'
+            OR LOWER(COALESCE(e.position, '')) LIKE '%technician%'
+            OR LOWER(COALESCE(e.position, '')) LIKE '%technical%'
+            OR LOWER(COALESCE(r.role_name, '')) IN ('technician', 'technical') THEN 'technician'
+          WHEN e.employee_id IS NOT NULL
+            OR LOWER(COALESCE(r.role_name, '')) IN ('employee', 'staff', 'nhan vien', 'nhân viên') THEN 'staff'
+          ELSE 'user'
+        END = 'user'
       ORDER BY u.created_at DESC
       LIMIT 20`,
       [q, q, q],
