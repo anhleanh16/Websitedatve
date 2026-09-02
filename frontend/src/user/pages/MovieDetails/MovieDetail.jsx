@@ -112,6 +112,7 @@ export default function MovieDetail() {
   const [showAllActors, setShowAllActors] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [showAllCinemas, setShowAllCinemas] = useState(false);
+  const [scheduleRegion, setScheduleRegion] = useState(null);
   const [activeCinema, setActiveCinema] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
   const scheduleRef = useRef(null);
@@ -452,6 +453,7 @@ export default function MovieDetail() {
           id: showtime.showtime_id,
           cinemaId: Number(showtime.cinema_id),
           cinemaName: showtime.cinema_name,
+          cinemaCity: showtime.city || 'Chưa có',
           roomId: Number(showtime.room_id),
           roomName: showtime.room_name,
           roomType: showtime.room_type,
@@ -466,11 +468,25 @@ export default function MovieDetail() {
         }))
     : [];
 
+  // Lấy danh sách tất cả các khu vực (city)
+  const regions = Array.from(
+    new Set(showtimeItems.map((item) => item.cinemaCity).filter(Boolean)),
+  ).sort();
+
+  // Lấy danh sách rạp, lọc theo khu vực đã chọn
+  const filteredShowtimeItems = scheduleRegion
+    ? showtimeItems.filter((item) => item.cinemaCity === scheduleRegion)
+    : showtimeItems;
+
   const cinemas = Array.from(
     new Map(
-      showtimeItems.map((showtime) => [
+      filteredShowtimeItems.map((showtime) => [
         showtime.cinemaId,
-        { id: showtime.cinemaId, name: showtime.cinemaName },
+        { 
+          id: showtime.cinemaId, 
+          name: showtime.cinemaName,
+          city: showtime.cinemaCity 
+        },
       ]),
     ).values(),
   );
@@ -498,7 +514,7 @@ export default function MovieDetail() {
   }, [bookingContext, cinemas, selectedCinema]);
 
   const currentCinema = cinemas.find((cinema) => cinema.id === activeCinema) || null;
-  const showTimes = showtimeItems.filter(
+  const showTimes = filteredShowtimeItems.filter(
     (showtime) =>
       showtime.cinemaId === activeCinema && showtime.dateKey === activeDay,
   );
@@ -515,6 +531,12 @@ export default function MovieDetail() {
 
   const handleCinemaChange = (cinemaId) => {
     setActiveCinema(cinemaId);
+    setSelectedTime(null);
+  };
+
+  const handleRegionChange = (region) => {
+    setScheduleRegion(region);
+    setActiveCinema(null);
     setSelectedTime(null);
   };
 
@@ -1019,6 +1041,31 @@ export default function MovieDetail() {
           <div className="movie-detail-schedule" ref={scheduleRef}>
             <div className="schedule-sidebar">
               <div className="cinema-title"><span className="icon">📅</span>Lịch chiếu</div>
+              
+              {/* Region/City Selection */}
+              {regions.length > 1 && (
+                <div className="region-selector">
+                  <label htmlFor="region-dropdown">
+                    <span className="label-text">Chọn khu vực:</span>
+                  </label>
+                  <select 
+                    id="region-dropdown"
+                    value={scheduleRegion || ''}
+                    onChange={(e) => handleRegionChange(e.target.value || null)}
+                    className="region-dropdown"
+                  >
+                    <option value="">Tất cả khu vực ({showtimeItems.length > 0 ? Array.from(new Set(showtimeItems.map(s => s.cinemaCity))).length : 0})</option>
+                    {regions.map((region) => (
+                      <option key={region} value={region}>
+                        {region} ({showtimeItems.filter(s => s.cinemaCity === region).length > 0 
+                          ? Array.from(new Set(showtimeItems.filter(s => s.cinemaCity === region).map(s => s.cinemaId))).length 
+                          : 0} rạp)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <ul className={`cinema-list ${showAllCinemas ? 'expanded' : 'collapsed'}`} ref={cinemaListRef}>
                 {(showAllCinemas ? cinemas : cinemas.slice(0, 4)).map((cinema) => (
                   <li

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { adminShowtimeService, adminMovieService } from "../../services/adminApi";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
 import AdminModalPortal from "../../components/AdminModalPortal.jsx";
@@ -619,6 +619,13 @@ function RecurringForm({ movies, cinemas, showtimes = [], onClose, onSave }) {
       defaultSlotsPerDay: 2,
     };
   });
+
+  // Scroll modal body to top khi mở
+  useEffect(() => {
+    if (modalBodyRef.current) {
+      modalBodyRef.current.scrollTop = 0;
+    }
+  }, []);
   const [errors, setErrors] = useState({});
 
   const set = (field, value) => {
@@ -778,7 +785,7 @@ function RecurringForm({ movies, cinemas, showtimes = [], onClose, onSave }) {
           <h2>🔁 Tạo lịch chiếu theo nhóm</h2>
           <button className="sh-modal-close" onClick={onClose}>✕</button>
         </div>
-        <div className="sh-modal-body sh-recurring-body">
+        <div className="sh-modal-body sh-recurring-body" ref={modalBodyRef}>
           <p className="sh-recurring-desc">
             Chọn nhiều phim và nhiều rạp cùng lúc. Mỗi phòng có thể tự động nhận nhiều suất ở các khung giờ khác nhau, theo thời lượng phim, khoảng nghỉ 15 phút và ưu tiên của từng phim.
           </p>
@@ -1170,6 +1177,7 @@ function RecurringForm({ movies, cinemas, showtimes = [], onClose, onSave }) {
 /** 4. Tạo / Sửa lịch chiếu */
 function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, onSave }) {
   const isEdit = !!showtime;
+  const modalBodyRef = useRef(null);
   const [form, setForm] = useState(showtime
     ? {
         movieId: showtime.movieId,
@@ -1185,6 +1193,13 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
     : { ...EMPTY_FORM }
   );
   const [errors, setErrors] = useState({});
+
+  // Scroll modal body to top khi mở
+  useEffect(() => {
+    if (modalBodyRef.current) {
+      modalBodyRef.current.scrollTop = 0;
+    }
+  }, []);
 
   const set = (f, v) => { setForm(p => ({ ...p, [f]: v })); setErrors(p => ({ ...p, [f]: undefined })); };
 
@@ -1237,7 +1252,7 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
           <h2>{isEdit ? "Chỉnh sửa suất chiếu" : "Tạo suất chiếu mới"}</h2>
           <button className="sh-modal-close" onClick={onClose}>✕</button>
         </div>
-        <div className="sh-modal-body">
+        <div className="sh-modal-body" ref={modalBodyRef}>
           <div className="sh-form-grid">
             {/* Col 1 */}
             <div className="sh-form-col">
@@ -1405,7 +1420,16 @@ export default function AdminShowtimes() {
   const [confirmTarget,   setConfirmTarget]   = useState(null);
   const [toast,           setToast]           = useState("");
 
+  const modalsContainerRef = useRef(null);
+
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3200); };
+
+  // Auto-scroll khi mở form
+  useEffect(() => {
+    if ((editSt !== undefined || showRecurring) && modalsContainerRef.current) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [editSt, showRecurring]);
 
   // ── Fetch dữ liệu từ API ──
   const fetchAll = useCallback(async () => {
@@ -1669,6 +1693,7 @@ export default function AdminShowtimes() {
       )}
 
       {/* Modals */}
+<<<<<<< HEAD
       {showRecurring && (
         <RecurringForm
           movies={movies}
@@ -1689,6 +1714,29 @@ export default function AdminShowtimes() {
           onSave={handleSave}
         />
       )}
+=======
+      <div ref={modalsContainerRef}>
+        {showRecurring && (
+          <RecurringForm
+            movies={movies}
+            cinemas={cinemas}
+            onClose={() => setShowRecurring(false)}
+            onSave={handleSaveRecurring}
+          />
+        )}
+        {editSt !== undefined && (
+          <ShowtimeForm
+            showtime={editSt}
+            showtimes={showtimes}
+            rooms={rooms}
+            movies={movies}
+            cinemas={cinemas}
+            onClose={() => setEditSt(undefined)}
+            onSave={handleSave}
+          />
+        )}
+      </div>
+>>>>>>> 7c761f73e1c30c917da23ea461f1184389892301
       {confirmTarget && (
         <Confirm
           title="Xác nhận xóa"

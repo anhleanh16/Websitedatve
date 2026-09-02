@@ -71,7 +71,7 @@
 .tx-booking { background: rgba(124,97,255,0.15); color: #d4c8ff; }
 .tx-refund  { background: rgba(251,191,36,0.15);  color: #ffe7a9; }
 .tx-points  { background: rgba(251,191,36,0.15);  color: #fde68a; }
-.us-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(6px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.us-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(6px); z-index: 9999; display: flex; align-items: flex-start; justify-content: center; padding: 24px; }
 .us-modal { background: linear-gradient(180deg,#0e1430,#080d1e); border: 1px solid rgba(255,255,255,0.1); border-radius: 28px; width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 40px 100px rgba(0,0,0,0.5); }
 .us-modal > form { display: flex; min-height: 0; flex-direction: column; }
 .us-modal-sm { max-width: 440px; }
