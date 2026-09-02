@@ -17,6 +17,7 @@
 .mv-select option { background: #0d1224; }
 .mv-btn { padding: 8px 14px; border: none; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s, transform 0.15s; }
 .mv-btn:hover { transform: translateY(-1px); }
+.mv-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 .mv-btn-view     { background: rgba(124,97,255,0.2);   color: #d4c8ff; }
 .mv-btn-view:hover   { background: rgba(124,97,255,0.35); }
 .mv-btn-edit     { background: rgba(251,191,36,0.18);  color: #ffe7a9; }
@@ -89,6 +90,9 @@
 .mv-field label { font-size: 13px; color: #9db0ff; }
 .mv-field input, .mv-field select {
   height: 46px;
+  min-height: 46px;
+  max-height: 46px;
+  flex: none;
   padding: 0 14px;
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.1);
@@ -113,7 +117,10 @@
   font-family: inherit;
 }
 .mv-field input:focus, .mv-field select:focus, .mv-field textarea:focus { border-color: rgba(124,97,255,0.45); }
-.mv-field input.error, .mv-field select.error { border-color: rgba(248,113,113,0.5); }
+.mv-field input.error,
+.mv-field select.error,
+.mv-field textarea.error,
+.trailer-youtube-input.error { border-color: rgba(248,113,113,0.6); background: rgba(248,113,113,0.06); }
 .mv-field textarea { resize: vertical; }
 .mv-field select option { background: #0d1224; }
 .mv-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

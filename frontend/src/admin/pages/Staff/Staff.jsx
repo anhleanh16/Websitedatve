@@ -57,6 +57,12 @@ const ATT_STATUS = {
 
 const getInitials = (name) => name.split(" ").slice(-2).map(w => w[0]).join("").toUpperCase();
 const fmtSalary   = (type, n) => type === "part_time" ? `${n.toLocaleString()} ₫/giờ` : `${n.toLocaleString()} ₫/tháng`;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^(?:\+84|0)(?:3|5|7|8|9)\d{8}$/;
+const EMPLOYEE_CODE_PATTERN = /^[A-Za-z0-9_-]{2,30}$/;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const normalizePhone = (value) => String(value || "").replace(/[\s.()-]/g, "");
+const isFutureDate = (value) => Boolean(value && value > new Date().toISOString().slice(0, 10));
 
 const EMPTY_STAFF = {
   userId: "", name: "", code: "", email: "", phone: "",
@@ -126,6 +132,18 @@ function Toast({ message, onClose }) {
 
 // ─── Confirm ─────────────────────────────────────────────────────────────────
 function Confirm({ message, onClose, onConfirm }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirm = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <AdminModalPortal>
     <div className="sf-overlay" onClick={onClose}>
@@ -133,8 +151,8 @@ function Confirm({ message, onClose, onConfirm }) {
         <div className="sf-modal-header"><h2>Xác nhận</h2><button className="sf-modal-close" onClick={onClose}>✕</button></div>
         <div className="sf-modal-body"><div className="sf-warn">⚠️ {message}</div></div>
         <div className="sf-modal-footer">
-          <button className="sf-btn sf-btn-delete sf-btn-lg" onClick={onConfirm}>Xác nhận</button>
-          <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={onClose}>Hủy</button>
+          <button className="sf-btn sf-btn-delete sf-btn-lg" onClick={handleConfirm} disabled={isDeleting}>{isDeleting ? "Đang xóa..." : "Xác nhận"}</button>
+          <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={onClose} disabled={isDeleting}>Hủy</button>
         </div>
       </div>
     </div>
@@ -150,13 +168,22 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
   const [avatarFile, setAvatarFile] = useState(null);
   const [idCardFrontFile, setIdCardFrontFile] = useState(null);
   const [idCardBackFile, setIdCardBackFile] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: undefined })); };
 
   const toggleShift = (id) => set("shifts", form.shifts.includes(id) ? form.shifts.filter(s => s !== id) : [...form.shifts, id]);
 
   const handleAvatarFile = (file) => {
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setErrors(previous => ({ ...previous, avatar: "Ảnh đại diện phải là tệp hình ảnh." }));
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setErrors(previous => ({ ...previous, avatar: "Ảnh đại diện không được vượt quá 5MB." }));
+      return;
+    }
     setAvatarFile(file);
     set("avatar", URL.createObjectURL(file));
   };
@@ -166,7 +193,16 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
     set("avatar", "");
   };
   const handleIdCardFile = (side, file) => {
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
+    const errorKey = side === "front" ? "idCardFront" : "idCardBack";
+    if (!file.type.startsWith("image/")) {
+      setErrors(previous => ({ ...previous, [errorKey]: "Ảnh CCCD phải là tệp hình ảnh." }));
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setErrors(previous => ({ ...previous, [errorKey]: "Ảnh CCCD không được vượt quá 5MB." }));
+      return;
+    }
     if (side === "front") setIdCardFrontFile(file);
     else setIdCardBackFile(file);
     set(side === "front" ? "idCardFront" : "idCardBack", URL.createObjectURL(file));
@@ -193,31 +229,59 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
 
   const validate = () => {
     const e = {};
+    const name = String(form.name || "").trim();
+    const code = String(form.code || "").trim();
+    const email = String(form.email || "").trim();
+    const phone = normalizePhone(form.phone);
+    const salary = Number(form.salary);
     if (!isEdit && !form.userId) e.userId = "Chọn tài khoản người dùng để tạo nhân viên.";
-    if (!form.name.trim())     e.name     = "Nhập họ tên.";
-    if (isEdit && !form.code.trim()) e.code = "Mã nhân viên không hợp lệ.";
-    if (!form.email.trim())    e.email    = "Nhập email.";
-    if (!form.phone.trim())    e.phone    = "Nhập số điện thoại.";
+    if (!name) e.name = "Nhập họ tên.";
+    else if (name.length < 2 || name.length > 100) e.name = "Họ tên phải từ 2 đến 100 ký tự.";
+    if (isEdit && !code) e.code = "Nhập mã nhân viên.";
+    else if (isEdit && !EMPLOYEE_CODE_PATTERN.test(code)) e.code = "Mã nhân viên chỉ gồm 2–30 chữ, số, gạch ngang hoặc gạch dưới.";
+    if (!email) e.email = "Nhập email.";
+    else if (!EMAIL_PATTERN.test(email)) e.email = "Email không hợp lệ.";
+    if (!phone) e.phone = "Nhập số điện thoại.";
+    else if (!PHONE_PATTERN.test(phone)) e.phone = "Số điện thoại Việt Nam không hợp lệ.";
     if (!form.cinemaId)        e.cinemaId = "Chọn rạp.";
     if (!form.departmentId)    e.departmentId = "Chọn bộ phận.";
-    if (!form.salary || form.salary <= 0) e.salary = "Nhập mức lương.";
+    if (!Number.isFinite(salary) || salary <= 0) e.salary = "Mức lương phải lớn hơn 0.";
+    else if (salary > 1_000_000_000) e.salary = "Mức lương không được vượt quá 1 tỷ đồng.";
     if (!form.hireDate)        e.hireDate = "Chọn ngày vào làm.";
+    else if (isFutureDate(form.hireDate)) e.hireDate = "Ngày vào làm không được ở tương lai.";
     if (form.dob && !isValidBirthDate(form.dob)) e.dob = BIRTH_DATE_ERROR;
     if (form.citizenId && !/^\d{12}$/.test(String(form.citizenId))) e.citizenId = "CCCD phải gồm đúng 12 chữ số.";
-    if (form.shifts.length === 0) e.shifts = "Chọn ít nhất một ca.";
+    if (String(form.address || "").trim().length > 255) e.address = "Địa chỉ không được vượt quá 255 ký tự.";
+    if (!Array.isArray(form.shifts) || form.shifts.length === 0) e.shifts = "Chọn ít nhất một ca.";
     return e;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSaving) return;
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-    const data = { ...form, id: staff?.id || Date.now(), baseSalary: Number(form.salary), salary: Number(form.salary) };
+    const data = {
+      ...form,
+      name: form.name.trim(),
+      code: String(form.code || "").trim(),
+      email: form.email.trim().toLowerCase(),
+      phone: normalizePhone(form.phone),
+      address: String(form.address || "").trim(),
+      id: staff?.id || Date.now(),
+      baseSalary: Number(form.salary),
+      salary: Number(form.salary),
+    };
     if (avatarFile) {
       data.avatarFile = avatarFile;
     }
     if (idCardFrontFile) data.idCardFrontFile = idCardFrontFile;
     if (idCardBackFile) data.idCardBackFile = idCardBackFile;
-    onSave(data);
+    setIsSaving(true);
+    try {
+      await onSave(data);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -303,7 +367,8 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
 
               <div className="sf-field">
                 <label>Địa chỉ</label>
-                <input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Số nhà, đường, quận, tỉnh…" />
+                <input className={errors.address ? "error" : ""} value={form.address} onChange={e => set("address", e.target.value)} placeholder="Số nhà, đường, quận, tỉnh…" />
+                {errors.address && <span className="sf-error">{errors.address}</span>}
               </div>
 
               <div className="sf-field">
@@ -341,6 +406,7 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
                   style={{ display: "none" }}
                   onChange={(e) => handleAvatarFile(e.target.files?.[0])}
                 />
+                {errors.avatar && <span className="sf-error">{errors.avatar}</span>}
               </div>
 
               <div className="sf-field">
@@ -354,6 +420,8 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
                   ))}
                 </div>
                 <small className="sf-account-hint">Ảnh dùng để đối chiếu hồ sơ nhân viên.</small>
+                {errors.idCardFront && <span className="sf-error">Mặt trước: {errors.idCardFront}</span>}
+                {errors.idCardBack && <span className="sf-error">Mặt sau: {errors.idCardBack}</span>}
               </div>
 
               <div className="sf-field sf-shifts-field">
@@ -451,8 +519,8 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
           </div>
         </div>
         <div className="sf-modal-footer">
-          <button className="sf-btn sf-btn-add sf-btn-lg" onClick={handleSave}>{isEdit ? "Lưu thay đổi" : "Thêm nhân viên"}</button>
-          <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={onClose}>Hủy</button>
+          <button className="sf-btn sf-btn-add sf-btn-lg" onClick={handleSave} disabled={isSaving}>{isSaving ? "Đang lưu..." : isEdit ? "Lưu thay đổi" : "Thêm nhân viên"}</button>
+          <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={onClose} disabled={isSaving}>Hủy</button>
         </div>
       </div>
     </div>

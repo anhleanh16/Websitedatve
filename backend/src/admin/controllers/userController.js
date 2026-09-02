@@ -11,6 +11,17 @@ import {
   userNameExists,
 } from "../models/authModel.js";
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^(?:\+84|0)(?:3|5|7|8|9)\d{8}$/;
+const normalizePhone = (value) => String(value || "").replace(/[\s.()-]/g, "");
+const passwordValidationMessage = (password, label = "Mật khẩu") => {
+  if (!password || password.length < 6) return `${label} phải có ít nhất 6 ký tự.`;
+  if (password.length > 72) return `${label} không được vượt quá 72 ký tự.`;
+  if (/\s/.test(password)) return `${label} không được chứa khoảng trắng.`;
+  if (!/[A-Za-zÀ-ỹ]/.test(password) || !/\d/.test(password)) return `${label} phải có ít nhất một chữ cái và một chữ số.`;
+  return "";
+};
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const getAdminUsers = async (req, res) => {
   try {
@@ -54,34 +65,48 @@ export const createAdminUser = async (req, res) => {
       sex,
       status = "active",
     } = req.body || {};
+    const normalizedFullName = String(full_name || "").trim();
     const normalizedEmail = String(email || "").trim().toLowerCase();
-    const normalizedPhone = String(phone || "").trim();
+    const normalizedPhone = normalizePhone(phone);
     const normalizedUserName = String(user_name || "").trim().toLowerCase();
     await ensureEmailVerificationSchema();
     await ensureUserNameSchema();
 
-    if (!full_name || !normalizedUserName || !password) {
+    if (!normalizedFullName || !normalizedUserName || !password) {
       return res
         .status(400)
         .json({ message: "Vui lòng nhập đầy đủ họ tên, tên người dùng và mật khẩu." });
+    }
+
+    if (normalizedFullName.length < 2 || normalizedFullName.length > 100) {
+      return res.status(400).json({ message: "Họ tên phải từ 2 đến 100 ký tự." });
     }
 
     if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUserName)) {
       return res.status(400).json({ message: "Tên người dùng gồm 3–30 ký tự: chữ, số, dấu chấm, gạch dưới hoặc gạch ngang." });
     }
 
-    if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Mật khẩu phải có ít nhất 6 ký tự." });
-    }
+    const passwordError = passwordValidationMessage(password);
+    if (passwordError) return res.status(400).json({ message: passwordError });
 
     if (birthday && !isValidBirthDate(birthday)) {
       return res.status(400).json({ message: BIRTH_DATE_ERROR });
     }
 
-    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    if (normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)) {
       return res.status(400).json({ message: "Email không hợp lệ." });
+    }
+
+    if (normalizedPhone && !PHONE_PATTERN.test(normalizedPhone)) {
+      return res.status(400).json({ message: "Số điện thoại Việt Nam không hợp lệ." });
+    }
+
+    if (!["active", "inactive", "blocked"].includes(status)) {
+      return res.status(400).json({ message: "Trạng thái tài khoản không hợp lệ." });
+    }
+
+    if (sex && !["male", "female", "other", "Nam", "Nu", "Khac"].includes(sex)) {
+      return res.status(400).json({ message: "Giới tính không hợp lệ." });
     }
 
     if (normalizedEmail && await emailExists(normalizedEmail)) {
@@ -106,7 +131,7 @@ export const createAdminUser = async (req, res) => {
     const mappedSex = sexMap[sex] || sex || null;
     const userId = await createUser({
       roleId,
-      full_name,
+      full_name: normalizedFullName,
       user_name: normalizedUserName,
       email: storedEmail,
       password: hashedPassword,
@@ -298,11 +323,23 @@ export const resetAdminUserPassword = async (req, res) => {
       return res.status(400).json({ message: "Không xác định được người dùng." });
     }
 
-    if (!new_password || new_password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự." });
+    const normalizedFullName = String(full_name || "").trim();
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedFullName || normalizedFullName.length < 2 || normalizedFullName.length > 100) {
+      return res.status(400).json({ message: "Họ tên xác minh phải từ 2 đến 100 ký tự." });
     }
+    if (normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)) {
+      return res.status(400).json({ message: "Email xác minh không hợp lệ." });
+    }
+    if (normalizedPhone && !PHONE_PATTERN.test(normalizedPhone)) {
+      return res.status(400).json({ message: "Số điện thoại xác minh không hợp lệ." });
+    }
+    if (birthday && !isValidBirthDate(birthday)) {
+      return res.status(400).json({ message: BIRTH_DATE_ERROR });
+    }
+    const passwordError = passwordValidationMessage(new_password, "Mật khẩu mới");
+    if (passwordError) return res.status(400).json({ message: passwordError });
 
     const [[user]] = await db.query(
       `SELECT id, full_name, email, phone, birthday FROM User WHERE id = ?`,
@@ -315,14 +352,14 @@ export const resetAdminUserPassword = async (req, res) => {
 
     const expected = {
       full_name: normalizeStr(user.full_name),
-      email: normalizeStr(user.email),
+      email: String(user.email || "").toLowerCase().endsWith("@unlinked.local") ? "" : normalizeStr(user.email),
       phone: normalizeStr(user.phone),
       birthday: normalizeDate(user.birthday),
     };
     const provided = {
       full_name: normalizeStr(full_name),
-      email: normalizeStr(email),
-      phone: normalizeStr(phone),
+      email: normalizeStr(normalizedEmail),
+      phone: normalizeStr(normalizedPhone),
       birthday: normalizeDate(birthday),
     };
 

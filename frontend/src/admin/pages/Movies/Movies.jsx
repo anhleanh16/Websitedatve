@@ -75,6 +75,19 @@ const STATUS_OPTS = [
   { value: "ended",       label: "Đã kết thúc", cls: "mv-status-ended"    },
 ];
 const statusInfo = (v) => STATUS_OPTS.find((s) => s.value === v) || STATUS_OPTS[0];
+const MAX_POSTER_SIZE = 5 * 1024 * 1024;
+const MAX_TRAILER_SIZE = 100 * 1024 * 1024;
+const VALID_VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/ogg"]);
+
+const isValidYouTubeUrl = (value) => {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    return url.protocol === "https:" && ["youtube.com", "m.youtube.com", "youtu.be"].includes(host);
+  } catch {
+    return false;
+  }
+};
 
 // ─── Custom Tag Dropdown ────────────────────────────────────────────────────────
 function TagDropdown({ value, onChange, categories }) {
@@ -342,7 +355,22 @@ function MovieForm({ movie, categories, onClose, onSave }) {
 
   // Xử lý chọn nhiều poster mới
   const handlePosterFiles = (files) => {
-    const newFiles = Array.from(files).filter(file => file.type.startsWith("image/"));
+    const selectedFiles = Array.from(files || []);
+    const invalidType = selectedFiles.some(file => !file.type.startsWith("image/"));
+    const oversized = selectedFiles.some(file => file.size > MAX_POSTER_SIZE);
+    if (invalidType) {
+      setErrors(previous => ({ ...previous, posters: "Poster chỉ chấp nhận tệp hình ảnh." }));
+      return;
+    }
+    if (oversized) {
+      setErrors(previous => ({ ...previous, posters: "Mỗi poster không được vượt quá 5MB." }));
+      return;
+    }
+    if (allPosters.length + selectedFiles.length > 12) {
+      setErrors(previous => ({ ...previous, posters: "Tối đa 12 poster." }));
+      return;
+    }
+    const newFiles = selectedFiles;
     const newPreviews = newFiles.map(file => ({
       url: URL.createObjectURL(file),
       isNew: true,
@@ -350,6 +378,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
     }));
     setNewPosterFiles(prev => [...prev, ...newFiles]);
     setAllPosters(prev => [...prev, ...newPreviews]);
+    setErrors(previous => ({ ...previous, posters: undefined }));
   };
 
   const handlePosterDrop = (e) => {
@@ -360,21 +389,25 @@ function MovieForm({ movie, categories, onClose, onSave }) {
 
   // Xử lý chọn trailer
   const handleTrailerFile = (file) => {
-    if (!file || !file.type.startsWith("video/")) return;
+    if (!file) return;
+    if (!VALID_VIDEO_TYPES.has(file.type)) {
+      setErrors(previous => ({ ...previous, trailer: "Trailer chỉ chấp nhận MP4, WEBM hoặc OGG." }));
+      return;
+    }
+    if (file.size > MAX_TRAILER_SIZE) {
+      setErrors(previous => ({ ...previous, trailer: "Trailer không được vượt quá 100MB." }));
+      return;
+    }
     setTrailerFile(file);
+    setErrors(previous => ({ ...previous, trailer: undefined }));
   };
 
   // Xóa poster (cả cũ và mới)
   const removePoster = (index) => {
     const removed = allPosters[index];
     if (removed.isNew) {
-      // Xóa khỏi file mới
-      const fileIndex = newPosterFiles.findIndex(f => 
-        URL.createObjectURL(f) === removed.url
-      );
-      if (fileIndex !== -1) {
-        setNewPosterFiles(prev => prev.filter((_, i) => i !== fileIndex));
-      }
+      setNewPosterFiles(prev => prev.filter(file => file !== removed.file));
+      URL.revokeObjectURL(removed.url);
     }
     // Cập nhật danh sách tất cả poster
     setAllPosters(prev => prev.filter((_, i) => i !== index));
@@ -393,13 +426,29 @@ function MovieForm({ movie, categories, onClose, onSave }) {
         ? f.categories.filter((c) => c !== id)
         : [...f.categories, id],
     }));
+    setErrors(previous => ({ ...previous, categories: undefined }));
   };
 
   const validate = () => {
     const e = {};
-    if (!form.title?.trim()) e.title = "Vui lòng nhập tên phim.";
-    if (!form.director?.trim()) e.director = "Vui lòng nhập đạo diễn.";
-    if (!form.duration || form.duration <= 0) e.duration = "Thời lượng phải > 0.";
+    const title = String(form.title || "").trim();
+    const director = String(form.director || "").trim();
+    const duration = Number(form.duration);
+    if (!title) e.title = "Vui lòng nhập tên phim.";
+    else if (title.length < 2 || title.length > 150) e.title = "Tên phim phải từ 2 đến 150 ký tự.";
+    if (!director) e.director = "Vui lòng nhập đạo diễn.";
+    else if (director.length < 2 || director.length > 150) e.director = "Tên đạo diễn phải từ 2 đến 150 ký tự.";
+    if (!Number.isInteger(duration) || duration < 1 || duration > 600) e.duration = "Thời lượng phải là số nguyên từ 1 đến 600 phút.";
+    if (String(form.description || "").trim().length > 5000) e.description = "Mô tả không được vượt quá 5.000 ký tự.";
+    if (String(form.actors || "").trim().length > 1000) e.actors = "Danh sách diễn viên không được vượt quá 1.000 ký tự.";
+    if (String(form.language || "").trim().length > 100) e.language = "Ngôn ngữ không được vượt quá 100 ký tự.";
+    if (String(form.country || "").trim().length > 100) e.country = "Quốc gia không được vượt quá 100 ký tự.";
+    if (!STATUS_OPTS.some(option => option.value === form.status)) e.status = "Trạng thái phim không hợp lệ.";
+    if (![0, 13, 16, 18].includes(Number(form.ageLimit))) e.ageLimit = "Giới hạn tuổi không hợp lệ.";
+    if (!Array.isArray(form.categories) || form.categories.length === 0) e.categories = "Chọn ít nhất một Tag cho phim.";
+    if (!deleteTrailer && trailerType === "youtube" && youtubeUrl.trim() && !isValidYouTubeUrl(youtubeUrl.trim())) {
+      e.trailer = "Link trailer phải là đường dẫn YouTube HTTPS hợp lệ.";
+    }
 
     if (isEdit) {
       if (allPosters.length < 1) e.posters = "Phim cần ít nhất 1 poster để lưu.";
@@ -418,15 +467,15 @@ function MovieForm({ movie, categories, onClose, onSave }) {
     try {
       // Tạo FormData
       const formData = new FormData();
-      formData.append('title', form.title);
-      formData.append('description', form.description);
+      formData.append('title', form.title.trim());
+      formData.append('description', String(form.description || '').trim());
       formData.append('duration', form.duration);
       formData.append('age_limit', form.ageLimit);
-      formData.append('director', form.director);
-      formData.append('actors', form.actors);
+      formData.append('director', form.director.trim());
+      formData.append('actors', String(form.actors || '').trim());
       formData.append('status', form.status);
-      formData.append('language', form.language);
-      formData.append('country', form.country);
+      formData.append('language', String(form.language || '').trim());
+      formData.append('country', String(form.country || '').trim());
       
       // Gửi danh mục
       if (form.categories && form.categories.length > 0) {
@@ -484,7 +533,8 @@ function MovieForm({ movie, categories, onClose, onSave }) {
 
               <div className="mv-field">
                 <label>Mô tả</label>
-                <textarea rows={4} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Nội dung phim…" />
+                <textarea className={errors.description ? "error" : ""} rows={4} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Nội dung phim…" />
+                {errors.description && <span className="mv-error">{errors.description}</span>}
               </div>
 
               <div className="mv-field-row">
@@ -495,12 +545,13 @@ function MovieForm({ movie, categories, onClose, onSave }) {
                 </div>
                 <div className="mv-field">
                   <label>Giới hạn tuổi</label>
-                  <select value={form.ageLimit} onChange={(e) => set("ageLimit", Number(e.target.value))}>
+                  <select className={errors.ageLimit ? "error" : ""} value={form.ageLimit} onChange={(e) => set("ageLimit", Number(e.target.value))}>
                     <option value={0}>Mọi lứa tuổi</option>
                     <option value={13}>13+</option>
                     <option value={16}>16+</option>
                     <option value={18}>18+</option>
                   </select>
+                  {errors.ageLimit && <span className="mv-error">{errors.ageLimit}</span>}
                 </div>
               </div>
 
@@ -512,17 +563,20 @@ function MovieForm({ movie, categories, onClose, onSave }) {
 
               <div className="mv-field">
                 <label>Diễn viên</label>
-                <input value={form.actors} onChange={(e) => set("actors", e.target.value)} placeholder="Tên diễn viên, phân cách bằng dấu phẩy…" />
+                <input className={errors.actors ? "error" : ""} value={form.actors} onChange={(e) => set("actors", e.target.value)} placeholder="Tên diễn viên, phân cách bằng dấu phẩy…" />
+                {errors.actors && <span className="mv-error">{errors.actors}</span>}
               </div>
 
               <div className="mv-field-row">
                 <div className="mv-field">
                   <label>Ngôn ngữ</label>
-                  <input value={form.language} onChange={(e) => set("language", e.target.value)} />
+                  <input className={errors.language ? "error" : ""} value={form.language} onChange={(e) => set("language", e.target.value)} />
+                  {errors.language && <span className="mv-error">{errors.language}</span>}
                 </div>
                 <div className="mv-field">
                   <label>Quốc gia</label>
-                  <input value={form.country} onChange={(e) => set("country", e.target.value)} />
+                  <input className={errors.country ? "error" : ""} value={form.country} onChange={(e) => set("country", e.target.value)} />
+                  {errors.country && <span className="mv-error">{errors.country}</span>}
                 </div>
               </div>
             </div>
@@ -531,9 +585,10 @@ function MovieForm({ movie, categories, onClose, onSave }) {
             <div className="mv-form-col">
               <div className="mv-field">
                 <label>Trạng thái</label>
-                <select value={form.status} onChange={(e) => set("status", e.target.value)}>
+                <select className={errors.status ? "error" : ""} value={form.status} onChange={(e) => set("status", e.target.value)}>
                   {STATUS_OPTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
+                {errors.status && <span className="mv-error">{errors.status}</span>}
               </div>
 
               <div className="mv-field">
@@ -597,8 +652,8 @@ function MovieForm({ movie, categories, onClose, onSave }) {
                       type="text"
                       placeholder="Nhập link YouTube (vd: https://www.youtube.com/watch?v=...)"
                       value={youtubeUrl}
-                      onChange={(e) => setYoutubeUrl(e.target.value)}
-                      className="trailer-youtube-input"
+                      onChange={(e) => { setYoutubeUrl(e.target.value); setErrors(previous => ({ ...previous, trailer: undefined })); }}
+                      className={`trailer-youtube-input${errors.trailer ? " error" : ""}`}
                     />
                     {youtubeUrl && (
                       <button
@@ -654,6 +709,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
                   style={{ display: "none" }}
                   onChange={(e) => handleTrailerFile(e.target.files?.[0])}
                 />
+                {errors.trailer && <span className="mv-error">{errors.trailer}</span>}
               </div>
 
               <div className="mv-field">
@@ -702,6 +758,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
 
               <div className="mv-field">
                 <label>Tags</label>
+                {errors.categories && <span className="mv-error">{errors.categories}</span>}
                 <div className="mv-cat-check-grid">
                   {categories.map((c) => (
                     <label key={c.id} className={`mv-cat-check${form.categories.includes(c.id) ? " checked" : ""}`}>
@@ -719,10 +776,10 @@ function MovieForm({ movie, categories, onClose, onSave }) {
           </div>
         </div>
         <div className="mv-modal-footer">
-          <button className="mv-btn mv-btn-add mv-btn-lg" onClick={handleSave} disabled={isSaving}>
+          <button type="button" className="mv-btn mv-btn-add mv-btn-lg" onClick={handleSave} disabled={isSaving}>
             {isSaving ? "Đang lưu..." : isEdit ? "Lưu thay đổi" : "Thêm phim"}
           </button>
-          <button className="mv-btn mv-btn-secondary mv-btn-lg" onClick={onClose} disabled={isSaving}>Hủy</button>
+          <button type="button" className="mv-btn mv-btn-secondary mv-btn-lg" onClick={onClose} disabled={isSaving}>Hủy</button>
         </div>
       </div>
     </div>

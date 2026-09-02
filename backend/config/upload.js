@@ -179,11 +179,11 @@ export const uploadMovieFilesMiddleware = (req, res, next) => {
   upload(req, res, (err) => {
     if (err) {
       console.error("Multer error:", err);
-      // Ignore all multer errors and just continue, because we might not even be uploading files (just a YouTube link)
-      console.log("Ignoring multer error, continuing with request...");
-      // Make sure req.files is an empty array if there's an error
-      if (!req.files) req.files = [];
-      return next();
+      return res.status(400).json({
+        message: err.code === "LIMIT_FILE_SIZE"
+          ? "Tệp tải lên vượt quá dung lượng cho phép."
+          : err.message || "Tệp tải lên không hợp lệ.",
+      });
     }
     next();
   });

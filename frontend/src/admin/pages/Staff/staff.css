@@ -19,6 +19,7 @@
 .sf-select option { background: #0d1224; }
 .sf-btn { padding: 7px 14px; border: none; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.15s; white-space: nowrap; }
 .sf-btn:hover { transform: translateY(-1px); }
+.sf-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 .sf-btn-add      { background: linear-gradient(135deg,#7c61ff,#5b3fd1); color: #fff; }
 .sf-btn-add:hover { box-shadow: 0 4px 16px rgba(124,97,255,0.4); }
 .sf-btn-view     { background: rgba(124,97,255,0.2);  color: #d4c8ff; }
@@ -75,6 +76,9 @@
 .sf-field label { font-size: 13px; color: #8fa6ff; font-weight: 500; }
 .sf-field input, .sf-field select {
   height: 46px;
+  min-height: 46px;
+  max-height: 46px;
+  flex: none;
   padding: 0 13px;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.1);
@@ -100,7 +104,8 @@
   box-sizing: border-box;
 }
 .sf-field input:focus, .sf-field select:focus { border-color: rgba(124,97,255,0.45); }
-.sf-field input.error { border-color: rgba(248,113,113,0.5); }
+.sf-field input.error,
+.sf-field select.error { border-color: rgba(248,113,113,0.5); background: rgba(248,113,113,0.06); }
 .sf-field select option { background: #0d1224; }
 .sf-error { color: #f87171; font-size: 12px; }
 .sf-shift-check-group { display: flex; flex-direction: column; gap: 8px; }

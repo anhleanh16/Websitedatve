@@ -6,6 +6,20 @@ import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../..
 import "./users.css";
 
 const MEMBERSHIP_COLORS = ["#cd7f32", "#9ca3af", "#fbbf24", "#60a5fa"];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^(?:\+84|0)(?:3|5|7|8|9)\d{8}$/;
+const normalizePhone = (value) => String(value || "").replace(/[\s.()-]/g, "");
+
+const validatePassword = (password, label = "Mật khẩu") => {
+  if (!password) return `Nhập ${label.toLowerCase()}.`;
+  if (password.length < 6) return `${label} phải có ít nhất 6 ký tự.`;
+  if (password.length > 72) return `${label} không được vượt quá 72 ký tự.`;
+  if (/\s/.test(password)) return `${label} không được chứa khoảng trắng.`;
+  if (!/[A-Za-zÀ-ỹ]/.test(password) || !/\d/.test(password)) {
+    return `${label} phải có ít nhất một chữ cái và một chữ số.`;
+  }
+  return "";
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const STATUS_MAP = {
@@ -643,6 +657,7 @@ function ResetPasswordModal({ user, onClose, onConfirm }) {
 
   const set = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }));
+    setApiError("");
     if (errors[k]) {
       setErrors((e) => ({ ...e, [k]: undefined }));
     }
@@ -650,16 +665,23 @@ function ResetPasswordModal({ user, onClose, onConfirm }) {
 
   const validate = () => {
     const e = {};
-    if (!form.full_name.trim()) e.full_name = "Nhập họ tên.";
-    if (!form.email.trim()) e.email = "Nhập email.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+    const fullName = form.full_name.trim();
+    const phone = normalizePhone(form.phone);
+    const accountEmail = String(user.email || "").trim().toLowerCase();
+    const requiresEmail = Boolean(accountEmail && !accountEmail.endsWith("@unlinked.local"));
+    const requiresPhone = Boolean(String(user.phone || user.phone_number || "").trim());
+    const requiresBirthday = Boolean(user.birthday);
+    if (!fullName) e.full_name = "Nhập họ tên.";
+    else if (fullName.length < 2 || fullName.length > 100) e.full_name = "Họ tên phải từ 2 đến 100 ký tự.";
+    if (requiresEmail && !form.email.trim()) e.email = "Nhập email đã liên kết với tài khoản.";
+    else if (form.email.trim() && !EMAIL_PATTERN.test(form.email.trim()))
       e.email = "Email không hợp lệ.";
-    if (!form.phone.trim()) e.phone = "Nhập số điện thoại.";
-    if (!form.birthday) e.birthday = "Chọn ngày sinh.";
-    else if (!isValidBirthDate(form.birthday)) e.birthday = BIRTH_DATE_ERROR;
-    if (!form.new_password) e.new_password = "Nhập mật khẩu mới.";
-    else if (form.new_password.length < 6)
-      e.new_password = "Mật khẩu mới ít nhất 6 ký tự.";
+    if (requiresPhone && !phone) e.phone = "Nhập số điện thoại đã liên kết với tài khoản.";
+    else if (phone && !PHONE_PATTERN.test(phone)) e.phone = "Số điện thoại Việt Nam không hợp lệ.";
+    if (requiresBirthday && !form.birthday) e.birthday = "Chọn ngày sinh của tài khoản.";
+    else if (form.birthday && !isValidBirthDate(form.birthday)) e.birthday = BIRTH_DATE_ERROR;
+    const passwordError = validatePassword(form.new_password, "Mật khẩu mới");
+    if (passwordError) e.new_password = passwordError;
     if (!form.confirm_password) e.confirm_password = "Xác nhận mật khẩu mới.";
     else if (form.confirm_password !== form.new_password)
       e.confirm_password = "Mật khẩu xác nhận không trùng khớp.";
@@ -678,8 +700,8 @@ function ResetPasswordModal({ user, onClose, onConfirm }) {
     try {
       await adminUserService.resetPassword(user.id, {
         full_name: form.full_name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
+        email: form.email.trim().toLowerCase(),
+        phone: normalizePhone(form.phone),
         birthday: form.birthday,
         new_password: form.new_password,
       });
@@ -899,6 +921,7 @@ function CreateUserModal({ onClose, onConfirm }) {
 
   const set = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }));
+    setApiError("");
     if (errors[k]) {
       setErrors((e) => ({ ...e, [k]: undefined }));
     }
@@ -906,17 +929,20 @@ function CreateUserModal({ onClose, onConfirm }) {
 
   const validate = () => {
     const e = {};
-    if (!form.full_name.trim()) e.full_name = "Nhập họ tên.";
+    const fullName = form.full_name.trim();
+    const phone = normalizePhone(form.phone);
+    if (!fullName) e.full_name = "Nhập họ tên.";
+    else if (fullName.length < 2 || fullName.length > 100) e.full_name = "Họ tên phải từ 2 đến 100 ký tự.";
     if (!form.user_name.trim()) e.user_name = "Nhập tên người dùng.";
     else if (!/^[a-zA-Z0-9._-]{3,30}$/.test(form.user_name.trim()))
       e.user_name = "Tên người dùng gồm 3–30 ký tự: chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.";
-    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+    if (form.email.trim() && !EMAIL_PATTERN.test(form.email.trim()))
       e.email = "Email không hợp lệ.";
-    if (!form.email.trim() && !form.phone.trim())
+    if (!form.email.trim() && !phone)
       e.phone = "Nhập số điện thoại khi chưa có email.";
-    if (!form.password) e.password = "Nhập mật khẩu.";
-    else if (form.password.length < 6)
-      e.password = "Mật khẩu ít nhất 6 ký tự.";
+    else if (phone && !PHONE_PATTERN.test(phone)) e.phone = "Số điện thoại Việt Nam không hợp lệ.";
+    const passwordError = validatePassword(form.password);
+    if (passwordError) e.password = passwordError;
     if (form.birthday && !isValidBirthDate(form.birthday)) e.birthday = BIRTH_DATE_ERROR;
     return e;
   };
@@ -933,9 +959,9 @@ function CreateUserModal({ onClose, onConfirm }) {
       await adminUserService.createUser({
         full_name: form.full_name.trim(),
         user_name: form.user_name.trim(),
-        email: form.email.trim(),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
-        phone: form.phone.trim() || null,
+        phone: normalizePhone(form.phone) || null,
         birthday: form.birthday || null,
         sex: form.sex || null,
         role: "user",
@@ -1051,12 +1077,15 @@ function CreateUserModal({ onClose, onConfirm }) {
                   <label>Ngày sinh</label>
                   <input
                     type="date"
-                    className="us-input"
+                    className={`us-input ${errors.birthday ? "error" : ""}`}
                     value={form.birthday}
                     min={getBirthDateBounds().min}
                     max={getBirthDateBounds().max}
                     onChange={(e) => set("birthday", e.target.value)}
                   />
+                  {errors.birthday && (
+                    <span className="us-field-error">{errors.birthday}</span>
+                  )}
                 </div>
 
                 <div className="us-form-field">
