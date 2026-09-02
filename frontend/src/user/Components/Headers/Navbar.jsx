@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import {
@@ -22,6 +23,13 @@ const NAV_ITEMS = [
 ]
 
 const NOTIF_ICONS = { ticket: '🎟️', promo: '🎁', movie: '🎬', points: '⭐', system: '⚙️' }
+
+function ResponsivePortal({ active, children }) {
+  if (active && typeof document !== 'undefined') {
+    return createPortal(children, document.body)
+  }
+  return children
+}
 
 export default function Navbar() {
   const profile       = useSelector((s) => s.user.profile)
@@ -50,12 +58,16 @@ export default function Navbar() {
   const [cinemas,      setCinemas]      = useState([])
   const [cinemaError,  setCinemaError]  = useState('')
   const [bellOpen,     setBellOpen]     = useState(false)
+  const [mobileBellPortal, setMobileBellPortal] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  )
   const [emailAlertDismissed, setEmailAlertDismissed] = useState(false)
 
   const dropdownRef = useRef(null)
   const searchRef   = useRef(null)
   const regionRef   = useRef(null)
   const bellRef     = useRef(null)
+  const bellPanelRef = useRef(null)
   const inputRef    = useRef(null)
 
   /* scroll effect */
@@ -75,10 +87,22 @@ export default function Navbar() {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false)
       if (searchRef.current   && !searchRef.current.contains(e.target))   setSearchOpen(false)
       if (regionRef.current   && !regionRef.current.contains(e.target))   setCinemaOpen(false)
-      if (bellRef.current     && !bellRef.current.contains(e.target))     setBellOpen(false)
+      if (
+        bellRef.current &&
+        !bellRef.current.contains(e.target) &&
+        !bellPanelRef.current?.contains(e.target)
+      ) setBellOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)')
+    const syncMobileBellPortal = (event) => setMobileBellPortal(event.matches)
+    setMobileBellPortal(media.matches)
+    media.addEventListener?.('change', syncMobileBellPortal)
+    return () => media.removeEventListener?.('change', syncMobileBellPortal)
   }, [])
 
   /* focus search input */
@@ -436,7 +460,11 @@ export default function Navbar() {
               <span className='notif-dot'>{unreadCount > 9 ? '9+' : unreadCount}</span>
             )}
           </button>
-          <div className='bell-dropdown'>
+          <ResponsivePortal active={mobileBellPortal}>
+          <div
+            ref={bellPanelRef}
+            className={`bell-dropdown${bellOpen ? ' open' : ''}${mobileBellPortal ? ' bell-dropdown-portal' : ''}`}
+          >
             <div className='bell-header'>
               <span className='bell-title'>Thông báo</span>
               {unreadCount > 0 && (
@@ -491,6 +519,7 @@ export default function Navbar() {
               Xem tất cả thông báo →
             </Link>
           </div>
+          </ResponsivePortal>
         </div>
 
         {/* Account dropdown */}

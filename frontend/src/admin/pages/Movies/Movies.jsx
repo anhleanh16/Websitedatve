@@ -516,8 +516,8 @@ function MovieForm({ movie, categories, onClose, onSave }) {
 
   return (
     <AdminModalPortal>
-    <div className="mv-modal-overlay" onClick={onClose}>
-      <div className="mv-modal mv-modal-lg" onClick={(e) => e.stopPropagation()}>
+    <div className="mv-modal-overlay mv-movie-form-overlay" onClick={onClose}>
+      <div className="mv-modal mv-modal-lg mv-movie-form-modal" onClick={(e) => e.stopPropagation()}>
         <div className="mv-modal-header">
           <h2>{isEdit ? "Chỉnh sửa phim" : "Thêm phim mới"}</h2>
           <button className="mv-modal-close" onClick={onClose}>✕</button>

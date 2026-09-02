@@ -921,7 +921,9 @@
   }
 }
 
-@media (max-width: 480px) {
+/* Điện thoại có viewport CSS tới 600px (màn hình độ phân giải cao vẫn có thể
+   báo rộng hơn 480px), nên dùng cùng layout compact với navbar mobile. */
+@media (max-width: 640px) {
   .film-page {
     padding: 16px 0;
   }
@@ -945,6 +947,9 @@
     align-items: start;
   }
   .film-page .movie-card {
+    display: block;
+    width: auto;
+    min-height: 0;
     padding: 0;
     border: 0;
     border-radius: 8px;

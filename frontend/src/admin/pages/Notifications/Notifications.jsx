@@ -33,12 +33,12 @@ function NotificationDetailModal({ detail, onClose }) {
   return (
     <AdminModalPortal>
     <div className="pr-overlay" onClick={onClose}>
-      <div className="pr-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="pr-modal notification-detail-modal" onClick={(e) => e.stopPropagation()}>
         <div className="pr-modal-header">
           <h2>Chi tiết thông báo</h2>
           <button className="pr-modal-close" onClick={onClose}>✕</button>
         </div>
-        <div className="pr-modal-body" style={{ display: "grid", gap: 14 }}>
+        <div className="pr-modal-body notification-detail-body" style={{ display: "grid", gap: 14 }}>
           <div className="report-card" style={{ margin: 0 }}>
             <h3 style={{ marginTop: 0 }}>{detail.notification.title}</h3>
             <p style={{ marginBottom: 8 }}>{detail.notification.content}</p>
@@ -237,7 +237,7 @@ export default function Notifications() {
   };
 
   return (
-    <div className="admin-promotions-page">
+    <div className="admin-promotions-page admin-notifications-page">
       <div className="pr-page-header">
         <h2>Quản lý thông báo</h2>
         <p>Tạo và gửi thông báo trực tiếp cho toàn bộ người dùng hoặc từng tài khoản cụ thể.</p>
@@ -265,8 +265,8 @@ export default function Notifications() {
         </div>
       )}
 
-      <div className="report-card" style={{ padding: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="report-card notification-form-card" style={{ padding: 20 }}>
+        <div className="notification-form-header" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <h3 style={{ marginTop: 0, marginBottom: 0 }}>{editingId ? "Sửa thông báo đã gửi" : "Gửi thông báo mới"}</h3>
           {editingId && (
             <button className="pr-btn pr-btn-secondary" type="button" onClick={resetForm}>
@@ -274,8 +274,8 @@ export default function Notifications() {
             </button>
           )}
         </div>
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 1fr", gap: 12 }}>
+        <form className="notification-form" onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+          <div className="notification-form-grid">
             <input
               className="pr-search"
               placeholder="Tiêu đề thông báo"
@@ -345,8 +345,8 @@ export default function Notifications() {
             style={{ minHeight: 120, resize: "vertical" }}
           />
 
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ color: "#8fa6ff", fontSize: 13 }}>
+          <div className="notification-form-actions" style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div className="notification-form-hint" style={{ color: "#8fa6ff", fontSize: 13 }}>
               {form.audienceScope === "all"
                 ? `Thông báo sẽ gửi đến ${users.length} người dùng đang hoạt động.`
                 : `Đã chọn ${form.recipientIds.length} người dùng.`}
@@ -358,7 +358,7 @@ export default function Notifications() {
         </form>
       </div>
 
-      <div className="table-card">
+      <div className="table-card notification-table-card">
         <table>
           <thead>
             <tr>

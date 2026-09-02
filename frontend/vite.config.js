@@ -8,6 +8,20 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    // Workspace hoisting can otherwise let Vite resolve more than one React
+    // runtime after a dependency re-optimization/HMR update.
+    resolve: {
+      dedupe: ["react", "react-dom"],
+    },
+    optimizeDeps: {
+      include: [
+        "react",
+        "react-dom",
+        "react-dom/client",
+        "react-redux",
+        "react-router-dom",
+      ],
+    },
     server: {
       allowedHosts: ["sweetstarcinemar.qlinterior.shop"],
       headers: {

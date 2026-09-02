@@ -448,3 +448,152 @@
   background: rgba(255,0,0,0.25);
   color: #fff;
 }
+
+/* ─── Movie form on phones ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .admin-movies-page {
+    width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .admin-movies-page .mv-toolbar,
+  .admin-movies-page .mv-search,
+  .admin-movies-page .mv-select,
+  .admin-movies-page .mv-tag-dropdown-wrap,
+  .admin-movies-page .mv-tag-dropdown-btn {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* iOS tự phóng viewport khi focus vào control có cỡ chữ dưới 16px. */
+  .admin-movies-page input:not([type="checkbox"]):not([type="radio"]),
+  .admin-movies-page select,
+  .admin-movies-page textarea,
+  .admin-modal-portal .mv-movie-form-modal input:not([type="checkbox"]):not([type="radio"]),
+  .admin-modal-portal .mv-movie-form-modal select,
+  .admin-modal-portal .mv-movie-form-modal textarea {
+    font-size: 16px !important;
+  }
+
+  .admin-modal-portal .mv-modal-overlay.mv-movie-form-overlay {
+    align-items: stretch !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .admin-modal-portal .mv-modal.mv-movie-form-modal {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh !important;
+    min-width: 0;
+    margin: 0 !important;
+    border-radius: 0;
+    overflow: hidden !important;
+  }
+
+  .mv-movie-form-modal .mv-modal-header {
+    flex: 0 0 auto;
+    padding: max(14px, env(safe-area-inset-top)) 16px 14px;
+  }
+
+  .mv-movie-form-modal .mv-modal-header h2 {
+    min-width: 0;
+    font-size: 18px;
+  }
+
+  .mv-movie-form-modal .mv-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 18px 16px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mv-movie-form-modal .mv-modal-footer {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+    background: #080d1e;
+  }
+
+  .mv-movie-form-modal .mv-modal-footer .mv-btn {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 10px;
+  }
+
+  .mv-movie-form-modal .mv-form-grid,
+  .mv-movie-form-modal .mv-field-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .mv-movie-form-modal .mv-form-col,
+  .mv-movie-form-modal .mv-field,
+  .mv-movie-form-modal .trailer-input-wrapper {
+    min-width: 0;
+  }
+
+  .mv-movie-form-modal .mv-field input,
+  .mv-movie-form-modal .mv-field select,
+  .mv-movie-form-modal .mv-field textarea,
+  .mv-movie-form-modal .trailer-youtube-input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mv-movie-form-modal .trailer-type-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .mv-movie-form-modal .trailer-type-btn {
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 13px;
+  }
+
+  .mv-movie-form-modal .img-upload-placeholder {
+    min-width: 0;
+    padding: 16px 12px;
+  }
+
+  .mv-movie-form-modal .img-upload-placeholder span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .mv-movie-form-modal .mv-posters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mv-movie-form-modal .mv-cat-check-grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .mv-movie-form-modal .mv-modal-body {
+    padding-inline: 12px;
+  }
+
+  .mv-movie-form-modal .mv-modal-footer {
+    padding-inline: 12px;
+  }
+
+  .mv-movie-form-modal .trailer-type-selector {
+    grid-template-columns: 1fr;
+  }
+}

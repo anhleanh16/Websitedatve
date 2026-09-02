@@ -1470,7 +1470,8 @@
   overflow: hidden;
 }
 
-.bell-wrap.open .bell-dropdown {
+.bell-wrap.open .bell-dropdown,
+.bell-dropdown.open {
   opacity: 1;
   visibility: visible;
   transform: translateY(0) scale(1);
@@ -1641,32 +1642,41 @@
 /* Keep this after the desktop bell rules so mobile positioning wins the
    cascade and the panel always remains inside the viewport. */
 @media (max-width: 768px) {
-  .bell-dropdown {
-    position: fixed;
+  .bell-dropdown.bell-dropdown-portal {
+    position: fixed !important;
     top: 74px;
     right: 12px;
     left: 12px;
-    width: auto;
-    max-width: none;
+    width: calc(100dvw - 24px) !important;
+    min-width: 0;
+    max-width: calc(100dvw - 24px) !important;
     max-height: calc(100svh - 86px);
     border-radius: 16px;
     transform-origin: top center;
+    z-index: 5000;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
   }
 
-  .bell-list {
+  .bell-dropdown-portal .bell-list {
+    flex: 1;
+    min-height: 0;
     max-height: calc(100svh - 190px);
   }
 }
 
 @media (max-width: 480px) {
-  .bell-dropdown {
+  .bell-dropdown.bell-dropdown-portal {
     top: 68px;
     right: 8px;
     left: 8px;
+    width: calc(100dvw - 16px) !important;
+    max-width: calc(100dvw - 16px) !important;
     max-height: calc(100svh - 76px);
   }
 
-  .bell-list {
+  .bell-dropdown-portal .bell-list {
     max-height: calc(100svh - 182px);
   }
 }
@@ -1838,6 +1848,6 @@
     font-size: 13px;
   }
 
-  .bell-dropdown { top: 62px; }
+  .bell-dropdown.bell-dropdown-portal { top: 62px; }
   .email-link-alert { top: 56px; }
 }
