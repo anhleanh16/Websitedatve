@@ -7,6 +7,16 @@ const normalizeUploadedComboImage = (file) => {
   return `/uploads/combos/${file.filename}`.replace(/\\/g, "/");
 };
 
+const getUploadedComboImage = (req) => {
+  if (req.file) return req.file;
+  if (!req.files) return null;
+
+  const files = Array.isArray(req.files)
+    ? req.files
+    : Object.values(req.files).flat();
+  return files.find((file) => ["imageFile", "comboImage", "image"].includes(file.fieldname)) || null;
+};
+
 const normalizeComboImageValue = (uploadedFile, bodyImage, fallbackImage = "") => {
   const uploadedPath = normalizeUploadedComboImage(uploadedFile);
   if (uploadedPath) return uploadedPath;
@@ -52,7 +62,7 @@ export const createAdminCombo = async (req, res) => {
   try {
     const payload = {
       ...(req.body || {}),
-      image: normalizeComboImageValue(req.file, req.body?.image),
+      image: normalizeComboImageValue(getUploadedComboImage(req), req.body?.image),
     };
     const combo = await ComboModel.create(payload);
     res.status(201).json({ message: "Tạo combo thành công", combo });
@@ -69,7 +79,7 @@ export const updateAdminCombo = async (req, res) => {
     const currentCombo = await ComboModel.findById(req.params.id);
     const payload = {
       ...(req.body || {}),
-      image: normalizeComboImageValue(req.file, req.body?.image, currentCombo?.image || ""),
+      image: normalizeComboImageValue(getUploadedComboImage(req), req.body?.image, currentCombo?.image || ""),
     };
     const combo = await ComboModel.update(req.params.id, payload);
     if (!combo) {

@@ -64,7 +64,7 @@ function ComboFormModal({ combo, onClose, onSave }) {
   );
   const [errors, setErrors] = useState({});
   const [selectedImageFile, setSelectedImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(combo?.image || "");
+  const [imagePreview, setImagePreview] = useState(resolveComboImage(combo?.image));
 
   const setField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));

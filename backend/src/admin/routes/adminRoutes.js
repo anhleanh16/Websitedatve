@@ -170,8 +170,8 @@ router.post(
 // ─── Combo Management ─────────────────────────────────────────────────────────
 router.get("/combos", authMiddleware, adminOnly, getAdminCombos);
 router.get("/combos/:id", authMiddleware, adminOnly, getAdminComboById);
-router.post("/combos", authMiddleware, adminOnly, uploadComboImage.single("imageFile"), createAdminCombo);
-router.put("/combos/:id", authMiddleware, adminOnly, uploadComboImage.single("imageFile"), updateAdminCombo);
+router.post("/combos", authMiddleware, adminOnly, uploadComboImage.any(), createAdminCombo);
+router.put("/combos/:id", authMiddleware, adminOnly, uploadComboImage.any(), updateAdminCombo);
 router.delete("/combos/:id", authMiddleware, adminOnly, deleteAdminCombo);
 
 // ─── Booking Management ──────────────────────────────────────────────────────
