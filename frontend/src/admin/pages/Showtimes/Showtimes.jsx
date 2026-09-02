@@ -1693,33 +1693,12 @@ export default function AdminShowtimes() {
       )}
 
       {/* Modals */}
-<<<<<<< HEAD
-      {showRecurring && (
-        <RecurringForm
-          movies={movies}
-          cinemas={cinemas}
-          showtimes={showtimes}
-          onClose={() => setShowRecurring(false)}
-          onSave={handleSaveRecurring}
-        />
-      )}
-      {editSt !== undefined && (
-        <ShowtimeForm
-          showtime={editSt}
-          showtimes={showtimes}
-          rooms={rooms}
-          movies={movies}
-          cinemas={cinemas}
-          onClose={() => setEditSt(undefined)}
-          onSave={handleSave}
-        />
-      )}
-=======
       <div ref={modalsContainerRef}>
         {showRecurring && (
           <RecurringForm
             movies={movies}
             cinemas={cinemas}
+            showtimes={showtimes}
             onClose={() => setShowRecurring(false)}
             onSave={handleSaveRecurring}
           />
@@ -1736,7 +1715,6 @@ export default function AdminShowtimes() {
           />
         )}
       </div>
->>>>>>> 7c761f73e1c30c917da23ea461f1184389892301
       {confirmTarget && (
         <Confirm
           title="Xác nhận xóa"
