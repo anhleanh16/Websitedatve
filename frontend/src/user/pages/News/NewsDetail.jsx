@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { FaCalendarAlt, FaClock, FaEye, FaTag } from "react-icons/fa";
+import { FaCalendarAlt, FaClock, FaEye, FaShareAlt, FaTag } from "react-icons/fa";
 import { userNewsService } from "../../services/userApi";
 import { toAbsoluteAssetUrl } from "../../../utils/api";
 import "./NewsDetail.css";
@@ -70,6 +70,11 @@ export default function NewsDetail() {
   const [related, setRelated] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [shareMessage, setShareMessage] = useState("");
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [slug]);
 
   useEffect(() => {
     const loadDetail = async () => {
@@ -102,6 +107,27 @@ export default function NewsDetail() {
     () => removeThumbnailFromBody(article?.content || "", article?.thumbnail || ""),
     [article?.content, article?.thumbnail],
   );
+
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    const shareData = { title: article.title, text: article.short_description || article.title, url: shareUrl };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        setShareMessage("Đã mở chia sẻ.");
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareMessage("Đã sao chép liên kết.");
+      }
+    } catch (shareError) {
+      if (shareError?.name !== "AbortError") {
+        setShareMessage("Không thể chia sẻ bài viết.");
+      }
+    }
+
+    window.setTimeout(() => setShareMessage(""), 2500);
+  };
 
   if (loading) {
     return (
@@ -150,6 +176,13 @@ export default function NewsDetail() {
               <FaClock /> {readTime(article.content)}
             </span>
             <span>Tác giả: {article.author_name || "Sweetstar Movie"}</span>
+          </div>
+          <div className="news-detail-actions">
+            <button type="button" className="news-detail-share" onClick={handleShare}>
+              <FaShareAlt aria-hidden="true" />
+              Chia sẻ bài viết
+            </button>
+            {shareMessage && <span className="news-detail-share-message" role="status">{shareMessage}</span>}
           </div>
         </header>
 

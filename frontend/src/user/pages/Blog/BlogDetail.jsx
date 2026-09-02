@@ -55,6 +55,10 @@ export default function BlogDetail() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [slug])
+
+  useEffect(() => {
     loadBlog()
   }, [slug])
 

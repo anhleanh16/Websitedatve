@@ -66,6 +66,7 @@ export default function News() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [visibleCount, setVisibleCount] = useState(6);
+  const [shareMessage, setShareMessage] = useState("");
 
   useEffect(() => {
     const loadNews = async () => {
@@ -108,6 +109,44 @@ export default function News() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  };
+
+  const handleFeaturedShare = async () => {
+    if (!featured) return;
+
+    const shareUrl = `${window.location.origin}/news/${featured.slug}`;
+    const shareData = {
+      title: featured.title,
+      text: featured.short_description || featured.title,
+      url: shareUrl,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        setShareMessage("Đã mở chia sẻ.");
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareMessage("Đã sao chép liên kết.");
+      } else {
+        const input = document.createElement("textarea");
+        input.value = shareUrl;
+        input.setAttribute("readonly", "");
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        input.remove();
+        setShareMessage("Đã sao chép liên kết.");
+      }
+    } catch (shareError) {
+      if (shareError?.name !== "AbortError") {
+        setShareMessage("Không thể chia sẻ bài viết.");
+      }
+    }
+
+    window.setTimeout(() => setShareMessage(""), 2500);
   };
 
   return (
@@ -172,9 +211,9 @@ export default function News() {
                 </Link>
                 <button
                   className="btn-share"
-                  onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/news/${featured.slug}`)}
+                  onClick={handleFeaturedShare}
                 >
-                  <FaShareAlt /> Chia sẻ
+                  <FaShareAlt /> {shareMessage || "Chia sẻ"}
                 </button>
               </div>
             </div>
@@ -252,7 +291,9 @@ export default function News() {
                         <FaClock /> {estimateReadTime(item.content)}
                       </span>
                     </div>
-                    <h3 className="news-card-title">{item.title}</h3>
+                    <Link className="news-card-title-link" to={`/news/${item.slug}`}>
+                      <h3 className="news-card-title">{item.title}</h3>
+                    </Link>
                     <div className="news-card-excerpt" dangerouslySetInnerHTML={{ __html: item.short_description || "Bài viết đang được cập nhật mô tả ngắn." }} />
                     <div className="news-card-footer">
                       <div className="news-card-stats">
