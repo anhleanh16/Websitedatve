@@ -29,3 +29,7 @@ frontend/.env
 *.njsproj
 *.sln
 *.sw?
+
+# Local diagnostics and generated scratch files
+.dbg/
+tmp/
