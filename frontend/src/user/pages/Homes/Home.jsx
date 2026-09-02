@@ -1200,12 +1200,6 @@ export default function Home() {
 
               {!blogError && featuredHomeBlogs.map((blog) => (
                 <Link to={`/blog/${blog.slug}`} key={blog.id} className='home-blog-card'>
-                  <div
-                    className='home-blog-image'
-                    style={blog.image ? { backgroundImage: `url(${blog.image})` } : undefined}
-                  >
-                    {!blog.image && <span>📝</span>}
-                  </div>
                   <div className='home-blog-body'>
                     <AutoMarqueeText as='span' className='news-tag'>{blog.categoryLabel}</AutoMarqueeText>
                     <AutoMarqueeText as='h3' className='home-blog-title' lines={2}>{blog.title}</AutoMarqueeText>
