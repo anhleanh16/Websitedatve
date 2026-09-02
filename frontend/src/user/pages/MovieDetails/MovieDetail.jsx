@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import ReviewSection from '../../Components/ReviewSection';
 import { userMovieService } from '../../services/userApi';
+import { formatMovieTitle } from '../../../utils/movieTitle';
 import './MovieDetail.css';
 
 const VISITED_TAG_STORAGE_KEY = 'sweetstar_user_tag_preferences';
@@ -187,7 +188,8 @@ export default function MovieDetail() {
       setMovieError(null);
       try {
         const data = await userMovieService.getById(id);
-        setMovie(data?.movie || null);
+        const nextMovie = data?.movie || null;
+        setMovie(nextMovie ? { ...nextMovie, title: formatMovieTitle(nextMovie.title) } : null);
       } catch (err) {
         console.error(err);
         setMovie(null);

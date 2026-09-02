@@ -5,12 +5,13 @@ import QuickBookWidget from "../../Components/QuickBookWidget/QuickBookWidget";
 import AutoMarqueeText from "../../Components/AutoMarqueeText/AutoMarqueeText";
 import { userMovieService } from "../../services/userApi";
 import { getActiveHomeBanners, hydrateHomeBannerImages } from "../../utils/homeBanners";
+import { formatMovieTitle } from "../../../utils/movieTitle";
 
 const VISITED_TAG_STORAGE_KEY = "sweetstar_user_tag_preferences";
 
 const normalizeMovieItem = (m) => ({
   id: m.movie_id,
-  title: m.title,
+  title: formatMovieTitle(m.title),
   poster: m.poster,
   ageLimit: Number(m.age_limit || 0),
   rating:

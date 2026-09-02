@@ -3,6 +3,7 @@ import { adminMovieService, adminCategoryService } from '../../services/adminApi
 import AdminPagination, { useAdminPagination } from '../../components/AdminPagination.jsx';
 import AdminModalPortal from '../../components/AdminModalPortal.jsx';
 import './movies.css';
+import { formatMovieTitle } from '../../../utils/movieTitle.js';
 
 // ─── Helpers chuyển đổi dữ liệu camelCase ↔ snake_case ───────────────────────────────
 const normalizeDateInputValue = (value) => {
@@ -34,7 +35,7 @@ const formatDisplayDate = (value) => {
 const snakeToCamelMovie = (obj) => {
   return {
     id: obj.movie_id,
-    title: obj.title,
+    title: formatMovieTitle(obj.title),
     description: obj.description,
     duration: obj.duration,
     ageLimit: obj.age_limit,

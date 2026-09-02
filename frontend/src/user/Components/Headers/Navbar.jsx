@@ -9,6 +9,7 @@ import { markAsRead, markAllAsRead, deleteNotification, setNotifications } from 
 import { setSelectedCinema } from '../../../redux/slices/cinemaSlice'
 import { clearUser } from '../../../redux/slices/userSlice'
 import { userCinemaService, userNotificationService, userMovieService } from '../../services/userApi'
+import { formatMovieTitle } from '../../../utils/movieTitle'
 import './nav.css'
 
 const NAV_ITEMS = [
@@ -388,7 +389,7 @@ export default function Navbar() {
                         style={m.poster ? { backgroundImage: `url(${m.poster})` } : undefined}
                       />
                       <div className='search-movie-info'>
-                        <span className='search-movie-title'>{m.title}</span>
+                        <span className='search-movie-title'>{formatMovieTitle(m.title)}</span>
                         <span className='search-movie-meta'>
                           {m.status === 'now_showing' ? '🎬 Đang chiếu' : m.status === 'coming_soon' ? '🕐 Sắp chiếu' : ''}
                           {m.duration ? ` · ${m.duration} phút` : ''}
@@ -415,7 +416,7 @@ export default function Navbar() {
                     style={m.poster ? { backgroundImage: `url(${m.poster})` } : undefined}
                   />
                   <div className='search-movie-info'>
-                    <span className='search-movie-title'>{m.title}</span>
+                    <span className='search-movie-title'>{formatMovieTitle(m.title)}</span>
                     <span className='search-movie-meta'>
                       {m.status === 'now_showing' ? '🎬 Đang chiếu' : m.status === 'coming_soon' ? '🕐 Sắp chiếu' : '✅ Đã chiếu'}
                       {m.duration ? ` · ${m.duration} phút` : ''}

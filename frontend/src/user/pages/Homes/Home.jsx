@@ -1,3 +1,4 @@
+import { formatMovieTitle } from '../../../utils/movieTitle.js'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import QuickBookWidget from '../../Components/QuickBookWidget/QuickBookWidget'
@@ -200,7 +201,7 @@ const buildHeroBackground = (poster, fallbackBg) =>
 
 const normalizeMovie = (movie) => ({
   id: movie.movie_id,
-  title: movie.title,
+  title: formatMovieTitle(movie.title),
   poster: movie.poster || '',
   status: movie.status,
   releaseDate: movie.release_date,
