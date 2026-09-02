@@ -1220,11 +1220,11 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                           {movie.genre || "Phim chiếu rạp"}
                           {movie.age_limit ? ` • ${movie.age_limit}+` : ""}
                         </div>
-                        {movie.release_date && (
-                          <div className="admin-booking-movie-release">
-                            Khởi chiếu: {new Date(movie.release_date).toLocaleDateString("vi-VN")}
-                          </div>
-                        )}
+                        <div className="admin-booking-movie-release">
+                          Khởi chiếu: {movie.release_date
+                            ? new Date(movie.release_date).toLocaleDateString("vi-VN")
+                            : "Chưa có ngày khởi chiếu"}
+                        </div>
                         {isEnded && <small>Phim đã kết thúc, không thể đặt vé.</small>}
                       </div>
                     </button>

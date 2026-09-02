@@ -59,37 +59,9 @@ const getUploadedPaths = (files = {}) => {
   return [...posterPaths, ...trailerPaths];
 };
 
-const toDateOnlyString = (value) => {
-  if (!value) return "";
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return typeof value === "string" ? value.slice(0, 10) : "";
-  }
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const normalizeMovieStatusPayload = ({ release_date, status, ...rest }) => {
-  const today = toDateOnlyString(new Date());
-  let normalizedReleaseDate = toDateOnlyString(release_date);
-  const normalizedStatus = status || "coming_soon";
-
-  if (normalizedStatus === "now_showing" && (!normalizedReleaseDate || normalizedReleaseDate > today)) {
-    normalizedReleaseDate = today;
-  }
-
-  return {
-    ...rest,
-    release_date: normalizedReleaseDate,
-    status: normalizedStatus,
-  };
+const normalizeMovieStatusPayload = ({ status, ...rest }) => {
+  delete rest.release_date;
+  return { ...rest, status: status || "coming_soon" };
 };
 
 export const MovieModel = {
@@ -101,18 +73,27 @@ export const MovieModel = {
         SELECT
           movie_id,
           COUNT(CASE WHEN status <> 'cancelled' THEN 1 END) AS non_cancelled_showtime_count,
-          SUM(CASE WHEN status <> 'cancelled' AND end_time >= NOW() THEN 1 ELSE 0 END) AS active_or_upcoming_showtime_count,
-          MAX(CASE WHEN status <> 'cancelled' THEN end_time END) AS last_end_time
+          SUM(
+            CASE
+              WHEN status <> 'cancelled' AND start_time >= NOW() AND start_time <= DATE_ADD(NOW(), INTERVAL 3 DAY)
+              THEN 1
+              ELSE 0
+            END
+          ) AS upcoming_3day_showtime_count,
+          MAX(CASE WHEN status <> 'cancelled' THEN end_time END) AS last_end_time,
+          MIN(CASE WHEN status <> 'cancelled' THEN DATE(start_time) END) AS first_show_date
         FROM Showtimes
         GROUP BY movie_id
       ) s ON s.movie_id = m.movie_id
-      SET m.status = CASE
-        WHEN DATE(m.release_date) > CURDATE() THEN 'coming_soon'
-        WHEN COALESCE(s.active_or_upcoming_showtime_count, 0) > 0 THEN 'now_showing'
+      SET
+        m.release_date = s.first_show_date,
+        m.status = CASE
+        WHEN s.first_show_date > CURDATE() THEN 'coming_soon'
+        WHEN COALESCE(s.upcoming_3day_showtime_count, 0) > 0 THEN 'now_showing'
         WHEN COALESCE(s.non_cancelled_showtime_count, 0) > 0
           AND s.last_end_time IS NOT NULL
           AND s.last_end_time < NOW() THEN 'ended'
-        ELSE m.status
+        ELSE 'coming_soon'
       END
       `,
     );
@@ -186,7 +167,6 @@ export const MovieModel = {
         age_limit,
         director,
         actors,
-        release_date,
         status,
         language,
         country,
@@ -245,7 +225,7 @@ export const MovieModel = {
           trailer,
           poster,
           JSON.stringify(posters),
-          release_date,
+          null,
           status,
           language,
           country,
@@ -298,7 +278,6 @@ export const MovieModel = {
         age_limit,
         director,
         actors,
-        release_date,
         status,
         language,
         country,
@@ -377,7 +356,7 @@ export const MovieModel = {
       ];
 
       await conn.query(
-        "UPDATE Movies SET title=?, description=?, duration=?, age_limit=?, director=?, actors=?, trailer=?, poster=?, posters=?, release_date=?, status=?, language=?, country=? WHERE movie_id=?",
+        "UPDATE Movies SET title=?, description=?, duration=?, age_limit=?, director=?, actors=?, trailer=?, poster=?, posters=?, status=?, language=?, country=? WHERE movie_id=?",
         [
           title,
           description,
@@ -388,7 +367,6 @@ export const MovieModel = {
           trailer,
           poster,
           JSON.stringify(posters),
-          release_date,
           status,
           language,
           country,

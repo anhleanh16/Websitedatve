@@ -74,9 +74,7 @@ const resolveRecurringDateWindow = ({ movie, startDate, endDate, weeks }) => {
   const releaseDateRaw = movie?.release_date_only || movie?.release_date;
   const releaseDate = releaseDateRaw ? new Date(`${releaseDateRaw}T00:00:00`) : new Date();
   const normalizedStart = startDate ? new Date(`${startDate}T00:00:00`) : new Date(releaseDate);
-  const normalizedRelease = new Date(releaseDate);
-
-  const computedStart = normalizedStart < normalizedRelease ? new Date(normalizedRelease) : new Date(normalizedStart);
+  const computedStart = new Date(normalizedStart);
   const weeksValue = Number(weeks || 0);
   const computedEnd = endDate
     ? new Date(`${endDate}T23:59:59`)
@@ -86,6 +84,24 @@ const resolveRecurringDateWindow = ({ movie, startDate, endDate, weeks }) => {
     startDate: computedStart,
     endDate: computedEnd < computedStart ? computedStart : computedEnd,
   };
+};
+
+const syncMovieReleaseDates = async (movieIds = []) => {
+  const normalizedIds = [...new Set(movieIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!normalizedIds.length) return;
+
+  await db.query(
+    `UPDATE Movies m
+     LEFT JOIN (
+       SELECT movie_id, MIN(DATE(start_time)) AS first_show_date
+       FROM Showtimes
+       WHERE status <> 'cancelled'
+       GROUP BY movie_id
+     ) s ON s.movie_id = m.movie_id
+     SET m.release_date = s.first_show_date
+     WHERE m.movie_id IN (${normalizedIds.map(() => "?").join(", ")})`,
+    normalizedIds,
+  );
 };
 
 let schemaCapabilitiesPromise = null;
@@ -306,7 +322,6 @@ export const ShowtimeModel = {
     if (!normalizedStartTime) {
       throw buildAppError("Thời gian bắt đầu không hợp lệ.");
     }
-    this.ensureStartTimeOnOrAfterReleaseDate(movie, normalizedStartTime);
     const calculatedEndTime = addMinutes(normalizedStartTime, movie.duration);
     await this.ensureRoomScheduleGap({
       roomId: room_id,
@@ -368,6 +383,7 @@ export const ShowtimeModel = {
       `INSERT INTO Showtimes (${columns.join(", ")}) VALUES (${placeholders})`,
       params,
     );
+    await syncMovieReleaseDates([movie_id]);
     return result.insertId;
   },
 
@@ -631,13 +647,6 @@ export const ShowtimeModel = {
               }
             }
 
-            try {
-              this.ensureStartTimeOnOrAfterReleaseDate(movie, startTime);
-            } catch {
-              skipped.push({ movie_id: movieId, cinema_id: cinemaId, date: toDateKey(dayCursor), hour, minute, reason: "Trước ngày phát hành phim." });
-              continue;
-            }
-
             let roomAssigned = false;
             for (const roomRow of roomRows) {
               const roomId = Number(roomRow.room_id);
@@ -702,6 +711,7 @@ export const ShowtimeModel = {
       }
     }
 
+    await syncMovieReleaseDates(movieEntries.map((entry) => entry.movie_id ?? entry.movieId ?? entry.id));
     return { created, skipped };
   },
 
@@ -728,6 +738,10 @@ export const ShowtimeModel = {
       throw buildAppError("Thông tin phim hoặc phòng chiếu không hợp lệ.");
     }
 
+    const [[existingShowtime]] = await db.query(
+      "SELECT movie_id FROM Showtimes WHERE showtime_id = ?",
+      [id],
+    );
     const normalizedStatus = normalizeStoredShowtimeStatus(status);
     const movie = await this.getMovieById(movie_id);
     const room = await this.getRoomById(room_id);
@@ -735,7 +749,6 @@ export const ShowtimeModel = {
     if (!normalizedStartTime) {
       throw buildAppError("Thời gian bắt đầu không hợp lệ.");
     }
-    this.ensureStartTimeOnOrAfterReleaseDate(movie, normalizedStartTime);
     const calculatedEndTime = addMinutes(normalizedStartTime, movie.duration);
     await this.ensureRoomScheduleGap({
       roomId: room_id,
@@ -787,6 +800,9 @@ export const ShowtimeModel = {
       `UPDATE Showtimes SET ${setClauses.join(", ")} WHERE showtime_id = ?`,
       params,
     );
+    if (result.affectedRows > 0) {
+      await syncMovieReleaseDates([existingShowtime?.movie_id, movie_id]);
+    }
     return result.affectedRows > 0;
   },
 
@@ -796,7 +812,7 @@ export const ShowtimeModel = {
   async delete(id) {
     // Cảnh báo: Chỉ nên xóa lịch chiếu chưa có ai đặt vé.
     const [[showtime]] = await db.query(
-      "SELECT end_time, status FROM Showtimes WHERE showtime_id = ?",
+      "SELECT movie_id, end_time, status FROM Showtimes WHERE showtime_id = ?",
       [id],
     );
     if (!showtime) return false;
@@ -811,6 +827,7 @@ export const ShowtimeModel = {
       "DELETE FROM Showtimes WHERE showtime_id = ?",
       [id],
     );
+    if (result.affectedRows > 0) await syncMovieReleaseDates([showtime.movie_id]);
     return result.affectedRows > 0;
   },
 
@@ -818,10 +835,15 @@ export const ShowtimeModel = {
    * Hủy một lịch chiếu (cập nhật trạng thái).
    */
   async cancel(id) {
+    const [[showtime]] = await db.query(
+      "SELECT movie_id FROM Showtimes WHERE showtime_id = ?",
+      [id],
+    );
     const [result] = await db.query(
       "UPDATE Showtimes SET status = 'cancelled' WHERE showtime_id = ?",
       [id],
     );
+    if (result.affectedRows > 0) await syncMovieReleaseDates([showtime?.movie_id]);
     return result.affectedRows > 0;
   },
 
@@ -870,17 +892,6 @@ export const ShowtimeModel = {
       ...movie,
       duration,
     };
-  },
-
-  ensureStartTimeOnOrAfterReleaseDate(movie, startTime) {
-    const releaseDate = String(movie?.release_date_only || "");
-    const startDate = toDateKey(startTime);
-    if (!releaseDate || !startDate) return;
-    if (startDate < releaseDate) {
-      throw buildAppError(
-        `Phim "${movie.title}" chỉ được xếp lịch chiếu từ ngày phát hành ${releaseDate} trở đi.`,
-      );
-    }
   },
 
   async getRoomById(roomId) {

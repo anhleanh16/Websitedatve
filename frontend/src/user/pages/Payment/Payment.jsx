@@ -1,19 +1,13 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSelector } from 'react-redux'
-import { useLocation, useNavigate, Link } from 'react-router-dom'
-import { FaCreditCard, FaUniversity, FaMobileAlt, FaLock, FaTag, FaShieldAlt, FaTicketAlt, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaChair } from 'react-icons/fa'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { FaCreditCard, FaUniversity, FaLock, FaTag, FaShieldAlt, FaTicketAlt, FaMapMarkerAlt, FaCalendarAlt, FaClock, FaChair } from 'react-icons/fa'
 import './Payment.css'
 import { userBookingService, userPromotionService } from '../../services/userApi'
-import { buildVietQROnlyImageUrl } from '../../utils/vietqr'
+import { buildVietQROnlyImageUrl, VIETQR_BANK_BIN } from '../../utils/vietqr'
 import { getValidStoredToken } from '../../../utils/auth'
 import { PAYMENT_BANKS as BANKS, PAYMENT_BANK_INFO as BANK_INFO, getPaymentBankLogo as bankLogo } from '../../../utils/paymentConfig'
 
-const CARD_TYPES = [
-  { name: 'Visa',       pattern: /^4/,      color: 'linear-gradient(135deg,#1a1f71,#2563eb)', icon: 'VISA' },
-  { name: 'Mastercard', pattern: /^5[1-5]/, color: 'linear-gradient(135deg,#eb001b,#f79e1b)', icon: 'MC'   },
-  { name: 'JCB',        pattern: /^35/,     color: 'linear-gradient(135deg,#003087,#009f6b)', icon: 'JCB'  },
-  { name: 'Amex',       pattern: /^3[47]/,  color: 'linear-gradient(135deg,#0077c5,#179cde)', icon: 'AMEX' },
-]
 // Map bank id → BIN cho VietQR
 const BANK_BIN_MAP = Object.fromEntries(BANKS.map(b => [b.id, b.bin]))
 // ZaloPay logo inline (SiZalopay không có trong react-icons v5)
@@ -53,12 +47,11 @@ export default function Payment() {
   const [err, setErr] = useState('')
   const errRef = useRef(null)
 
-  const detectedCard = useMemo(() => null, []) // unused — card handled by ZaloPay Gateway
   const seats = selectedSeatLabels.length > 0 ? selectedSeatLabels : selectedSeats
   const seatTot  = Number(seatTotal  || 0)
   const snackTot = Number(snackTotal || 0)
   const comboTot = Number(comboTotal || 0)
-  const base = Number(totalWithSnacks ?? (seatTot + snackTot + comboTot) || total)
+  const base = Number(totalWithSnacks ?? ((seatTot + snackTot + comboTot) || total))
   const foods = useMemo(() => Array.isArray(foodItems) ? foodItems.filter(i => Number(i?.quantity||0) > 0) : [], [foodItems])
   const foodTransferSummary = useMemo(() => {
     if (!foods.length) return ''
@@ -159,19 +152,29 @@ export default function Payment() {
           promoCode: promoOk ? (promoData?.code || promo.trim()) : '',
           paymentMethod: method,
         })
-        // Lưu context vào sessionStorage để hiển thị khi redirect về
-        sessionStorage.setItem('zlp_pending', JSON.stringify({
+        // Lưu context để trang QR vẫn khôi phục được nếu người dùng tải lại trang.
+        const pendingPayment = {
           appTransId: zlp.appTransId,
           movieTitle, cinema, day, time,
           displaySeats: seats,
           foods,
           finalTotal: Math.round(total2),
           method,
-        }))
-        // Mở ZaloPay trong tab mới — tab app vẫn còn để detect khi user quay lại
+          qrCode: zlp.qrCode || '',
+          orderUrl: zlp.orderUrl || '',
+          expiresAt: Date.now() + (15 * 60 * 1000),
+        }
+        sessionStorage.setItem('zlp_pending', JSON.stringify(pendingPayment))
+
+        if (method === 'zalopay') {
+          if (!zlp.qrCode) throw new Error('ZaloPay không trả về mã QR thanh toán.')
+          navigate('/payment/result', { replace: true, state: { pendingPayment } })
+          return
+        }
+
+        // Thanh toán thẻ vẫn được thực hiện trên cổng bảo mật của ZaloPay.
         if (!zlp.orderUrl) throw new Error('Không nhận được đường dẫn thanh toán từ ZaloPay.')
         window.location.assign(zlp.orderUrl)
-        // Chuyển sang trang chờ xác nhận
         return
       }
 
@@ -188,13 +191,13 @@ export default function Payment() {
 
   useEffect(() => {
     if (!currentUser?.id) {
-      setMembershipTier(null)
-      setMembershipReady(false)
       return
     }
 
     let active = true
-    setMembershipReady(false)
+    const loadingTimer = window.setTimeout(() => {
+      if (active) setMembershipReady(false)
+    }, 0)
     fetch(`${API_BASE}/points/user/${currentUser.id}`, {
       headers: { Authorization: `Bearer ${getValidStoredToken() || ''}` },
     })
@@ -208,7 +211,10 @@ export default function Payment() {
       .finally(() => {
         if (active) setMembershipReady(true)
       })
-    return () => { active = false }
+    return () => {
+      active = false
+      window.clearTimeout(loadingTimer)
+    }
   }, [currentUser?.id])
 
   useEffect(() => {
@@ -259,7 +265,7 @@ export default function Payment() {
                 <div className="pay-method-logo zlp-logo"><ZaloPayLogo /></div>
                 <div className="pay-method-body">
                   <span className="pay-method-name">Ví ZaloPay</span>
-                  <span className="pay-method-sub">Thanh toán qua ZaloPay, VietQR, ATM, Visa</span>
+                  <span className="pay-method-sub">Quét mã QR bằng ứng dụng ZaloPay</span>
                 </div>
                 <span className="pay-method-tag hot">Phổ biến</span>
               </label>
@@ -291,12 +297,12 @@ export default function Payment() {
               <div className="zlp-hero">
                 <div className="zlp-icon"><ZaloPayLogo /></div>
                 <div>
-                  <h4>Thanh toán qua ZaloPay Gateway</h4>
-                  <p>Bấm "Thanh toán" để chuyển sang trang ZaloPay — hỗ trợ ví ZaloPay, VietQR, ATM, Visa/Master</p>
+                  <h4>Quét mã bằng ứng dụng ZaloPay</h4>
+                  <p>Bấm "Thanh toán" để tạo mã QR ZaloPay, sau đó mở ứng dụng ZaloPay và quét mã để thanh toán.</p>
                 </div>
               </div>
               <div className="zlp-methods">
-                {['Ví ZaloPay','VietQR','ATM / Internet Banking','Visa / Master / JCB'].map(m => (
+                {['QR ZaloPay','Xác nhận tự động','Không cần nhập thông tin'].map(m => (
                   <div key={m} className="zlp-method-chip">✓ {m}</div>
                 ))}
               </div>

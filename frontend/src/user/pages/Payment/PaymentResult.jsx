@@ -1,31 +1,44 @@
 /**
  * Trang /payment/result
- * Hiển thị sau khi user mở ZaloPay trong tab mới.
- * User bấm "Tôi đã thanh toán" → app verify với ZaloPay server → tạo booking.
+ * Hiển thị QR ZaloPay và tự kiểm tra giao dịch cho đến khi tạo booking thành công.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, Link, useNavigate } from 'react-router-dom'
 import { FaCheckCircle, FaTimesCircle, FaSpinner, FaHome, FaUser } from 'react-icons/fa'
+import QRCode from 'qrcode'
 import { userBookingService } from '../../services/userApi'
 import './PaymentResult.css'
 
 export default function PaymentResult() {
   const location = useLocation()
   const navigate = useNavigate()
-
-  const [status, setStatus]           = useState('verifying') // verifying | waiting | success | fail
-  const [pending, setPending]         = useState(null)
-  const [booking, setBooking]         = useState(null)
-  const [pointsAwarded, setPointsAwarded] = useState(0)
-  const [checking, setChecking] = useState(false)
-  const [checkMessage, setCheckMessage] = useState('')
-  const hasStartedVerification = useRef(false)
   const params = new URLSearchParams(location.search)
   const returnedAppTransId = params.get('apptransid') || params.get('app_trans_id') || ''
   const amountRaw = params.get('amount')
 
-  const verifyPayment = async (appTransId, { showLoading = false } = {}) => {
+  const [status, setStatus]           = useState('verifying') // verifying | waiting | success | fail
+  const [pending] = useState(() => {
+    try {
+      if (location.state?.pendingPayment?.appTransId) return location.state.pendingPayment
+
+      const raw = sessionStorage.getItem('zlp_pending')
+      if (raw) return JSON.parse(raw)
+      if (returnedAppTransId) {
+        return { appTransId: returnedAppTransId, finalTotal: Number(amountRaw || 0) }
+      }
+    } catch {
+      return null
+    }
+    return null
+  })
+  const [booking, setBooking]         = useState(null)
+  const [pointsAwarded, setPointsAwarded] = useState(0)
+  const [checking, setChecking] = useState(false)
+  const [checkMessage, setCheckMessage] = useState('')
+  const [qrImageUrl, setQrImageUrl] = useState('')
+
+  const verifyPayment = useCallback(async (appTransId, { showLoading = false } = {}) => {
     if (!appTransId) return
 
     if (showLoading) setStatus('verifying')
@@ -50,9 +63,9 @@ export default function PaymentResult() {
     } finally {
       setChecking(false)
     }
-  }
+  }, [])
 
-  const checkPaymentStatus = async (appTransId) => {
+  const checkPaymentStatus = useCallback(async (appTransId) => {
     if (!appTransId) return
     setChecking(true)
     setCheckMessage('')
@@ -62,45 +75,57 @@ export default function PaymentResult() {
         await verifyPayment(appTransId, { showLoading: true })
         return
       }
-      setStatus(Number(result?.return_code) === 2 ? 'waiting' : 'fail')
-      setCheckMessage(result?.return_message || 'ZaloPay chưa xác nhận giao dịch.')
+      const isPending = Number(result?.return_code) === 3
+      setStatus(isPending ? 'waiting' : 'fail')
+      setCheckMessage(isPending ? '' : (result?.return_message || 'ZaloPay chưa xác nhận giao dịch.'))
     } catch {
       setStatus('waiting')
       setCheckMessage('Chưa thể kiểm tra ZaloPay. Vui lòng thử lại sau ít phút.')
     } finally {
       setChecking(false)
     }
-  }
+  }, [verifyPayment])
 
   useEffect(() => {
-    if (hasStartedVerification.current) return
-    hasStartedVerification.current = true
-
-    // Đọc pending data từ sessionStorage
-    let savedPending = null
-    try {
-      const raw = sessionStorage.getItem('zlp_pending')
-      if (raw) {
-        savedPending = JSON.parse(raw)
-        setPending(savedPending)
-      } else if (returnedAppTransId) {
-        savedPending = { appTransId: returnedAppTransId, finalTotal: Number(amountRaw || 0) }
-        setPending(savedPending)
-      } else {
-        navigate('/', { replace: true })
-        return
-      }
-    } catch (_) {
+    if (!pending?.appTransId) {
       navigate('/', { replace: true })
-      return
+      return undefined
     }
 
-    // Demo: tự động confirm luôn khi vào trang
-    const appTransId = returnedAppTransId || savedPending?.appTransId
-    if (appTransId) {
-      checkPaymentStatus(appTransId)
-    }
-  }, [navigate])
+    // Dùng timer để tương thích React Strict Mode: lần effect thử đầu tiên có
+    // thể bị cleanup ngay trong môi trường development, lần kế tiếp vẫn phải
+    // được phép chạy xác minh giao dịch.
+    const timer = window.setTimeout(() => {
+      checkPaymentStatus(returnedAppTransId || pending.appTransId)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [checkPaymentStatus, navigate, pending, returnedAppTransId])
+
+  useEffect(() => {
+    if (!pending?.qrCode) return undefined
+
+    let active = true
+    QRCode.toDataURL(pending.qrCode, {
+      width: 320,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#111827', light: '#ffffff' },
+    })
+      .then((url) => { if (active) setQrImageUrl(url) })
+      .catch(() => { if (active) setCheckMessage('Không thể hiển thị mã QR ZaloPay. Vui lòng thử tạo lại giao dịch.') })
+
+    return () => { active = false }
+  }, [pending?.qrCode])
+
+  useEffect(() => {
+    if (status !== 'waiting' || !pending?.appTransId) return undefined
+
+    const timer = window.setInterval(() => {
+      if (!checking) checkPaymentStatus(pending.appTransId)
+    }, 3000)
+
+    return () => window.clearInterval(timer)
+  }, [checkPaymentStatus, checking, pending?.appTransId, status])
 
   const finalTotal = pending?.finalTotal || Number(amountRaw || 0)
 
@@ -141,6 +166,23 @@ export default function PaymentResult() {
 
         {status !== 'success' && checkMessage && (
           <div className="pr-error-msg">{checkMessage}</div>
+        )}
+
+        {status === 'waiting' && pending?.method === 'zalopay' && (
+          <div className="pr-zalopay-qr">
+            <div className="pr-zalopay-label">ZaloPay</div>
+            <h2>Quét mã để thanh toán</h2>
+            {qrImageUrl ? (
+              <img src={qrImageUrl} alt="Mã QR thanh toán ZaloPay" />
+            ) : (
+              <div className="pr-qr-loading"><FaSpinner className="pr-spinner" /></div>
+            )}
+            <strong>{Number(finalTotal).toLocaleString('vi-VN')}đ</strong>
+            <p>Mở ZaloPay → chọn “Quét mã” → quét mã QR bên trên và xác nhận thanh toán.</p>
+            {pending?.orderUrl && (
+              <a className="pr-open-zalopay" href={pending.orderUrl}>Mở ứng dụng ZaloPay</a>
+            )}
+          </div>
         )}
 
         {booking && (

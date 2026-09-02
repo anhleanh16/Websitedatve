@@ -50,6 +50,7 @@
 .sh-footer-count strong { color: #c8d8ff; }
 .sh-section { display: flex; flex-direction: column; }
 .sh-empty { text-align: center; color: #8fa6ff; padding: 48px; font-size: 15px; }
+
 .sh-timeline-wrap { background: rgba(8,12,25,0.96); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; overflow-x: auto; box-shadow: 0 22px 60px rgba(0,0,0,0.25); }
 .sh-timeline-header { display: flex; border-bottom: 1px solid rgba(255,255,255,0.07); }
 .sh-room-label-col { width: 180px; min-width: 180px; padding: 12px 16px; border-right: 1px solid rgba(255,255,255,0.07); display: flex; flex-direction: column; justify-content: center; }
@@ -71,20 +72,41 @@
 .sh-legend-item::before { content: ""; width: 14px; height: 14px; border-radius: 4px; }
 .sh-legend-normal::before { background: rgba(124,97,255,0.28); border: 1px solid rgba(124,97,255,0.6); }
 .sh-legend-full::before   { background: rgba(248,113,113,0.25); border: 1px solid rgba(248,113,113,0.5); }
-.sh-schedule-movie-block { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; padding: 16px 20px; margin-bottom: 14px; }
-.sh-schedule-movie-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-.sh-schedule-movie-title    { font-size: 16px; font-weight: 700; color: #eef4ff; flex: 1; }
-.sh-schedule-movie-duration { font-size: 13px; color: #8fa6ff; }
-.sh-schedule-count { padding: 3px 10px; border-radius: 999px; background: rgba(124,97,255,0.15); color: #c4b5ff; font-size: 12px; }
-.sh-schedule-shows { display: flex; flex-wrap: wrap; gap: 10px; }
-.sh-schedule-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 14px; min-width: 190px; background: rgba(255,255,255,0.04); border: 1px solid rgba(124,97,255,0.2); transition: border-color 0.2s, background 0.2s; }
+.sh-schedule-toolbar { align-items: center; }
+.sh-schedule-movie-filter { min-width: 220px; max-width: 320px; }
+.sh-schedule-day-block { margin-bottom: 16px; overflow: hidden; border: 1px solid rgba(124,97,255,0.16); border-radius: 18px; background: rgba(5,9,22,0.42); }
+.sh-schedule-day-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid rgba(124,97,255,0.16); background: linear-gradient(90deg, rgba(124,97,255,0.14), rgba(91,202,212,0.04)); }
+.sh-schedule-day-label { display: block; margin-bottom: 2px; color: #7f95c7; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.sh-schedule-day-header h3 { margin: 0; color: #e7edff; font-size: 15px; text-transform: capitalize; }
+.sh-schedule-day-count { flex: none; padding: 4px 10px; border-radius: 999px; background: rgba(91,202,212,0.12); color: #7ee7ee; font-size: 11px; font-weight: 700; }
+.sh-schedule-movie-block { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.055); }
+.sh-schedule-movie-block:last-child { border-bottom: 0; }
+.sh-schedule-movie-header { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; flex-wrap: wrap; }
+.sh-schedule-movie-title { min-width: 180px; overflow: hidden; color: #eef4ff; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.sh-schedule-movie-duration { color: #8fa6ff; font-size: 11px; }
+.sh-schedule-count { padding: 2px 8px; border-radius: 999px; background: rgba(124,97,255,0.15); color: #c4b5ff; font-size: 10px; }
+.sh-schedule-shows { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.sh-schedule-card { display: flex; min-width: 0; flex-direction: column; gap: 7px; padding: 10px 11px; border-radius: 11px; background: rgba(255,255,255,0.035); border: 1px solid rgba(124,97,255,0.18); transition: border-color 0.2s, background 0.2s; }
 .sh-schedule-card:hover   { background: rgba(124,97,255,0.08); }
 .sh-schedule-card.full    { border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.06); }
 .sh-schedule-card.cancelled,
-.sh-schedule-card.ended { border-color: rgba(100,100,120,0.25); opacity: 0.55; }
-.sh-schedule-time { font-size: 22px; font-weight: 700; color: #fff; }
-.sh-schedule-room { display: flex; flex-direction: column; gap: 4px; }
-.sh-schedule-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 2px; }
+.sh-schedule-card.ended { border-color: rgba(100,100,120,0.25); opacity: 0.68; }
+.sh-schedule-card-head { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.sh-schedule-time { color: #fff; font-size: 18px; font-weight: 750; line-height: 1; }
+.sh-schedule-end-time { color: #7f95c7; font-size: 11px; white-space: nowrap; }
+.sh-schedule-state { margin-left: auto; padding: 2px 6px; border-radius: 999px; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.sh-schedule-state.active { background: rgba(74,222,128,0.12); color: #66e795; }
+.sh-schedule-state.full { background: rgba(248,113,113,0.12); color: #fb8d8d; }
+.sh-schedule-state.ended { background: rgba(148,163,184,0.12); color: #aab6c9; }
+.sh-schedule-room { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.sh-schedule-cinema { overflow: hidden; color: #c0d0ff; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.sh-schedule-room-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.sh-schedule-room-row .sh-room-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-schedule-seats { flex: none; color: #4ade80; font-size: 9px; white-space: nowrap; }
+.sh-schedule-seats.full { color: #f87171; }
+.sh-schedule-prices { display: flex; flex-wrap: wrap; gap: 3px 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06); color: #7f95c7; font-size: 9px; }
+.sh-schedule-prices span { white-space: nowrap; }
+.sh-schedule-prices strong { color: #bda8ff; font-weight: 700; }
 .sh-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(6px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .sh-modal { background: linear-gradient(180deg,#0e1430,#080d1e); border: 1px solid rgba(255,255,255,0.1); border-radius: 28px; width: 100%; max-width: 800px; max-height: 90vh; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 40px 100px rgba(0,0,0,0.5); box-sizing: border-box; }
 .sh-modal-sm { max-width: 460px; }
@@ -686,6 +708,26 @@
 .sh-modal-recurring .sh-checkbox-item span {
   min-width: 0;
   line-height: 1.4;
+}
+
+.sh-movie-choice-title {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-modal-recurring .sh-movie-existing-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 4px 9px;
+  border: 1px solid rgba(91,202,212,0.25);
+  border-radius: 999px;
+  background: rgba(91,202,212,0.1);
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .sh-early-toggle-field {

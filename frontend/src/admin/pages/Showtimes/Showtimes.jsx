@@ -28,9 +28,19 @@ function fmtTime(iso) {
   const d = new Date(iso);
   return d.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
-function fmtDate(iso) {
+function fmtHour(iso) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+}
+function fmtDateHeading(dateKey) {
+  const d = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return dateKey;
+  const weekday = d.toLocaleDateString("vi-VN", { weekday: "long" });
+  const date = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return `${weekday}, ${date}`;
 }
 function fmtMoney(n) { return Number(n).toLocaleString("vi-VN") + " ₫"; }
 
@@ -428,75 +438,151 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
 
 /** 3. Danh sách lịch chiếu – theo ngày dạng card */
 function ShowtimeSchedule({ showtimes, rooms, movies, cinemas }) {
-  const [selectedDate, setSD]   = useState(() => new Date().toISOString().slice(0, 10));
-  const [filterCinema, setFC]   = useState("all");
+  const [filterDate, setFD]       = useState("");
+  const [filterMovie, setFM]      = useState("all");
+  const [filterCinema, setFC]     = useState("all");
+  const pageSize = 12;
 
-  const dayShows = showtimes
-    .filter(s => s.startTime.startsWith(selectedDate) && (filterCinema === "all" || String(s.cinemaId) === filterCinema))
-    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+  const filteredShows = useMemo(() => showtimes
+    .filter(showtime => (
+      (!filterDate || showtime.startTime.startsWith(filterDate))
+      && (filterMovie === "all" || String(showtime.movieId) === filterMovie)
+      && (filterCinema === "all" || String(showtime.cinemaId) === filterCinema)
+    ))
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime)),
+  [showtimes, filterDate, filterMovie, filterCinema]);
 
-  // Group by movie
-  const byMovie = dayShows.reduce((acc, s) => {
-    const key = s.movieId;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(s);
-    return acc;
-  }, {});
+  const { page, setPage, totalPages, pageItems } = useAdminPagination(filteredShows, pageSize);
+
+  const scheduleGroups = useMemo(() => {
+    const dates = new Map();
+    pageItems.forEach(showtime => {
+      const dateKey = showtime.startTime.slice(0, 10);
+      if (!dates.has(dateKey)) dates.set(dateKey, new Map());
+      const movieGroups = dates.get(dateKey);
+      const movieKey = String(showtime.movieId);
+      if (!movieGroups.has(movieKey)) movieGroups.set(movieKey, []);
+      movieGroups.get(movieKey).push(showtime);
+    });
+    return [...dates.entries()].map(([dateKey, movieGroups]) => [dateKey, [...movieGroups.entries()]]);
+  }, [pageItems]);
+
+  const groupCounts = useMemo(() => {
+    const dates = new Map();
+    const moviesByDate = new Map();
+    filteredShows.forEach(showtime => {
+      const dateKey = showtime.startTime.slice(0, 10);
+      const movieKey = `${dateKey}:${showtime.movieId}`;
+      dates.set(dateKey, (dates.get(dateKey) || 0) + 1);
+      moviesByDate.set(movieKey, (moviesByDate.get(movieKey) || 0) + 1);
+    });
+    return { dates, moviesByDate };
+  }, [filteredShows]);
+
+  const changeFilter = (setter, value) => {
+    setter(value);
+    setPage(1);
+  };
 
   return (
     <div className="sh-section">
-      <div className="sh-toolbar">
-        <input type="date" className="sh-select" value={selectedDate} onChange={e => setSD(e.target.value)} />
-        <select className="sh-select" value={filterCinema} onChange={e => setFC(e.target.value)}>
+      <div className="sh-toolbar sh-schedule-toolbar">
+        <input
+          type="date"
+          className="sh-select"
+          value={filterDate}
+          aria-label="Lọc lịch chiếu theo ngày"
+          title="Để trống để xem tất cả ngày"
+          onChange={event => changeFilter(setFD, event.target.value)}
+        />
+        {filterDate && (
+          <button type="button" className="sh-btn sh-btn-secondary" onClick={() => changeFilter(setFD, "")}>
+            Tất cả ngày
+          </button>
+        )}
+        <select className="sh-select sh-schedule-movie-filter" value={filterMovie} onChange={event => changeFilter(setFM, event.target.value)}>
+          <option value="all">Tất cả phim</option>
+          {movies.map(movie => <option key={movie.id} value={movie.id}>{movie.title}</option>)}
+        </select>
+        <select className="sh-select" value={filterCinema} onChange={event => changeFilter(setFC, event.target.value)}>
           <option value="all">Tất cả rạp</option>
           {cinemas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
 
-      {Object.keys(byMovie).length === 0 ? (
-        <div className="sh-empty">Không có lịch chiếu nào cho ngày này.</div>
-      ) : Object.entries(byMovie).map(([movieId, shows]) => {
-        const movie = movies.find(m => m.id === Number(movieId));
-        return (
-          <div key={movieId} className="sh-schedule-movie-block">
-            <div className="sh-schedule-movie-header">
-              <span className="sh-schedule-movie-title">{movie?.title}</span>
-              <span className="sh-schedule-movie-duration">⏱ {movie?.duration} phút</span>
-              <span className="sh-schedule-count">{shows.length} suất</span>
+      {scheduleGroups.length === 0 ? (
+        <div className="sh-empty">Không có lịch chiếu phù hợp với bộ lọc.</div>
+      ) : scheduleGroups.map(([dateKey, movieGroups]) => (
+        <section key={dateKey} className="sh-schedule-day-block">
+          <div className="sh-schedule-day-header">
+            <div>
+              <span className="sh-schedule-day-label">Ngày chiếu</span>
+              <h3>{fmtDateHeading(dateKey)}</h3>
             </div>
-            <div className="sh-schedule-shows">
-              {shows.map(s => {
-                const room   = rooms.find(r => r.id === s.roomId);
-                const cinema = cinemas.find(c => c.id === s.cinemaId);
-                const rtColor = ROOM_TYPE_COLOR[room?.type] || "#8fa6ff";
-                const isFull = s.availableSeats === 0;
-                const isEnded = s.status === "ended";
-                return (
-                  <div key={s.id} className={`sh-schedule-card${isEnded ? " ended" : isFull ? " full" : ""}`}>
-                    <div className="sh-schedule-time">
-                      {new Date(s.startTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                    <div className="sh-schedule-room">
-                      <span style={{ color: "#c0d0ff", fontSize: 12 }}>{cinema?.name}</span>
-                      <span className="sh-room-badge sm" style={{ color: rtColor, background: `${rtColor}15`, borderColor: `${rtColor}33` }}>
-                        {room?.name} · {room?.type}
-                      </span>
-                    </div>
-                    <div className="sh-schedule-meta">
-                      <span style={{ color: "#a78bfa", fontWeight: 600 }}>
-                        Thường {fmtMoney(s.priceStandard)} · VIP {fmtMoney(s.priceVip)} · Đôi {fmtMoney(s.priceCouple)}
-                      </span>
-                      <span style={{ color: isEnded ? "#94a3b8" : isFull ? "#f87171" : "#4ade80", fontSize: 12 }}>
-                        {isEnded ? "Đã kết thúc" : isFull ? "Hết chỗ" : `${s.availableSeats} ghế trống`}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <span className="sh-schedule-day-count">{groupCounts.dates.get(dateKey) || 0} suất</span>
           </div>
-        );
-      })}
+
+          {movieGroups.map(([movieId, shows]) => {
+            const movie = movies.find(item => item.id === Number(movieId));
+            return (
+              <div key={`${dateKey}-${movieId}`} className="sh-schedule-movie-block">
+                <div className="sh-schedule-movie-header">
+                  <span className="sh-schedule-movie-title">{movie?.title || "Phim không xác định"}</span>
+                  <span className="sh-schedule-movie-duration">⏱ {movie?.duration || 0} phút</span>
+                  <span className="sh-schedule-count">{groupCounts.moviesByDate.get(`${dateKey}:${movieId}`) || 0} suất</span>
+                </div>
+                <div className="sh-schedule-shows">
+                  {shows.map(showtime => {
+                    const room = rooms.find(item => item.id === showtime.roomId);
+                    const cinema = cinemas.find(item => item.id === showtime.cinemaId);
+                    const roomColor = ROOM_TYPE_COLOR[room?.type] || "#8fa6ff";
+                    const isFull = showtime.availableSeats === 0;
+                    const isEnded = showtime.status === "ended";
+                    return (
+                      <article key={showtime.id} className={`sh-schedule-card${isEnded ? " ended" : isFull ? " full" : ""}`}>
+                        <div className="sh-schedule-card-head">
+                          <strong className="sh-schedule-time">{fmtHour(showtime.startTime)}</strong>
+                          <span className="sh-schedule-end-time">– {fmtHour(showtime.endTime)}</span>
+                          <span className={`sh-schedule-state${isEnded ? " ended" : isFull ? " full" : " active"}`}>
+                            {isEnded ? "Đã kết thúc" : isFull ? "Hết chỗ" : "Đang hoạt động"}
+                          </span>
+                        </div>
+                        <div className="sh-schedule-room">
+                          <span className="sh-schedule-cinema" title={cinema?.name}>{cinema?.name || "Rạp không xác định"}</span>
+                          <div className="sh-schedule-room-row">
+                            <span className="sh-room-badge sm" style={{ color: roomColor, background: `${roomColor}15`, borderColor: `${roomColor}33` }}>
+                              {room?.name || "Chưa có phòng"} · {room?.type || "—"}
+                            </span>
+                            <span className={`sh-schedule-seats${isFull ? " full" : ""}`}>
+                              {isFull ? "0 ghế trống" : `${showtime.availableSeats} ghế trống`}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="sh-schedule-prices">
+                          <span>Thường <strong>{fmtMoney(showtime.priceStandard)}</strong></span>
+                          <span>VIP <strong>{fmtMoney(showtime.priceVip)}</strong></span>
+                          <span>Đôi <strong>{fmtMoney(showtime.priceCouple)}</strong></span>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      ))}
+
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={filteredShows.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+      />
+      <div className="sh-footer-count">
+        Tìm thấy <strong>{filteredShows.length}</strong> / {showtimes.length} lịch chiếu
+      </div>
     </div>
   );
 }
@@ -509,7 +595,7 @@ const RECURRING_TEMPLATE_PRESETS = {
 };
 
 /** 4a. Tạo lịch chiếu lặp lại theo khung giờ cố định */
-function RecurringForm({ movies, cinemas, onClose, onSave }) {
+function RecurringForm({ movies, cinemas, showtimes = [], onClose, onSave }) {
 
   const [selectedMovieIds, setSelectedMovieIds] = useState([]);
   const [selectedCinemaIds, setSelectedCinemaIds] = useState([]);
@@ -613,6 +699,16 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
       return sum + Math.ceil(estimated);
     }, 0) * selectedCinemaIds.length;
   }, [days, selectedMovieIds, selectedCinemaIds, form, weekdaySlots, weekendSlots]);
+
+  const existingShowtimeCountByMovie = useMemo(() => {
+    const counts = new Map();
+    showtimes.forEach((showtime) => {
+      if (showtime.status !== "active") return;
+      const movieId = Number(showtime.movieId);
+      counts.set(movieId, (counts.get(movieId) || 0) + 1);
+    });
+    return counts;
+  }, [showtimes]);
 
   const validate = () => {
     const e = {};
@@ -750,7 +846,13 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
                                 checked={selectedMovieIds.includes(movie.id)}
                                 onChange={() => toggleMovie(movie.id)}
                               />
-                              <span>{movie.title} · {movie.duration} phút</span>
+                              <span className="sh-movie-choice-title">{movie.title} · {movie.duration} phút</span>
+                              <span
+                                className="sh-movie-existing-count"
+                                title="Số suất chiếu đang hoạt động, chưa kết thúc"
+                              >
+                                {existingShowtimeCountByMovie.get(Number(movie.id)) || 0} suất
+                              </span>
                             </label>
                           )) : (
                             <div className="sh-selection-dropdown-empty">Chưa có phim để lựa chọn.</div>
@@ -1088,8 +1190,6 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
 
   const cinemaRooms = rooms.filter(r => String(r.cinemaId) === String(form.cinemaId));
   const selMovie    = movies.find(m => m.id === Number(form.movieId));
-  const releaseDate = selMovie?.releaseDate || "";
-  const minStartTime = releaseDate ? `${releaseDate}T00:00` : "";
   const endTime     = calcEndTime(form.startTime, selMovie?.duration);
   const nextAllowedStartTime = calcNextAllowedStartTime(endTime);
   const conflicts   = form.roomId && form.startTime && form.movieId
@@ -1102,9 +1202,6 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
     if (!form.cinemaId)    e.cinemaId   = "Chọn rạp.";
     if (!form.roomId)      e.roomId     = "Chọn phòng chiếu.";
     if (!form.startTime)   e.startTime  = "Chọn giờ bắt đầu.";
-    if (releaseDate && form.startTime && form.startTime.slice(0, 10) < releaseDate) {
-      e.startTime = `Phim này chỉ được chiếu từ ngày phát hành ${fmtDate(releaseDate)} trở đi.`;
-    }
     if (!form.priceStandard || Number(form.priceStandard) <= 0) e.priceStandard = "Nhập giá vé thường hợp lệ.";
     if (!form.priceVip || Number(form.priceVip) <= 0) e.priceVip = "Nhập giá vé VIP hợp lệ.";
     if (!form.priceCouple || Number(form.priceCouple) <= 0) e.priceCouple = "Nhập giá ghế đôi hợp lệ.";
@@ -1181,10 +1278,7 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
             <div className="sh-form-col">
               <div className="sh-field">
                 <label>Giờ bắt đầu *</label>
-                <input type="datetime-local" className={errors.startTime ? "error" : ""} value={form.startTime} min={minStartTime || undefined} onChange={e => set("startTime", e.target.value)} />
-                {releaseDate && (
-                  <span className="sh-hint">Chỉ được tạo suất chiếu từ ngày phát hành {fmtDate(releaseDate)} trở đi.</span>
-                )}
+                <input type="datetime-local" className={errors.startTime ? "error" : ""} value={form.startTime} onChange={e => set("startTime", e.target.value)} />
                 {errors.startTime && <span className="sh-error">{errors.startTime}</span>}
               </div>
 
@@ -1579,6 +1673,7 @@ export default function AdminShowtimes() {
         <RecurringForm
           movies={movies}
           cinemas={cinemas}
+          showtimes={showtimes}
           onClose={() => setShowRecurring(false)}
           onSave={handleSaveRecurring}
         />

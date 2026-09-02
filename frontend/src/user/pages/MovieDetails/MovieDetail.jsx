@@ -676,7 +676,7 @@ export default function MovieDetail() {
                       <strong>
                         {movie?.release_date
                           ? new Date(movie.release_date).toLocaleDateString('vi-VN')
-                          : '--'}
+                          : 'Chưa có ngày khởi chiếu'}
                       </strong>
                     </div>
                     <div className="movie-meta-row">

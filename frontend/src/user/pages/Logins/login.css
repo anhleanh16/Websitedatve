@@ -269,20 +269,23 @@
   color: #a78bfa;
 }
 
-.error-message {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
+.auth-form .error-message,
+.auth-card .error-message {
+  background: rgba(245, 158, 11, 0.18) !important;
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+  color: #fef3c7 !important;
   padding: 12px 16px;
   border-radius: 10px;
   font-size: 14px;
   text-align: center;
+  font-weight: 600;
+  line-height: 1.6;
 }
 
 .countdown-message {
-  background: rgba(59, 130, 246, 0.16);
-  border: 1px solid rgba(125, 211, 252, 0.35);
-  color: #dbeafe;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.38);
+  color: #fef3c7;
   padding: 12px 16px;
   border-radius: 10px;
   font-size: 14px;
@@ -290,7 +293,7 @@
 }
 
 .countdown-message strong {
-  color: #fde68a;
+  color: #fbbf24;
   font-variant-numeric: tabular-nums;
 }
 

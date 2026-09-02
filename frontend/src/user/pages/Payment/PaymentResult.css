@@ -180,6 +180,65 @@
   text-align: left;
 }
 
+.pr-zalopay-qr {
+  margin: 0 0 1.2rem;
+  padding: 1.2rem;
+  border: 1px solid rgba(0, 104, 255, 0.35);
+  border-radius: 18px;
+  background: rgba(0, 104, 255, 0.08);
+}
+
+.pr-zalopay-label {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: #0068ff;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.pr-zalopay-qr h2 {
+  margin: 0.65rem 0 0.9rem;
+  color: #fff;
+  font-size: 1.05rem;
+}
+
+.pr-zalopay-qr img,
+.pr-qr-loading {
+  display: flex;
+  width: min(260px, 100%);
+  aspect-ratio: 1;
+  margin: 0 auto 0.8rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: #fff;
+  padding: 8px;
+}
+
+.pr-zalopay-qr > strong {
+  display: block;
+  color: #60a5fa;
+  font-size: 1.25rem;
+}
+
+.pr-zalopay-qr p {
+  margin: 0.55rem 0 0;
+  color: #cbd5e1;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.pr-open-zalopay {
+  display: inline-flex;
+  margin-top: 0.8rem;
+  color: #93c5fd;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .pr-btn.disabled {
   opacity: 0.6;
   cursor: not-allowed;

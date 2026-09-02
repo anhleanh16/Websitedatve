@@ -370,9 +370,26 @@ export const userGetMovies = async (req, res) => {
     const params = [];
     let whereSql = "WHERE m.is_deleted = 0 AND m.is_hidden = 0";
 
-    if (status && ["now_showing", "coming_soon"].includes(status)) {
-      whereSql += " AND m.status = ?";
-      params.push(status);
+    if (status === "now_showing") {
+      whereSql += " AND EXISTS ("
+      whereSql += " SELECT 1 FROM Showtimes s WHERE s.movie_id = m.movie_id "
+      whereSql += " AND s.status <> 'cancelled' "
+      whereSql += " AND s.start_time >= NOW() "
+      whereSql += " AND s.start_time <= DATE_ADD(NOW(), INTERVAL 3 DAY)"
+      whereSql += " )";
+    }
+
+    if (status === "coming_soon") {
+      whereSql += " AND ("
+      whereSql += " m.status = 'coming_soon' "
+      whereSql += " OR m.release_date > CURDATE() "
+      whereSql += " OR NOT EXISTS ("
+      whereSql += " SELECT 1 FROM Showtimes s WHERE s.movie_id = m.movie_id "
+      whereSql += " AND s.status <> 'cancelled' "
+      whereSql += " AND s.start_time >= NOW() "
+      whereSql += " AND s.start_time <= DATE_ADD(NOW(), INTERVAL 3 DAY)"
+      whereSql += " )"
+      whereSql += " )";
     }
 
     const [movies] = await db.query(

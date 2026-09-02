@@ -4,7 +4,7 @@ import QuickBookWidget from '../../Components/QuickBookWidget/QuickBookWidget'
 import AutoMarqueeText from '../../Components/AutoMarqueeText/AutoMarqueeText'
 import {
   FaPlay, FaTicketAlt, FaStar, FaMapMarkerAlt, FaClock,
-  FaFire, FaRobot, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt, FaEye, FaPaperPlane, FaTimes, FaMicrophone, FaStop
+  FaFire, FaChevronLeft, FaChevronRight, FaTag, FaGift, FaBolt, FaEye
 } from 'react-icons/fa'
 import { MdLocalOffer } from 'react-icons/md'
 import { useSelector } from 'react-redux'
@@ -816,110 +816,6 @@ export default function Home() {
 
   return (
     <div className='home-page'>
-
-      {/* AI Float */}
-      <button
-        type='button'
-        hidden
-        className={`ai-float-btn${isAiOpen ? ' is-open' : ''}`}
-        onClick={toggleAiPanel}
-        aria-label='Mở AI Assistant mini'
-        aria-expanded={isAiOpen}
-        aria-controls='ai-mini-chat'
-      >
-        <span className='ai-float-icon'><FaRobot /></span>
-        <span className='ai-float-label'>AI Assistant</span>
-      </button>
-
-      {false && isAiOpen && (
-        <section className='ai-mini-chat' id='ai-mini-chat' role='dialog' aria-label='AI Assistant mini'>
-          <header className='ai-mini-header'>
-            <div className='ai-mini-title'>
-              <span className='ai-mini-dot' />
-              AI Assistant
-            </div>
-            <button
-              type='button'
-              className='ai-mini-close'
-              onClick={toggleAiPanel}
-              aria-label='Đóng hộp chat AI'
-            >
-              <FaTimes />
-            </button>
-          </header>
-
-          <div className='ai-mini-mode-switch'>
-            <button
-              type='button'
-              className={`ai-mini-mode-btn${aiMode === 'voice' ? ' active' : ''}`}
-              onClick={() => setAiMode('voice')}
-            >
-              Voice
-            </button>
-            <button
-              type='button'
-              className={`ai-mini-mode-btn${aiMode === 'text' ? ' active' : ''}`}
-              onClick={() => setAiMode('text')}
-            >
-              Text
-            </button>
-          </div>
-
-          {aiMode === 'voice' && (
-            <div className='ai-mini-voice-wrap'>
-              <button
-                type='button'
-                className={`ai-voice-btn${voiceListening ? ' listening' : ''}`}
-                onClick={toggleVoiceListening}
-                disabled={!voiceSupported}
-              >
-                {voiceListening ? <FaStop /> : <FaMicrophone />}
-              </button>
-              <div className='ai-voice-title'>Voice chat trực tiếp</div>
-              <p className='ai-voice-note'>
-                {voiceSupported
-                  ? 'Nội dung bạn nói sẽ không hiển thị thành tin nhắn text. AI phản hồi bằng giọng nói ngay sau khi nghe xong.'
-                  : 'Trình duyệt chưa hỗ trợ voice chat. Bạn có thể chuyển sang Text mode.'}
-              </p>
-              <div className='ai-voice-status'>{aiTyping ? 'AI đang suy nghĩ...' : voiceStatus}</div>
-            </div>
-          )}
-
-          {aiMode === 'text' && (
-          <>
-          <div className='ai-mini-body'>
-            {aiMessages.map((item) => (
-              <div key={item.id} className={`ai-mini-msg ${item.role}`}>
-                <div className='ai-mini-bubble'>{item.text}</div>
-              </div>
-            ))}
-            {aiTyping && (
-              <div className='ai-mini-msg assistant'>
-                <div className='ai-mini-bubble typing'>AI đang trả lời...</div>
-              </div>
-            )}
-            <div ref={aiMessagesEndRef} />
-          </div>
-
-          <form className='ai-mini-input-wrap' onSubmit={handleAiSubmit}>
-            <input
-              value={aiInput}
-              onChange={(e) => setAiInput(e.target.value)}
-              placeholder='Nhập câu hỏi của bạn...'
-              maxLength={300}
-            />
-            <button type='submit' disabled={!aiInput.trim()} aria-label='Gửi tin nhắn'>
-              <FaPaperPlane />
-            </button>
-          </form>
-          </>
-          )}
-
-          <div className='ai-mini-footer'>
-            <Link to='/ai-assistant' className='ai-mini-full-link'>Mở AI Assistant</Link>
-          </div>
-        </section>
-      )}
 
       {/* ══════════════════════════════════════════
           LAYOUT CHÍNH: 2 CỘT

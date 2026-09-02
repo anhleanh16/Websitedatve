@@ -24,18 +24,11 @@ const normalizeDateInputValue = (value) => {
 
 const formatDisplayDate = (value) => {
   const normalized = normalizeDateInputValue(value);
-  if (!normalized) return "—";
+  if (!normalized) return "Chưa có ngày khởi chiếu";
 
   const [year, month, day] = normalized.split("-");
   if (!year || !month || !day) return normalized;
   return `${day}/${month}/${year}`;
-};
-
-const formatDateInput = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 };
 
 const snakeToCamelMovie = (obj) => {
@@ -139,7 +132,7 @@ function TagDropdown({ value, onChange, categories }) {
 const EMPTY_MOVIE = {
   title: "", description: "", duration: "", ageLimit: 0,
   director: "", actors: "", trailer: "", poster: "",
-  posters: [], releaseDate: "", status: "coming_soon",
+  posters: [], status: "coming_soon",
   language: "Tiếng Việt", country: "Việt Nam",
   categories: [], rating: null,
 };
@@ -329,12 +322,6 @@ function MovieForm({ movie, categories, onClose, onSave }) {
   const [posterDrag, setPosterDrag] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const todayStr = formatDateInput(new Date());
-  const minDateStr = todayStr;
-  const effectiveMinDateStr = isEdit && form.releaseDate && form.releaseDate < minDateStr
-    ? form.releaseDate
-    : minDateStr;
-
   useEffect(() => {
     if (movie) {
       // Hiển thị tất cả poster hiện tại (chính + phụ)
@@ -347,12 +334,6 @@ function MovieForm({ movie, categories, onClose, onSave }) {
       }));
     }
   }, [movie]);
-
-  useEffect(() => {
-    if (form.status === "now_showing" && (!form.releaseDate || form.releaseDate > todayStr)) {
-      setForm((prev) => ({ ...prev, releaseDate: todayStr }));
-    }
-  }, [form.status, form.releaseDate, todayStr]);
 
   const set = (field, val) => {
     setForm((f) => ({ ...f, [field]: val }));
@@ -419,7 +400,6 @@ function MovieForm({ movie, categories, onClose, onSave }) {
     if (!form.title?.trim()) e.title = "Vui lòng nhập tên phim.";
     if (!form.director?.trim()) e.director = "Vui lòng nhập đạo diễn.";
     if (!form.duration || form.duration <= 0) e.duration = "Thời lượng phải > 0.";
-    if (!form.releaseDate) e.releaseDate = "Vui lòng chọn ngày khởi chiếu.";
 
     if (isEdit) {
       if (allPosters.length < 1) e.posters = "Phim cần ít nhất 1 poster để lưu.";
@@ -444,7 +424,6 @@ function MovieForm({ movie, categories, onClose, onSave }) {
       formData.append('age_limit', form.ageLimit);
       formData.append('director', form.director);
       formData.append('actors', form.actors);
-      formData.append('release_date', form.releaseDate);
       formData.append('status', form.status);
       formData.append('language', form.language);
       formData.append('country', form.country);
@@ -550,18 +529,11 @@ function MovieForm({ movie, categories, onClose, onSave }) {
 
             {/* Cột phải */}
             <div className="mv-form-col">
-              <div className="mv-field-row">
-                <div className="mv-field">
-                  <label>Ngày khởi chiếu *</label>
-                  <input type="date" className={errors.releaseDate ? "error" : ""} value={form.releaseDate} onChange={(e) => set("releaseDate", e.target.value)} min={effectiveMinDateStr} />
-                  {errors.releaseDate && <span className="mv-error">{errors.releaseDate}</span>}
-                </div>
-                <div className="mv-field">
-                  <label>Trạng thái</label>
-                  <select value={form.status} onChange={(e) => set("status", e.target.value)}>
-                    {STATUS_OPTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                </div>
+              <div className="mv-field">
+                <label>Trạng thái</label>
+                <select value={form.status} onChange={(e) => set("status", e.target.value)}>
+                  {STATUS_OPTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
               </div>
 
               <div className="mv-field">

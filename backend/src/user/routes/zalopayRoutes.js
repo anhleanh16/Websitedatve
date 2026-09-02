@@ -155,6 +155,31 @@ function buildGatewayUrl(appId, zpTransToken) {
   return `${gatewayBase}?order=${orderB64}`;
 }
 
+const getHttpOrigin = (value) => {
+  if (!value) return '';
+  try {
+    const url = new URL(String(value));
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.origin : '';
+  } catch {
+    return '';
+  }
+};
+
+// Luôn đưa người dùng về đúng website đã bắt đầu thanh toán. Ví dụ, đơn được
+// tạo từ domain production sẽ quay lại domain đó; localhost chỉ dùng khi người
+// dùng thực sự thanh toán trên localhost hoặc request không có Origin/Referer.
+const resolvePaymentRedirectUrl = (req) => {
+  const requestOrigin = getHttpOrigin(req.get('origin'))
+    || getHttpOrigin(req.get('referer'));
+  if (requestOrigin) return `${requestOrigin}/payment/result`;
+
+  const configuredRedirect = String(process.env.ZALOPAY_REDIRECT_URL || '').trim();
+  if (getHttpOrigin(configuredRedirect)) return configuredRedirect;
+
+  const frontendOrigin = getHttpOrigin(process.env.FRONTEND_URL);
+  return `${frontendOrigin || 'http://localhost:5173'}/payment/result`;
+};
+
 const queryZaloPayTransaction = async (appTransId) => {
   const appId = process.env.ZALOPAY_APP_ID || '553';
   const key1 = process.env.ZALOPAY_KEY1 || '9phuAOYhan4urywHTh0ndEXiV3pKHr5Q';
@@ -200,7 +225,7 @@ router.post('/:userId/payments/zalopay', authMiddleware, selfOrAdminOnly, requir
     const key1         = process.env.ZALOPAY_KEY1      || '9phuAOYhan4urywHTh0ndEXiV3pKHr5Q';
     const endpoint     = process.env.ZALOPAY_ENDPOINT || 'https://sb-openapi.zalopay.vn/v2/create';
     const callbackUrl  = process.env.ZALOPAY_CALLBACK_URL  || '';
-    const redirectUrl  = process.env.ZALOPAY_REDIRECT_URL  || 'http://localhost:5173/payment/result';
+    const redirectUrl  = resolvePaymentRedirectUrl(req);
 
     const parsedAmount = Math.round(Number(amount || 0)); // ZaloPay yêu cầu integer (VND)
     if (!parsedAmount || parsedAmount <= 0) {
@@ -363,7 +388,7 @@ router.post('/payments/zalopay/confirm', authMiddleware, async (req, res) => {
     if (Number(paymentResult?.return_code) !== 1) {
       return res.status(409).json({
         success: false,
-        pending: Number(paymentResult?.return_code) === 2,
+        pending: Number(paymentResult?.return_code) === 3,
         message: paymentResult?.return_message || 'ZaloPay chưa xác nhận giao dịch thành công.',
       });
     }
