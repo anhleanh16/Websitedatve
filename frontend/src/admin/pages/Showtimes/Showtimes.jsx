@@ -367,7 +367,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
 
           const maxLanes = Math.max(1, ...arrangedShows.map(show => show.laneIndex + 1));
           const rtColor   = ROOM_TYPE_COLOR[room.type] || "#8fa6ff";
-          const laneSpacing = 32;
+          const laneSpacing = 40;
 
           return (
             <div key={room.id} className="sh-timeline-row">
@@ -377,7 +377,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
                   {room.type} · {room.totalSeats} ghế
                 </span>
               </div>
-              <div className="sh-timeline-track" style={{ height: `${Math.max(60, 18 + maxLanes * laneSpacing)}px` }}>
+              <div className="sh-timeline-track" style={{ height: `${Math.max(68, 18 + maxLanes * laneSpacing)}px` }}>
                 {HOURS.map(h => (
                   <div key={h} className="sh-track-grid-line" style={{ left: `${((h - 8) / 15) * 100}%` }} />
                 ))}
@@ -388,7 +388,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas }) {
                   const isFull = s.availableSeats === 0;
                   const isEnded = s.status === "ended";
                   const laneTop = 8 + (s.laneIndex * laneSpacing);
-                  const blockHeight = Math.max(28, laneSpacing - 4);
+                  const blockHeight = Math.max(34, laneSpacing - 5);
                   const safeWidth = Math.max(8, Math.min(100 - left, width));
 
                   return (
