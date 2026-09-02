@@ -16,6 +16,7 @@ import {
   checkInBooking,
   verifyBookingCode,
   staffCreateBooking,
+  confirmAdminBookingPayment,
 } from "../controllers/bookingController.js";
 import {
   getAllCategories,
@@ -178,6 +179,7 @@ router.get("/bookings", authMiddleware, staffBasicOnly, getAdminBookings);
 router.get("/bookings/verify/:code", authMiddleware, staffBasicOnly, verifyBookingCode);
 router.post("/bookings/staff-create", authMiddleware, staffBasicOnly, staffCreateBooking);
 router.get("/bookings/:orderId", authMiddleware, staffBasicOnly, getAdminBookingDetail);
+router.put("/bookings/:orderId/payment", authMiddleware, staffBasicOnly, confirmAdminBookingPayment);
 router.put("/bookings/:orderId/refund", authMiddleware, adminOnly, refundBooking);
 router.put("/bookings/:orderId/check-in", authMiddleware, staffBasicOnly, checkInBooking);
 

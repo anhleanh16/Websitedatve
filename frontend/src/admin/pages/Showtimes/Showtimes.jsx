@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { adminShowtimeService, adminMovieService } from "../../services/adminApi";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 import './showtimes.css';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -512,6 +513,7 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
 
   const [selectedMovieIds, setSelectedMovieIds] = useState([]);
   const [selectedCinemaIds, setSelectedCinemaIds] = useState([]);
+  const [openSelectionDropdown, setOpenSelectionDropdown] = useState(null);
   const [form, setForm] = useState(() => {
     const today = new Date().toISOString().slice(0, 10);
     return {
@@ -524,6 +526,9 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
       earlyShowDurationDays: 7,
       weekdayTemplate: "balanced",
       weekendTemplate: "weekend",
+      priceStandard: "",
+      priceVip: "",
+      priceCouple: "",
       defaultPriority: 3,
       defaultSlotsPerDay: 2,
     };
@@ -555,6 +560,7 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
       const next = prev.includes(movieId) ? prev.filter((id) => id !== movieId) : [...prev, movieId];
       return next;
     });
+    setErrors((prev) => ({ ...prev, movies: undefined }));
   };
 
   const toggleCinema = (cinemaId) => {
@@ -562,6 +568,11 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
       const next = prev.includes(cinemaId) ? prev.filter((id) => id !== cinemaId) : [...prev, cinemaId];
       return next;
     });
+    setErrors((prev) => ({ ...prev, cinemas: undefined }));
+  };
+
+  const toggleSelectionDropdown = (name) => {
+    setOpenSelectionDropdown((current) => (current === name ? null : name));
   };
 
   const updateMovieConfig = (movieId, field, value) => {
@@ -610,6 +621,9 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
     if (!form.releaseDate) e.releaseDate = "Chọn ngày phát hành.";
     if (!form.officialEndDate) e.officialEndDate = "Chọn ngày kết thúc dự kiến.";
     if (form.releaseDate && form.officialEndDate && form.officialEndDate < form.releaseDate) e.officialEndDate = "Ngày kết thúc phải sau ngày phát hành.";
+    if (!form.priceStandard || Number(form.priceStandard) <= 0) e.priceStandard = "Nhập giá vé thường hợp lệ.";
+    if (!form.priceVip || Number(form.priceVip) <= 0) e.priceVip = "Nhập giá vé VIP hợp lệ.";
+    if (!form.priceCouple || Number(form.priceCouple) <= 0) e.priceCouple = "Nhập giá ghế đôi hợp lệ.";
     if (form.earlyShowEnabled && Number(form.earlyShowDays || 0) < 0) e.earlyShowDays = "Sớm bao nhiêu ngày phải >= 0.";
     return e;
   };
@@ -618,6 +632,8 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
     const e = validate();
     if (Object.keys(e).length) {
       setErrors(e);
+      if (e.movies) setOpenSelectionDropdown("movies");
+      else if (e.cinemas) setOpenSelectionDropdown("cinemas");
       return;
     }
 
@@ -650,12 +666,16 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
       weekday_template: form.weekdayTemplate,
       weekend_template: form.weekendTemplate,
       weeks: 1,
+      priceStandard: Number(form.priceStandard),
+      priceVip: Number(form.priceVip),
+      priceCouple: Number(form.priceCouple),
       default_priority: Number(form.defaultPriority || 1),
       default_slots_per_day: Number(form.defaultSlotsPerDay || 1),
     });
   };
 
   return (
+    <AdminModalPortal>
     <div className="sh-modal-overlay" onClick={onClose}>
       <div className="sh-modal sh-modal-recurring" onClick={(event) => event.stopPropagation()}>
         <div className="sh-modal-header">
@@ -700,34 +720,88 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
 
                 <div className="sh-field">
                   <label>Danh sách phim *</label>
-                  <div className="sh-checkbox-list">
-                    {movies.map((movie) => (
-                      <label key={movie.id} className="sh-checkbox-item">
-                        <input
-                          type="checkbox"
-                          checked={selectedMovieIds.includes(movie.id)}
-                          onChange={() => toggleMovie(movie.id)}
-                        />
-                        <span>{movie.title} · {movie.duration} phút</span>
-                      </label>
-                    ))}
+                  <div className={`sh-selection-dropdown${openSelectionDropdown === "movies" ? " open" : ""}`}>
+                    <button
+                      type="button"
+                      className="sh-selection-dropdown-toggle"
+                      aria-expanded={openSelectionDropdown === "movies"}
+                      aria-controls="recurring-movie-list"
+                      onClick={() => toggleSelectionDropdown("movies")}
+                    >
+                      <span className="sh-selection-dropdown-copy">
+                        <strong>Chọn phim</strong>
+                        <small>
+                          {selectedMovieIds.length > 0
+                            ? `Đã chọn ${selectedMovieIds.length} phim`
+                            : "Bấm để mở danh sách phim"}
+                        </small>
+                      </span>
+                      <span className="sh-selection-dropdown-caret" aria-hidden="true">
+                        {openSelectionDropdown === "movies" ? "▲" : "▼"}
+                      </span>
+                    </button>
+                    {openSelectionDropdown === "movies" && (
+                      <div id="recurring-movie-list" className="sh-selection-dropdown-body">
+                        <div className="sh-checkbox-list">
+                          {movies.length > 0 ? movies.map((movie) => (
+                            <label key={movie.id} className="sh-checkbox-item">
+                              <input
+                                type="checkbox"
+                                checked={selectedMovieIds.includes(movie.id)}
+                                onChange={() => toggleMovie(movie.id)}
+                              />
+                              <span>{movie.title} · {movie.duration} phút</span>
+                            </label>
+                          )) : (
+                            <div className="sh-selection-dropdown-empty">Chưa có phim để lựa chọn.</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {errors.movies && <span className="sh-error">{errors.movies}</span>}
                 </div>
 
                 <div className="sh-field">
                   <label>Rạp chiếu *</label>
-                  <div className="sh-checkbox-list">
-                    {cinemas.map((cinema) => (
-                      <label key={cinema.id} className="sh-checkbox-item">
-                        <input
-                          type="checkbox"
-                          checked={selectedCinemaIds.includes(cinema.id)}
-                          onChange={() => toggleCinema(cinema.id)}
-                        />
-                        <span>{cinema.name}</span>
-                      </label>
-                    ))}
+                  <div className={`sh-selection-dropdown${openSelectionDropdown === "cinemas" ? " open" : ""}`}>
+                    <button
+                      type="button"
+                      className="sh-selection-dropdown-toggle"
+                      aria-expanded={openSelectionDropdown === "cinemas"}
+                      aria-controls="recurring-cinema-list"
+                      onClick={() => toggleSelectionDropdown("cinemas")}
+                    >
+                      <span className="sh-selection-dropdown-copy">
+                        <strong>Chọn rạp chiếu</strong>
+                        <small>
+                          {selectedCinemaIds.length > 0
+                            ? `Đã chọn ${selectedCinemaIds.length} rạp`
+                            : "Bấm để mở danh sách rạp"}
+                        </small>
+                      </span>
+                      <span className="sh-selection-dropdown-caret" aria-hidden="true">
+                        {openSelectionDropdown === "cinemas" ? "▲" : "▼"}
+                      </span>
+                    </button>
+                    {openSelectionDropdown === "cinemas" && (
+                      <div id="recurring-cinema-list" className="sh-selection-dropdown-body">
+                        <div className="sh-checkbox-list">
+                          {cinemas.length > 0 ? cinemas.map((cinema) => (
+                            <label key={cinema.id} className="sh-checkbox-item">
+                              <input
+                                type="checkbox"
+                                checked={selectedCinemaIds.includes(cinema.id)}
+                                onChange={() => toggleCinema(cinema.id)}
+                              />
+                              <span>{cinema.name}</span>
+                            </label>
+                          )) : (
+                            <div className="sh-selection-dropdown-empty">Chưa có rạp để lựa chọn.</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {errors.cinemas && <span className="sh-error">{errors.cinemas}</span>}
                 </div>
@@ -826,6 +900,51 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
                     onBlur={() => set("defaultSlotsPerDay", Math.min(8, Math.max(1, Number(form.defaultSlotsPerDay) || 1)))}
                   />
                 </div>
+
+                <div className="sh-field">
+                  <label>Giá vé thường (₫) *</label>
+                  <input
+                    type="number"
+                    min={1000}
+                    step={1000}
+                    className={errors.priceStandard ? "error" : ""}
+                    value={form.priceStandard}
+                    onChange={(event) => set("priceStandard", event.target.value)}
+                    placeholder="120000"
+                  />
+                  {errors.priceStandard && <span className="sh-error">{errors.priceStandard}</span>}
+                </div>
+
+                <div className="sh-field-row">
+                  <div className="sh-field">
+                    <label>Giá vé VIP (₫) *</label>
+                    <input
+                      type="number"
+                      min={1000}
+                      step={1000}
+                      className={errors.priceVip ? "error" : ""}
+                      value={form.priceVip}
+                      onChange={(event) => set("priceVip", event.target.value)}
+                      placeholder="150000"
+                    />
+                    {errors.priceVip && <span className="sh-error">{errors.priceVip}</span>}
+                  </div>
+                  <div className="sh-field">
+                    <label>Giá ghế đôi (₫) *</label>
+                    <input
+                      type="number"
+                      min={1000}
+                      step={1000}
+                      className={errors.priceCouple ? "error" : ""}
+                      value={form.priceCouple}
+                      onChange={(event) => set("priceCouple", event.target.value)}
+                      placeholder="220000"
+                    />
+                    {errors.priceCouple && <span className="sh-error">{errors.priceCouple}</span>}
+                  </div>
+                </div>
+
+                <span className="sh-hint">Mức giá này áp dụng cho tất cả suất chiếu được tạo trong đợt.</span>
               </div>
 
               <div className="sh-schedule-card-block sh-early-block">
@@ -930,6 +1049,7 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
               <div className="sh-preview-card">
                 <div className="sh-preview-row"><span>Khung ngày thường</span><strong>{weekdaySlots.map((slot) => `${slot.hour}:${slot.minute}`).join(" • ")}</strong></div>
                 <div className="sh-preview-row"><span>Khung cuối tuần</span><strong>{weekendSlots.map((slot) => `${slot.hour}:${slot.minute}`).join(" • ")}</strong></div>
+                <div className="sh-preview-row"><span>Giá ghế</span><strong>Thường {fmtMoney(form.priceStandard)} • VIP {fmtMoney(form.priceVip)} • Đôi {fmtMoney(form.priceCouple)}</strong></div>
                 <div className="sh-preview-row"><span>Phân bổ</span><strong>Ưu tiên cao ⇒ nhiều suất/ngày</strong></div>
               </div>
             </div>
@@ -941,6 +1061,7 @@ function RecurringForm({ movies, cinemas, onClose, onSave }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -1012,6 +1133,7 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
   };
 
   return (
+    <AdminModalPortal>
     <div className="sh-modal-overlay" onClick={onClose}>
       <div className="sh-modal" onClick={e => e.stopPropagation()}>
         <div className="sh-modal-header">
@@ -1138,12 +1260,14 @@ function ShowtimeForm({ showtime, showtimes, rooms, movies, cinemas, onClose, on
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
 /** Confirm modal */
 function Confirm({ title, message, onClose, onConfirm, danger }) {
   return (
+    <AdminModalPortal>
     <div className="sh-modal-overlay" onClick={onClose}>
       <div className="sh-modal sh-modal-sm" onClick={e => e.stopPropagation()}>
         <div className="sh-modal-header"><h2>{title}</h2><button className="sh-modal-close" onClick={onClose}>✕</button></div>
@@ -1156,6 +1280,7 @@ function Confirm({ title, message, onClose, onConfirm, danger }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -1315,9 +1440,9 @@ export default function AdminShowtimes() {
         default_slots_per_day: data.default_slots_per_day,
         time_slots: data.timeSlots,
         template: data.template,
-        price_standard: data.priceStandard,
-        price_vip: data.priceVip,
-        price_couple: data.priceCouple,
+        price_standard: data.price_standard ?? data.priceStandard,
+        price_vip: data.price_vip ?? data.priceVip,
+        price_couple: data.price_couple ?? data.priceCouple,
       };
 
       const res = await adminShowtimeService.createRecurring(payload);

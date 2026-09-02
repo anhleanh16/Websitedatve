@@ -225,6 +225,13 @@ export const adminBookingService = {
   /** Chi tiết vé */
   getBookingDetail: (orderId) => apiFetch(`/admin/bookings/${orderId}`),
 
+  /** Xác nhận thanh toán một vé đang chờ tại quầy/POS. */
+  confirmPayment: (orderId, payload) =>
+    apiFetch(`/admin/bookings/${orderId}/payment`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
   /** Kiểm tra & check-in vé */
   checkInBooking: (orderId, payload = {}) =>
     apiFetch(`/admin/bookings/${orderId}/check-in`, {

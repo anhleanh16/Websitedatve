@@ -391,6 +391,12 @@ export const ensureBookingSchema = async () => {
     if (!orderColumnSet.has('ticket_qr_token')) {
       await db.query('ALTER TABLE Orders ADD COLUMN ticket_qr_token CHAR(15) NULL AFTER booking_code');
     }
+    if (!orderColumnSet.has('payment_reference')) {
+      await db.query('ALTER TABLE Orders ADD COLUMN payment_reference VARCHAR(100) NULL AFTER payment_status');
+    }
+    if (!orderColumnSet.has('payment_confirmed_at')) {
+      await db.query('ALTER TABLE Orders ADD COLUMN payment_confirmed_at DATETIME NULL AFTER payment_reference');
+    }
     const [qrIndexes] = await db.query("SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Orders' AND INDEX_NAME = 'uq_orders_ticket_qr_token'");
     if (!qrIndexes.length) {
       await db.query('ALTER TABLE Orders ADD UNIQUE INDEX uq_orders_ticket_qr_token (ticket_qr_token)');
@@ -1230,6 +1236,98 @@ export const BookingModel = {
 
       await connection.commit();
 
+      const booking = await this.findById(normalizedOrderId, { includeTicketQr: true });
+      return {
+        ...booking,
+        pointsAwarded: Number(pointsResult?.earnedPoints || 0),
+        pointsBalance: Number(pointsResult?.newPoints || 0),
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  /** Nhân viên xác nhận một đơn chờ thanh toán tại quầy/POS. */
+  async confirmStaffPayment({ orderId, paymentMethod, paymentReference = '' }) {
+    await ensureBookingSchema();
+
+    const normalizedOrderId = Number(orderId || 0);
+    const normalizedMethod = String(paymentMethod || '').trim().toLowerCase();
+    const normalizedReference = String(paymentReference || '').trim().slice(0, 100);
+    const methodBase = normalizedMethod.split(':')[0];
+    const allowedMethods = new Set(['cash', 'cashier', 'banking', 'card_nfc', 'zalopay']);
+
+    if (!normalizedOrderId) throw buildBookingError('Không xác định được đơn hàng.');
+    if (!allowedMethods.has(methodBase)) throw buildBookingError('Phương thức thanh toán không hợp lệ.');
+    if (methodBase !== 'cash' && methodBase !== 'cashier' && normalizedReference.length < 4) {
+      throw buildBookingError('Vui lòng nhập mã giao dịch thanh toán thành công.');
+    }
+
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [[order]] = await connection.query(
+        `SELECT order_id, user_id, promotion_id, total_amount, payment_status, status, ticket_qr_token
+         FROM Orders WHERE order_id = ? FOR UPDATE`,
+        [normalizedOrderId],
+      );
+
+      if (!order) throw buildBookingError('Đơn hàng không tồn tại.', 404);
+      if (order.payment_status === 'paid') throw buildBookingError('Vé đã được thanh toán trước đó.');
+      if (order.status === 'cancelled' || order.status === 'refunded') {
+        throw buildBookingError('Không thể thanh toán vé đã hủy hoặc hoàn tiền.');
+      }
+
+      const normalizedUserId = Number(order.user_id || 0);
+      let ticketQrToken = order.ticket_qr_token || null;
+      let pointsResult = { earnedPoints: 0, newPoints: 0 };
+
+      if (normalizedUserId) {
+        await consumePromotionForOrder(connection, {
+          promotionId: order.promotion_id,
+          userId: normalizedUserId,
+        });
+        ticketQrToken = ticketQrToken || await getUniqueTicketQrToken(connection);
+
+        const [ticketRows] = await connection.query(
+          `SELECT s.seat_type FROM Tickets t
+           JOIN Seats s ON s.seat_id = t.seat_id
+           WHERE t.order_id = ?`,
+          [normalizedOrderId],
+        );
+        const [comboRows] = await connection.query(
+          `SELECT c.combo_name, oc.quantity FROM Order_Combos oc
+           JOIN Combos c ON c.combo_id = oc.combo_id
+           WHERE oc.order_id = ?`,
+          [normalizedOrderId],
+        );
+
+        pointsResult = await awardBookingPoints(
+          connection,
+          normalizedUserId,
+          normalizedOrderId,
+          Number(order.total_amount || 0),
+          ticketRows.map((row) => ({ type: row.seat_type })),
+          comboRows.map((row) => ({
+            comboName: row.combo_name,
+            quantity: Number(row.quantity || 1),
+          })),
+        );
+      }
+
+      await connection.query(
+        `UPDATE Orders
+         SET payment_method = ?, payment_status = 'paid', status = 'confirmed',
+             payment_reference = ?, payment_confirmed_at = NOW(), ticket_qr_token = ?
+         WHERE order_id = ?`,
+        [normalizedMethod, normalizedReference || null, ticketQrToken, normalizedOrderId],
+      );
+
+      await connection.commit();
       const booking = await this.findById(normalizedOrderId, { includeTicketQr: true });
       return {
         ...booking,

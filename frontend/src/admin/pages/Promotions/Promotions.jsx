@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminPromotionService } from "../../services/adminApi";
+import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 import './promotions.css';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ function CouponForm({ coupon, onClose, onSave }) {
   };
 
   return (
+    <AdminModalPortal>
     <div className="pr-overlay" onClick={onClose}>
       <div className="pr-modal" onClick={e => e.stopPropagation()}>
         <div className="pr-modal-header">
@@ -208,6 +210,7 @@ function CouponForm({ coupon, onClose, onSave }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -264,6 +267,7 @@ function VoucherForm({ voucher, users, onClose, onSave }) {
   };
 
   return (
+    <AdminModalPortal>
     <div className="pr-overlay" onClick={onClose}>
       <div className="pr-modal" onClick={e => e.stopPropagation()}>
         <div className="pr-modal-header">
@@ -378,12 +382,14 @@ function VoucherForm({ voucher, users, onClose, onSave }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
 // ─── Confirm Modal ────────────────────────────────────────────────────────────
 function Confirm({ message, onClose, onConfirm }) {
   return (
+    <AdminModalPortal>
     <div className="pr-overlay" onClick={onClose}>
       <div className="pr-modal pr-modal-sm" onClick={e => e.stopPropagation()}>
         <div className="pr-modal-header"><h2>Xác nhận xóa</h2><button className="pr-modal-close" onClick={onClose}>✕</button></div>
@@ -396,6 +402,7 @@ function Confirm({ message, onClose, onConfirm }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 

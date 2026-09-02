@@ -17,6 +17,8 @@ const generateTemporaryPassword = (length = 10) => {
   return result;
 };
 
+const BOOKING_PHONE_REGEX = /^0\d{9,}$/;
+
 export const staffCreateBooking = async (req, res) => {
   try {
     const {
@@ -65,6 +67,11 @@ export const staffCreateBooking = async (req, res) => {
       if (!phone) {
         return res.status(400).json({ message: "Vui lòng nhập số điện thoại khách vãng lai." });
       }
+      if (!BOOKING_PHONE_REGEX.test(phone)) {
+        return res.status(400).json({
+          message: "Số điện thoại khách vãng lai phải bắt đầu bằng 0 và có ít nhất 10 chữ số.",
+        });
+      }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ message: "Email không hợp lệ." });
       }
@@ -96,6 +103,11 @@ export const staffCreateBooking = async (req, res) => {
       }
       if (!phone) {
         return res.status(400).json({ message: "Vui lòng nhập số điện thoại khách hàng." });
+      }
+      if (!BOOKING_PHONE_REGEX.test(phone)) {
+        return res.status(400).json({
+          message: "Số điện thoại khách hàng phải bắt đầu bằng 0 và có ít nhất 10 chữ số.",
+        });
       }
       if (await emailExists(email)) {
         return res.status(409).json({
@@ -195,6 +207,35 @@ export const getAdminBookingDetail = async (req, res) => {
   } catch (err) {
     console.error("Error in getAdminBookingDetail:", err);
     res.status(500).json({ message: "Error getting booking details" });
+  }
+};
+
+export const confirmAdminBookingPayment = async (req, res) => {
+  try {
+    const orderId = Number(req.params.orderId || 0);
+    const paymentMethod = String(req.body?.paymentMethod || req.body?.payment_method || '').trim();
+    const paymentReference = String(req.body?.paymentReference || req.body?.payment_reference || '').trim();
+
+    const booking = await BookingModel.confirmStaffPayment({
+      orderId,
+      paymentMethod,
+      paymentReference,
+    });
+
+    if (booking?.customer_type !== 'guest') {
+      try {
+        await sendTicketQrEmail(booking);
+      } catch (mailError) {
+        console.warn('Ticket email send failed after staff payment:', mailError.message);
+      }
+    }
+
+    return res.json({ message: 'Xác nhận thanh toán thành công.', booking });
+  } catch (err) {
+    console.error('Error in confirmAdminBookingPayment:', err);
+    return res.status(err.statusCode || 500).json({
+      message: err.message || 'Không thể xác nhận thanh toán.',
+    });
   }
 };
 

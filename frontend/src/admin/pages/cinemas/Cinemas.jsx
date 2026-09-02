@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { adminCinemaService } from "../../services/adminApi";
+import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 import "./cinemas.css";
 
 /* ═══════════════════════════════════════════════════════════
@@ -369,6 +370,7 @@ function Toast({ message, onClose }) {
 /* ── Confirm ── */
 function Confirm({ message, onClose, onConfirm }) {
   return (
+    <AdminModalPortal>
     <div className="cn-modal-overlay" onClick={onClose}>
       <div
         className="cn-modal cn-modal-sm"
@@ -399,6 +401,7 @@ function Confirm({ message, onClose, onConfirm }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -1035,6 +1038,7 @@ function RoomForm({ room, onClose, onSave }) {
   }, [room?.id, isEdit]);
 
   return (
+    <AdminModalPortal>
     <div className="cn-modal-overlay" onClick={onClose}>
       <div
         ref={modalRef}
@@ -1235,6 +1239,7 @@ function RoomForm({ room, onClose, onSave }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -1341,6 +1346,7 @@ function CinemaForm({ cinema, onClose, onSave, saving }) {
 
   return (
     <>
+      <AdminModalPortal>
       <div className="cn-modal-overlay" onClick={onClose}>
         <div
           className="cn-modal cn-modal-lg"
@@ -1580,6 +1586,7 @@ function CinemaForm({ cinema, onClose, onSave, saving }) {
           </div>
         </div>
       </div>
+      </AdminModalPortal>
 
       {/* Room sub-modal */}
       {roomModal !== undefined && (
@@ -1703,6 +1710,7 @@ function CinemaDetail({ cinema, onClose, onEdit }) {
   const activeRooms = cinema.rooms.filter((r) => r.status === "active").length;
 
   return (
+    <AdminModalPortal>
     <div className="cn-modal-overlay" onClick={onClose}>
       <div
         className="cn-modal cn-modal-lg"
@@ -1801,6 +1809,7 @@ function CinemaDetail({ cinema, onClose, onEdit }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 

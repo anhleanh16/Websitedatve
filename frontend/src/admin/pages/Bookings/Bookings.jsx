@@ -3,7 +3,9 @@ import './bookings.css';
 import BookingWizard from "./BookingWizard.jsx";
 import { adminBookingService } from "../../services/adminApi";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 import { printTicketPdf } from "../../../utils/ticketPrint.js";
+import { PAYMENT_BANKS } from "../../../utils/paymentConfig.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const STATUS_MAP = {
@@ -22,6 +24,19 @@ const PAYMENT_MAP = {
 
 function formatMoney(n) {
   return n?.toLocaleString("vi-VN") + " ₫";
+}
+
+function formatPaymentMethod(method) {
+  const value = String(method || "").trim();
+  if (value === "cash" || value === "cashier") return "Tiền mặt tại quầy";
+  if (value === "card_nfc" || value.startsWith("card_nfc:")) return "Thẻ qua NFC/POS";
+  if (value === "card") return "Thẻ tín dụng / Ghi nợ";
+  if (value.startsWith("banking:")) return `Chuyển khoản · ${value.split(":")[1]}`;
+  if (value === "banking") return "Chuyển khoản ngân hàng";
+  if (value === "zalopay") return "Ví ZaloPay";
+  if (value === "momo") return "Ví MoMo";
+  if (value === "vnpay") return "VNPay";
+  return value || "—";
 }
 
 function stopCameraStream(videoElement) {
@@ -80,7 +95,7 @@ function mapBookingFromApi(item) {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** Danh sách vé */
-function BookingList({ bookings, onView, onCheck }) {
+function BookingList({ bookings, onView, onCheck, onPay }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
@@ -174,6 +189,11 @@ function BookingList({ bookings, onView, onCheck }) {
                     </td>
                     <td>
                       <div className="bk-actions">
+                        {b.paymentStatus === "pending" && b.status !== "cancelled" && (
+                          <button className="bk-btn bk-btn-pay" onClick={() => onPay(b)} title="Thanh toán vé">
+                            Thanh toán
+                          </button>
+                        )}
                         <button className="bk-btn bk-btn-view" onClick={() => onView(b)} title="Chi tiết">
                           Chi tiết
                         </button>
@@ -201,12 +221,13 @@ function BookingList({ bookings, onView, onCheck }) {
 }
 
 /** Chi tiết vé */
-function BookingDetail({ booking, onClose, onCheck }) {
+function BookingDetail({ booking, onClose, onCheck, onPay }) {
   if (!booking) return null;
   const st = STATUS_MAP[booking.status] || { label: booking.status, cls: "pending" };
   const py = PAYMENT_MAP[booking.paymentStatus] || { label: booking.paymentStatus, cls: "pay-pending" };
 
   return (
+    <AdminModalPortal>
     <div className="bk-modal-overlay" onClick={onClose}>
       <div className="bk-modal" onClick={(e) => e.stopPropagation()}>
         <div className="bk-modal-header">
@@ -257,7 +278,7 @@ function BookingDetail({ booking, onClose, onCheck }) {
             {/* Thanh toán */}
             <div className="bk-detail-card">
               <h4>Thông tin thanh toán</h4>
-              <div className="bk-detail-row"><span>Phương thức</span><strong>{booking.paymentMethod}</strong></div>
+              <div className="bk-detail-row"><span>Phương thức</span><strong>{formatPaymentMethod(booking.paymentMethod)}</strong></div>
               <div className="bk-detail-row"><span>Tổng tiền</span><strong className="bk-amount">{formatMoney(booking.totalAmount)}</strong></div>
               <div className="bk-detail-row"><span>Ngày đặt</span><strong>{booking.createdAt}</strong></div>
             </div>
@@ -267,6 +288,11 @@ function BookingDetail({ booking, onClose, onCheck }) {
 
         {/* Actions */}
         <div className="bk-modal-footer">
+          {booking.paymentStatus === "pending" && booking.status !== "cancelled" && (
+            <button className="bk-btn bk-btn-pay bk-btn-lg" onClick={() => onPay(booking)}>
+              Thanh toán
+            </button>
+          )}
           {booking.status === "confirmed" && (
             <button className="bk-btn bk-btn-check bk-btn-lg" onClick={() => onCheck(booking)}>
               {booking.customerType === "guest" ? "Đánh dấu hoàn thành" : "Kiểm tra vé"}
@@ -283,6 +309,122 @@ function BookingDetail({ booking, onClose, onCheck }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
+  );
+}
+
+/** Xác nhận thanh toán cho vé đang chờ. */
+function PaymentModal({ booking, onClose, onConfirm }) {
+  const currentMethod = String(booking?.paymentMethod || "").toLowerCase();
+  const initialMethod = currentMethod.startsWith("banking")
+    ? "banking"
+    : currentMethod === "zalopay"
+      ? "zalopay"
+    : currentMethod.startsWith("card_nfc") || currentMethod === "card"
+      ? "card_nfc"
+      : "cashier";
+  const initialBank = currentMethod.startsWith("banking:")
+    ? currentMethod.split(":")[1]
+    : "VCB";
+  const [method, setMethod] = useState(initialMethod);
+  const [bank, setBank] = useState(initialBank);
+  const [reference, setReference] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  if (!booking) return null;
+  const needsReference = method !== "cashier";
+
+  const submit = async () => {
+    const normalizedReference = reference.trim();
+    if (needsReference && normalizedReference.length < 4) {
+      setError("Vui lòng nhập mã giao dịch thanh toán thành công.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+    try {
+      await onConfirm({
+        paymentMethod: method === "banking" ? `banking:${bank}` : method,
+        paymentReference: normalizedReference,
+      });
+    } catch (submitError) {
+      setError(submitError?.message || "Không thể xác nhận thanh toán.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AdminModalPortal>
+      <div className="bk-modal-overlay" onClick={onClose}>
+        <div className="bk-modal bk-payment-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="bk-modal-header">
+            <div>
+              <h2>Thanh toán vé</h2>
+              <span className="bk-booking-code">{booking.bookingCode}</span>
+            </div>
+            <button className="bk-modal-close" onClick={onClose}>✕</button>
+          </div>
+
+          <div className="bk-modal-body">
+            <div className="bk-payment-summary">
+              <div><span>Khách hàng</span><strong>{booking.user}</strong></div>
+              <div><span>Phim · Ghế</span><strong>{booking.movie} · {booking.seats.join(", ")}</strong></div>
+              <div><span>Số tiền cần thanh toán</span><strong>{formatMoney(booking.totalAmount)}</strong></div>
+            </div>
+
+            <div className="bk-payment-method-grid">
+              <button type="button" className={method === "cashier" ? "selected" : ""} onClick={() => { setMethod("cashier"); setError(""); }}>
+                <span>💵</span><strong>Tiền mặt</strong><small>Thu tiền trực tiếp tại quầy</small>
+              </button>
+              <button type="button" className={method === "banking" ? "selected" : ""} onClick={() => { setMethod("banking"); setError(""); }}>
+                <span>🏦</span><strong>Chuyển khoản</strong><small>Xác nhận giao dịch ngân hàng</small>
+              </button>
+              <button type="button" className={method === "card_nfc" ? "selected" : ""} onClick={() => { setMethod("card_nfc"); setError(""); }}>
+                <span>💳</span><strong>Thẻ NFC/POS</strong><small>Xác nhận mã từ máy POS</small>
+              </button>
+              <button type="button" className={method === "zalopay" ? "selected" : ""} onClick={() => { setMethod("zalopay"); setError(""); }}>
+                <span className="bk-zalopay-mark">Z</span><strong>Ví ZaloPay</strong><small>Xác nhận mã giao dịch ZaloPay</small>
+              </button>
+            </div>
+
+            {method === "banking" && (
+              <label className="bk-payment-field">
+                <span>Ngân hàng</span>
+                <select value={bank} onChange={(event) => setBank(event.target.value)}>
+                  {PAYMENT_BANKS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                </select>
+              </label>
+            )}
+
+            {needsReference && (
+              <label className="bk-payment-field">
+                <span>{method === "card_nfc" ? "Mã giao dịch trên máy POS" : method === "zalopay" ? "Mã giao dịch ZaloPay" : "Mã giao dịch chuyển khoản"}</span>
+                <input
+                  value={reference}
+                  onChange={(event) => { setReference(event.target.value); setError(""); }}
+                  placeholder={method === "card_nfc" ? "Ví dụ: POS123456" : method === "zalopay" ? "Ví dụ: 240902_123456789" : "Ví dụ: FT2430012345"}
+                  maxLength={100}
+                  autoFocus
+                />
+                <small>Chỉ xác nhận sau khi ngân hàng, máy POS hoặc ZaloPay báo giao dịch thành công.</small>
+              </label>
+            )}
+
+            {error && <div className="bk-payment-error">⚠️ {error}</div>}
+          </div>
+
+          <div className="bk-modal-footer">
+            <button type="button" className="bk-btn bk-btn-pay bk-btn-lg" disabled={submitting} onClick={submit}>
+              {submitting ? "Đang xác nhận…" : `Xác nhận đã thanh toán ${formatMoney(booking.totalAmount)}`}
+            </button>
+            <button type="button" className="bk-btn bk-btn-secondary bk-btn-lg" disabled={submitting} onClick={onClose}>Hủy</button>
+          </div>
+        </div>
+      </div>
+    </AdminModalPortal>
   );
 }
 
@@ -409,6 +551,7 @@ function CheckModal({ booking, onClose, onConfirm }) {
   const isGuestBooking = booking.customerType === "guest";
 
   return (
+    <AdminModalPortal>
     <div className="bk-modal-overlay" onClick={handleClose}>
       <div className="bk-modal bk-modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="bk-modal-header">
@@ -509,6 +652,7 @@ function CheckModal({ booking, onClose, onConfirm }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -529,6 +673,7 @@ export default function AdminBookings() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("list"); // "list" | "detail" | "refund" | "check"
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [paymentBooking, setPaymentBooking] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showToast = (message, type = "success") => {
@@ -574,6 +719,34 @@ export default function AdminBookings() {
     setActiveTab("check");
   };
 
+  const handleOpenPayment = (booking) => {
+    setPaymentBooking(booking);
+  };
+
+  const handleConfirmPayment = async (payload) => {
+    const currentBooking = paymentBooking;
+    if (!currentBooking) return;
+
+    const response = await adminBookingService.confirmPayment(
+      currentBooking.orderId || currentBooking.id,
+      payload,
+    );
+    const updatedBooking = mapBookingFromApi(response?.booking || response);
+
+    setBookings((previous) => previous.map((booking) => (
+      booking.orderId === currentBooking.orderId || booking.id === currentBooking.id
+        ? updatedBooking
+        : booking
+    )));
+    setSelectedBooking((previous) => (
+      previous && (previous.orderId === currentBooking.orderId || previous.id === currentBooking.id)
+        ? updatedBooking
+        : previous
+    ));
+    setPaymentBooking(null);
+    showToast("Xác nhận thanh toán thành công!", "success");
+  };
+
   // Xác nhận check-in
   const handleConfirmCheckIn = async (booking) => {
     try {
@@ -601,6 +774,7 @@ export default function AdminBookings() {
   const handleClose = () => {
     setActiveTab("list");
     setSelectedBooking(null);
+    setPaymentBooking(null);
   };
 
   const tabs = [
@@ -668,6 +842,7 @@ export default function AdminBookings() {
             bookings={bookings}
             onView={handleView}
             onCheck={handleCheck}
+            onPay={handleOpenPayment}
           />
         )
       )}
@@ -679,8 +854,8 @@ export default function AdminBookings() {
             const b = r?.booking || {};
             const seatCodes = Array.isArray(b.seats) ? b.seats.join(", ") : (b.seat_codes || "");
             const newItem = {
-              id: `B${Date.now()}`,
-              orderId: `ORD_${Date.now()}`,
+              id: String(b.booking_id || b.order_id || `B${Date.now()}`),
+              orderId: String(b.booking_id || b.order_id || ""),
               user: b.full_name || r?.new_user?.full_name || r?.guest_customer?.full_name || "Khách hàng",
               customerType: b.customer_type || (r?.guest_customer ? "guest" : "account"),
               email: b.email || r?.new_user?.email || r?.guest_customer?.email || "",
@@ -693,7 +868,7 @@ export default function AdminBookings() {
               combo: null,
               totalAmount: Number(b.total_price || 0),
               paymentMethod: b.payment_method || b.paymentMethod || "",
-              paymentStatus: b.status === "cancelled" ? "failed" : "paid",
+              paymentStatus: b.payment_status || (b.status === "cancelled" ? "failed" : "pending"),
               status: b.status || "confirmed",
               bookingCode: b.booking_code || "",
               qrCode: b.booking_code ? `QR_${b.booking_code}` : "",
@@ -711,6 +886,15 @@ export default function AdminBookings() {
           booking={selectedBooking}
           onClose={handleClose}
           onCheck={handleCheck}
+          onPay={handleOpenPayment}
+        />
+      )}
+
+      {paymentBooking && (
+        <PaymentModal
+          booking={paymentBooking}
+          onClose={() => setPaymentBooking(null)}
+          onConfirm={handleConfirmPayment}
         />
       )}
 

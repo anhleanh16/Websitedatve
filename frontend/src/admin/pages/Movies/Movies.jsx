@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { adminMovieService, adminCategoryService } from '../../services/adminApi.js';
 import AdminPagination, { useAdminPagination } from '../../components/AdminPagination.jsx';
+import AdminModalPortal from '../../components/AdminModalPortal.jsx';
 import './movies.css';
 
 // ─── Helpers chuyển đổi dữ liệu camelCase ↔ snake_case ───────────────────────────────
@@ -253,6 +254,7 @@ function MovieDetail({ movie, categories, onClose, onEdit }) {
   const cats = (movie.categories || []).map((cat) => cat.name).filter(Boolean);
 
   return (
+    <AdminModalPortal>
     <div className="mv-modal-overlay" onClick={onClose}>
       <div className="mv-modal mv-modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="mv-modal-header">
@@ -309,6 +311,7 @@ function MovieDetail({ movie, categories, onClose, onEdit }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -483,6 +486,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
   };
 
   return (
+    <AdminModalPortal>
     <div className="mv-modal-overlay" onClick={onClose}>
       <div className="mv-modal mv-modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="mv-modal-header">
@@ -750,6 +754,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -794,6 +799,7 @@ function CategoryManager({ categories, onAdd, onEdit, onDelete }) {
 
       {/* Inline form */}
       {showForm && (
+        <AdminModalPortal>
         <div className="mv-modal-overlay" onClick={() => setShowForm(false)}>
           <div className="mv-modal mv-modal-sm" onClick={(e) => e.stopPropagation()}>
             <div className="mv-modal-header">
@@ -822,6 +828,7 @@ function CategoryManager({ categories, onAdd, onEdit, onDelete }) {
             </div>
           </div>
         </div>
+        </AdminModalPortal>
       )}
     </div>
   );
@@ -842,6 +849,7 @@ function DeleteConfirm({ target, type, onClose, onConfirm }) {
   };
 
   return (
+    <AdminModalPortal>
     <div className="mv-modal-overlay" onClick={onClose}>
       <div className="mv-modal mv-modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="mv-modal-header">
@@ -864,6 +872,7 @@ function DeleteConfirm({ target, type, onClose, onConfirm }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 

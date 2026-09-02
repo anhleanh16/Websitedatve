@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { adminPointsService, adminUserService } from "../../services/adminApi.js";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../../utils/birthDate.js";
 import "./users.css";
 
@@ -395,6 +396,7 @@ function UserDetail({ user, membershipLevels, onClose, onToggleStatus, onAdjustP
     : 100;
 
   return (
+    <AdminModalPortal>
     <div className="us-modal-overlay" onClick={onClose}>
       <div className="us-modal" onClick={(e) => e.stopPropagation()}>
         <div className="us-modal-header">
@@ -558,6 +560,7 @@ function UserDetail({ user, membershipLevels, onClose, onToggleStatus, onAdjustP
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -578,6 +581,7 @@ function AdjustPointsModal({ user, onClose, onConfirm }) {
   };
 
   return (
+    <AdminModalPortal>
     <div className="us-modal-overlay" onClick={onClose}>
       <div className="us-modal" onClick={(e) => e.stopPropagation()}>
         <div className="us-modal-header">
@@ -616,6 +620,7 @@ function AdjustPointsModal({ user, onClose, onConfirm }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -693,6 +698,7 @@ function ResetPasswordModal({ user, onClose, onConfirm }) {
   };
 
   return (
+    <AdminModalPortal>
     <div className="us-modal-overlay" onClick={onClose}>
       <div
         className="us-modal us-modal-lg"
@@ -871,6 +877,7 @@ function ResetPasswordModal({ user, onClose, onConfirm }) {
         </form>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -944,6 +951,7 @@ function CreateUserModal({ onClose, onConfirm }) {
   };
 
   return (
+    <AdminModalPortal>
     <div className="us-modal-overlay" onClick={onClose}>
       <div
         className="us-modal us-modal-lg"
@@ -1114,5 +1122,6 @@ function CreateUserModal({ onClose, onConfirm }) {
         </form>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }

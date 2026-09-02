@@ -4,11 +4,13 @@
 
 /* Banner: fixed phía sau, nội dung scroll lên trên */
 .trailer-hero-banner {
+  --trailer-hero-height: min(50vw, 520px);
+  --trailer-hero-video-min-width: min(88.889vw, 924.445px);
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: min(50vw, 520px);
+  height: var(--trailer-hero-height);
   z-index: 0;
   cursor: pointer;
   overflow: hidden;
@@ -23,6 +25,18 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* YouTube iframe được phóng theo kiểu cover để giống hệt video tải lên. */
+.trailer-hero-youtube-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100vw, var(--trailer-hero-video-min-width));
+  height: max(var(--trailer-hero-height), 56.25vw);
+  border: 0;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .trailer-hero-overlay {
@@ -1651,7 +1665,8 @@ h1.movie-detail-title,
   }
   /* Trailer banner */
   .trailer-hero-banner {
-    height: min(60vw, 400px);
+    --trailer-hero-height: min(60vw, 400px);
+    --trailer-hero-video-min-width: min(106.667vw, 711.112px);
     clip-path: inset(0 0 20% 0);
   }
 

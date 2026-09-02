@@ -12,10 +12,12 @@
 /* ── Outer shell ── */
 .admin-layout {
   display: flex;
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
   background: #070912;
   color: #e7eaf9;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 /* ── Sidebar ── */
@@ -31,9 +33,9 @@
   flex-shrink: 0;
   transition: width var(--transition), min-width var(--transition), max-width var(--transition);
   overflow: hidden;
-  position: sticky;
-  top: 0;
+  position: relative;
   height: 100vh;
+  height: 100dvh;
   z-index: 100;
 }
 
@@ -136,10 +138,13 @@
 .admin-content {
   flex: 1;
   min-width: 0;          /* quan trọng: ngăn overflow */
+  min-height: 0;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   transition: none;
-  overflow-x: hidden;
+  overflow: hidden;
   margin-left: 10px;
 }
 
@@ -205,7 +210,23 @@
   flex: 1;
   padding: 24px;
   min-width: 0;
+  min-height: 0;
   overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.admin-main::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Admin chỉ cuộn trong .admin-main, không để document kéo sidebar đi theo. */
+html:has(body .admin-layout),
+body:has(.admin-layout) {
+  overflow: hidden;
 }
 
 /* Mobile backdrop */
@@ -5063,11 +5084,127 @@
 @media (prefers-reduced-motion: reduce) {
   .admin-layout *,
   .admin-layout *::before,
-  .admin-layout *::after {
+  .admin-layout *::after,
+  .admin-modal-portal * {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── Expanded admin forms ────────────────────────────────────────────────
+   Modal dùng toàn bộ chiều ngang khả dụng và nở theo nội dung. Thanh cuộn
+   không còn nằm trong form; overlay chỉ giữ khả năng tiếp cận nội dung trên
+   màn hình thấp và ẩn hoàn toàn phần scrollbar. */
+.admin-modal-portal :is(
+  .bk-modal-overlay,
+  .mv-modal-overlay,
+  .us-modal-overlay,
+  .sh-modal-overlay,
+  .cn-modal-overlay,
+  .pr-overlay,
+  .sf-overlay,
+  .nm-overlay
+) {
+  align-items: flex-start !important;
+  padding: 16px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+/* Desktop/tablet: modal chỉ phủ vùng nội dung, giữ thanh danh mục luôn nhìn thấy.
+   Form vẫn cuộn độc lập trong overlay và sidebar không dịch chuyển theo form. */
+@media (min-width: 769px) {
+  .admin-modal-portal :is(
+    .bk-modal-overlay,
+    .mv-modal-overlay,
+    .us-modal-overlay,
+    .sh-modal-overlay,
+    .cn-modal-overlay,
+    .pr-overlay,
+    .sf-overlay,
+    .nm-overlay
+  ) {
+    left: var(--sidebar-w) !important;
+  }
+
+  body:has(.admin-layout.sidebar-collapsed) .admin-modal-portal :is(
+    .bk-modal-overlay,
+    .mv-modal-overlay,
+    .us-modal-overlay,
+    .sh-modal-overlay,
+    .cn-modal-overlay,
+    .pr-overlay,
+    .sf-overlay,
+    .nm-overlay
+  ) {
+    left: var(--sidebar-collapsed-w) !important;
+  }
+}
+
+.admin-modal-portal :is(
+  .bk-modal-overlay,
+  .mv-modal-overlay,
+  .us-modal-overlay,
+  .sh-modal-overlay,
+  .cn-modal-overlay,
+  .pr-overlay,
+  .sf-overlay,
+  .nm-overlay
+)::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.admin-modal-portal :is(
+  .bk-modal,
+  .mv-modal,
+  .us-modal,
+  .sh-modal,
+  .cn-modal,
+  .pr-modal,
+  .sf-modal,
+  .nm-modal
+) {
+  max-height: none !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+/* Khi modal mở, chỉ overlay được nhận thao tác cuộn; trang admin phía sau đứng yên. */
+html:has(body .admin-modal-portal),
+body:has(.admin-modal-portal) {
+  overflow: hidden !important;
+}
+
+.admin-modal-portal :is(
+  .bk-modal:not(.bk-modal-sm),
+  .mv-modal:not(.mv-modal-sm),
+  .us-modal:not(.us-modal-sm),
+  .sh-modal:not(.sh-modal-sm),
+  .cn-modal:not(.cn-modal-sm),
+  .pr-modal:not(.pr-modal-sm),
+  .sf-modal:not(.sf-modal-sm),
+  .nm-modal
+) {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Các vùng lựa chọn nằm trong form cũng bung toàn bộ thay vì cuộn riêng. */
+.admin-modal-portal :is(
+  .nm-modal-body,
+  .sh-recurring-body,
+  .mv-cat-check-grid,
+  .mv-tag-dropdown-list,
+  .sh-modal-recurring .sh-checkbox-list
+) {
+  max-height: none !important;
+  overflow-y: visible !important;
+  scrollbar-width: none;
 }

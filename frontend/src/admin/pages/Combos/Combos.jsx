@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { adminComboService } from "../../services/adminApi";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 import { toAbsoluteAssetUrl } from "../../../utils/api.js";
 import "./combos.css";
 
@@ -136,6 +137,7 @@ function ComboFormModal({ combo, onClose, onSave }) {
   const previewSummary = summarizeContents(form);
 
   return (
+    <AdminModalPortal>
     <div className="bk-modal-overlay" onClick={onClose}>
       <div className="bk-modal combo-modal" onClick={(event) => event.stopPropagation()}>
         <div className="bk-modal-header">
@@ -317,6 +319,7 @@ function ComboFormModal({ combo, onClose, onSave }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 

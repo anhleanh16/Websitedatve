@@ -33,22 +33,56 @@ const formatTimeLabel = (input, roomType) => {
   return `${hours}:${minutes}${roomType ? ` - ${roomType}` : ''}`;
 };
 
-// Check if trailer is a URL or local file
-const isTrailerUrl = (trailer) => {
-  if (!trailer) return false;
-  return typeof trailer === 'string' && (trailer.startsWith('http://') || trailer.startsWith('https://'));
+const getYouTubeVideoId = (url) => {
+  if (!url || typeof url !== 'string') return null;
+
+  try {
+    const parsedUrl = new URL(url.trim());
+    const hostname = parsedUrl.hostname.replace(/^(www\.|m\.)/, '');
+    let videoId = null;
+
+    if (hostname === 'youtu.be') {
+      [videoId] = parsedUrl.pathname.split('/').filter(Boolean);
+    } else if (hostname === 'youtube.com' || hostname === 'youtube-nocookie.com') {
+      videoId = parsedUrl.searchParams.get('v');
+
+      if (!videoId) {
+        const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+        if (['embed', 'shorts', 'live', 'v'].includes(pathParts[0])) {
+          videoId = pathParts[1];
+        }
+      }
+    }
+
+    return /^[\w-]{11}$/.test(videoId || '') ? videoId : null;
+  } catch {
+    return null;
+  }
 };
 
-// Convert YouTube URL to embed URL
-const getYouTubeEmbedUrl = (url) => {
-  if (!url) return null;
-  let videoId = null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url.match(regExp);
-  if (match && match[2].length === 11) {
-    videoId = match[2];
+// Tạo URL embed riêng cho từng vị trí để trailer ở hero có thể tự chạy như file upload.
+const getYouTubeEmbedUrl = (url, options = {}) => {
+  const videoId = getYouTubeVideoId(url);
+  if (!videoId) return null;
+
+  const params = new URLSearchParams({
+    rel: '0',
+    playsinline: '1',
+  });
+
+  if (options.autoplay) params.set('autoplay', '1');
+  if (options.muted) params.set('mute', '1');
+  if (options.loop) {
+    params.set('loop', '1');
+    params.set('playlist', videoId);
   }
-  return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+  if (options.controls === false) {
+    params.set('controls', '0');
+    params.set('disablekb', '1');
+    params.set('iv_load_policy', '3');
+  }
+
+  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
 };
 
 export default function MovieDetail() {
@@ -119,6 +153,13 @@ export default function MovieDetail() {
   const posterSrc = movie?.poster || '';
   const trailerSrc = movie?.trailer || '';
   const hasTrailer = Boolean(trailerSrc);
+  const youtubeTrailerUrl = getYouTubeEmbedUrl(trailerSrc);
+  const heroYoutubeTrailerUrl = getYouTubeEmbedUrl(trailerSrc, {
+    autoplay: true,
+    muted: true,
+    loop: true,
+    controls: false,
+  });
   const movieTitle = movie?.title || location.state?.movieTitle || '';
   const actorsText = String(movie?.actors || '').trim();
   const shouldCollapseActors = actorsText.length > 90;
@@ -519,17 +560,17 @@ export default function MovieDetail() {
         style={{ opacity: bannerOpacity }}
       >
         {hasTrailer ? (
-          isTrailerUrl(trailerSrc) ? (
-            // YouTube trailer (hero banner doesn't auto-play external videos)
-            <div className="trailer-hero-video">
-              {posterSrc ? <img src={posterSrc} alt={movie?.title || 'Poster'} /> : null}
-              <div className="trailer-hero-overlay">
-                <div className="trailer-hero-badge"><span>▶</span> Trailer</div>
-                <div className="trailer-hero-scroll-hint">Cuộn xuống để xem chi tiết ↓</div>
-              </div>
-            </div>
+          heroYoutubeTrailerUrl ? (
+            <iframe
+              className="trailer-hero-youtube-frame"
+              src={heroYoutubeTrailerUrl}
+              title={`Trailer ${movie?.title || ''}`.trim()}
+              frameBorder="0"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              aria-hidden="true"
+              tabIndex={-1}
+            />
           ) : (
-            // Local video file
             <video
               ref={videoRef}
               className="trailer-hero-video"
@@ -549,8 +590,7 @@ export default function MovieDetail() {
             <div className="trailer-waiting-hint">CHƯA CÓ TRAILER</div>
           </div>
         )}
-        {/* Only show overlay if not already showing for YouTube case */}
-        {!isTrailerUrl(trailerSrc) && hasTrailer && (
+        {hasTrailer && (
           <div className="trailer-hero-overlay">
             <div className="trailer-hero-badge"><span>▶</span> Trailer</div>
             <div className="trailer-hero-scroll-hint">Cuộn xuống để xem chi tiết ↓</div>
@@ -687,15 +727,15 @@ export default function MovieDetail() {
               <div
                 ref={trailerContainerRef}
                 className="trailer-video-container"
-                onClick={hasTrailer && !isTrailerUrl(trailerSrc) ? handleSmallTrailerClick : undefined}
+                onClick={hasTrailer && !youtubeTrailerUrl ? handleSmallTrailerClick : undefined}
               >
                 {hasTrailer ? (
-                  isTrailerUrl(trailerSrc) ? (
+                  youtubeTrailerUrl ? (
                     // YouTube/link trailer
                     <>
                       <iframe
                         className="trailer-video"
-                        src={getYouTubeEmbedUrl(trailerSrc) || trailerSrc}
+                        src={youtubeTrailerUrl}
                         title="Trailer"
                         frameBorder="0"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -921,11 +961,11 @@ export default function MovieDetail() {
                   ×
                 </button>
                 <div className="trailer-modal-video-container">
-                  {isTrailerUrl(trailerSrc) ? (
+                  {youtubeTrailerUrl ? (
                     // YouTube/link trailer in modal
                     <iframe
                       className="trailer-modal-video"
-                      src={getYouTubeEmbedUrl(trailerSrc) || trailerSrc}
+                      src={youtubeTrailerUrl}
                       title="Trailer"
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

@@ -6,6 +6,7 @@ import './Payment.css'
 import { userBookingService, userPromotionService } from '../../services/userApi'
 import { buildVietQROnlyImageUrl } from '../../utils/vietqr'
 import { getValidStoredToken } from '../../../utils/auth'
+import { PAYMENT_BANKS as BANKS, PAYMENT_BANK_INFO as BANK_INFO, getPaymentBankLogo as bankLogo } from '../../../utils/paymentConfig'
 
 const CARD_TYPES = [
   { name: 'Visa',       pattern: /^4/,      color: 'linear-gradient(135deg,#1a1f71,#2563eb)', icon: 'VISA' },
@@ -13,48 +14,6 @@ const CARD_TYPES = [
   { name: 'JCB',        pattern: /^35/,     color: 'linear-gradient(135deg,#003087,#009f6b)', icon: 'JCB'  },
   { name: 'Amex',       pattern: /^3[47]/,  color: 'linear-gradient(135deg,#0077c5,#179cde)', icon: 'AMEX' },
 ]
-const BANKS = [
-  { id: 'VCB',  bin: '970436', label: 'Vietcombank',      shortName: 'Vietcombank'      },
-  { id: 'AGR',  bin: '970405', label: 'Agribank',          shortName: 'Agribank'         },
-  { id: 'ICB',  bin: '970415', label: 'VietinBank',        shortName: 'VietinBank'       },
-  { id: 'BIDV', bin: '970418', label: 'BIDV',              shortName: 'BIDV'             },
-  { id: 'MB',   bin: '970422', label: 'MB Bank',           shortName: 'MBBank'           },
-  { id: 'TCB',  bin: '970407', label: 'Techcombank',       shortName: 'Techcombank'      },
-  { id: 'ACB',  bin: '970416', label: 'ACB',               shortName: 'ACB'              },
-  { id: 'VPB',  bin: '970432', label: 'VPBank',            shortName: 'VPBank'           },
-  { id: 'TPB',  bin: '970423', label: 'TPBank',            shortName: 'TPBank'           },
-  { id: 'STB',  bin: '970403', label: 'Sacombank',         shortName: 'Sacombank'        },
-  { id: 'HDB',  bin: '970437', label: 'HDBank',            shortName: 'HDBank'           },
-  { id: 'VIB',  bin: '970441', label: 'VIB',               shortName: 'VIB'              },
-  { id: 'SHB',  bin: '970443', label: 'SHB',               shortName: 'SHB'              },
-  { id: 'EIB',  bin: '970431', label: 'Eximbank',          shortName: 'Eximbank'         },
-  { id: 'MSB',  bin: '970426', label: 'MSB',               shortName: 'MSB'              },
-  { id: 'OCB',  bin: '970448', label: 'OCB',               shortName: 'OCB'              },
-  { id: 'LPB',  bin: '970449', label: 'LienVietPostBank',  shortName: 'LienVietPostBank' },
-  { id: 'NAB',  bin: '970428', label: 'Nam A Bank',        shortName: 'NamABank'         },
-  { id: 'PGB',  bin: '970430', label: 'PGBank',            shortName: 'PGBank'           },
-  { id: 'VCCB', bin: '970454', label: 'Bản Việt Bank',     shortName: 'VietCapitalBank'  },
-  { id: 'BAB',  bin: '970409', label: 'Bắc Á Bank',        shortName: 'BacABank'         },
-  { id: 'SEAB', bin: '970440', label: 'SeABank',           shortName: 'SeABank'          },
-  { id: 'CAKE', bin: '546034', label: 'cake by VPBank',    shortName: 'cake'             },
-  { id: 'IVB',  bin: '970434', label: 'Indovina Bank',     shortName: 'IndovinaBank'     },
-  { id: 'VAB',  bin: '970427', label: 'Việt Á Bank',       shortName: 'VietABank'        },
-  { id: 'KLB',  bin: '970452', label: 'KiênLong Bank',     shortName: 'KienLongBank'     },
-  { id: 'ABB',  bin: '970425', label: 'AnBình Bank',       shortName: 'ABBank'           },
-  { id: 'VBB',  bin: '970433', label: 'Việt Bank',         shortName: 'VietBank'         },
-  { id: 'BVB',  bin: '970438', label: 'BaoViet Bank',      shortName: 'BaoVietBank'      },
-  { id: 'SGCB', bin: '970400', label: 'Saigonbank',        shortName: 'Saigonbank'       },
-  { id: 'NCB',  bin: '970419', label: 'NCB',               shortName: 'NCB'              },
-  { id: 'SGB',  bin: '970400', label: 'Saigon Bank',       shortName: 'SGB'              },
-  { id: 'OJB',  bin: '970414', label: 'OceanBank',         shortName: 'Oceanbank'        },
-  { id: 'PBVN', bin: '970412', label: 'PVcomBank',         shortName: 'PVcomBank'        },
-  { id: 'VDB',  bin: '007',    label: 'VDB',               shortName: 'VDB'              },
-  { id: 'COOPBANK', bin: '970446', label: 'COOPBANK',      shortName: 'COOPBANK'         },
-]
-
-// Logo từ cdn.vietqr.io — chính thức, không cần auth
-const bankLogo = (code) => `https://cdn.vietqr.io/img/${code}.png`
-
 // Map bank id → BIN cho VietQR
 const BANK_BIN_MAP = Object.fromEntries(BANKS.map(b => [b.id, b.bin]))
 // ZaloPay logo inline (SiZalopay không có trong react-icons v5)
@@ -65,7 +24,6 @@ const ZaloPayLogo = () => (
       fill="white" fontSize="13" fontWeight="900" fontFamily="Arial, sans-serif">Z</text>
   </svg>
 )
-const BANK_INFO = { accountNumber: '0328959755', accountName: 'CÔNG TY SWEETSTAR', prefix: 'SWEETSTAR' }
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 const fmt = (v) => `${Number(v || 0).toLocaleString('vi-VN')}đ`
 const foodLabel = (item) => [`${item.quantity}x ${item.name}`, item.popcornType, item.drinkType].filter(Boolean).join(' • ')

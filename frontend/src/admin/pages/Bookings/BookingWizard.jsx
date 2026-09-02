@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { FaCheckCircle, FaCreditCard, FaMobileAlt, FaMoneyBillWave, FaSearch, FaUniversity, FaWifi } from "react-icons/fa";
 import {
   adminBookingService,
   adminUserService,
@@ -11,6 +12,8 @@ import {
 import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../../utils/birthDate.js";
 import { toAbsoluteAssetUrl } from "../../../utils/api.js";
 import { printTicketPdf } from "../../../utils/ticketPrint.js";
+import { PAYMENT_BANKS, PAYMENT_BANK_INFO, getPaymentBankLogo } from "../../../utils/paymentConfig.js";
+import { buildVietQROnlyImageUrl } from "../../../user/utils/vietqr.js";
 
 const SEAT_PRICES = {
   Standard: 80000,
@@ -31,6 +34,23 @@ const getSeatPrice = (type, showtime) => {
 };
 
 const fmtMoney = (n) => `${Number(n || 0).toLocaleString("vi-VN")} ₫`;
+const BANK_BIN_MAP = Object.fromEntries(PAYMENT_BANKS.map((bank) => [bank.id, bank.bin]));
+
+const toTransferText = (value) => String(value || "")
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/đ/gi, "d")
+  .replace(/[^a-zA-Z0-9\s]/g, "")
+  .trim()
+  .replace(/\s+/g, " ");
+
+const BOOKING_PHONE_REGEX = /^0\d{9,}$/;
+const sanitizeBookingPhone = (value) => String(value || "").replace(/\D/g, "");
+const MOVIE_STATUS_GROUPS = [
+  { value: "now_showing", label: "Đang chiếu", icon: "▶", className: "showing" },
+  { value: "coming_soon", label: "Sắp chiếu", icon: "◷", className: "coming" },
+  { value: "ended", label: "Kết thúc", icon: "■", className: "ended" },
+];
 
 const normalizeCinemaList = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -205,6 +225,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
   // Step 2: Movie
   const [movieList, setMovieList] = useState([]);
   const [selectedMovieId, setSelectedMovieId] = useState("");
+  const [movieStatusFilter, setMovieStatusFilter] = useState("now_showing");
 
   // Step 3: Showtime
   const [cinemas, setCinemas] = useState([]);
@@ -229,11 +250,17 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
 
   // Step 5: Payment
   const [paymentMethod, setPaymentMethod] = useState("cashier");
+  const [selectedBank, setSelectedBank] = useState("VCB");
+  const [bankSearch, setBankSearch] = useState("");
+  const [nfcStatus, setNfcStatus] = useState("idle");
+  const [nfcMessage, setNfcMessage] = useState("");
+  const [nfcReference, setNfcReference] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [bookingResult, setBookingResult] = useState(null);
 
   const debounceRef = useRef(null);
   const seatRuleTimerRef = useRef(null);
+  const nfcAbortRef = useRef(null);
 
   const showSeatRuleError = (message) => {
     setSeatRuleError(message);
@@ -297,6 +324,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
 
   useEffect(() => () => {
     if (seatRuleTimerRef.current) clearTimeout(seatRuleTimerRef.current);
+    nfcAbortRef.current?.abort();
   }, []);
 
   // Search user (debounced)
@@ -418,6 +446,9 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newCustomerForm.email))
       e.email = "Email không hợp lệ.";
     if (!newCustomerForm.phone.trim()) e.phone = "Nhập số điện thoại.";
+    else if (!BOOKING_PHONE_REGEX.test(newCustomerForm.phone.trim())) {
+      e.phone = "Số điện thoại phải bắt đầu bằng 0 và có ít nhất 10 chữ số.";
+    }
     if (newCustomerForm.birthday && !isValidBirthDate(newCustomerForm.birthday)) e.birthday = BIRTH_DATE_ERROR;
     return e;
   };
@@ -426,6 +457,9 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     const e = {};
     if (!guestCustomerForm.full_name.trim()) e.full_name = "Nhập họ tên.";
     if (!guestCustomerForm.phone.trim()) e.phone = "Nhập số điện thoại.";
+    else if (!BOOKING_PHONE_REGEX.test(guestCustomerForm.phone.trim())) {
+      e.phone = "Số điện thoại phải bắt đầu bằng 0 và có ít nhất 10 chữ số.";
+    }
     if (
       guestCustomerForm.email.trim()
       && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestCustomerForm.email.trim())
@@ -589,11 +623,55 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     (sum, c) => sum + Number(comboCounts[c.combo_id] || 0) * Number(c.price || 0),
     0,
   );
-  const totalAmount = seatTotal + comboTotal;
+  const subtotalAmount = seatTotal + comboTotal;
+  const membershipPercent = customerMode === "existing_user"
+    ? Number(selectedCustomer?.membership_discount || 0)
+    : 0;
+  const membershipDiscount = Math.round(subtotalAmount * membershipPercent / 100);
+  const amountAfterMembership = Math.max(0, subtotalAmount - membershipDiscount);
+  const serviceFee = Math.round(amountAfterMembership * 0.08);
+  const totalAmount = amountAfterMembership + serviceFee;
   const selectedMovie = useMemo(
     () => movieList.find((movie) => String(movie.movie_id) === String(selectedMovieId)) || null,
     [movieList, selectedMovieId],
   );
+  const movieStatusCounts = useMemo(() => MOVIE_STATUS_GROUPS.reduce((counts, group) => ({
+    ...counts,
+    [group.value]: movieList.filter((movie) => String(movie?.status || "now_showing") === group.value).length,
+  }), {}), [movieList]);
+  const filteredMovieList = useMemo(
+    () => movieList.filter((movie) => String(movie?.status || "now_showing") === movieStatusFilter),
+    [movieList, movieStatusFilter],
+  );
+  const transferNote = useMemo(() => [
+    PAYMENT_BANK_INFO.prefix,
+    customerMode === "existing_user"
+      ? selectedCustomer?.full_name
+      : customerMode === "guest"
+        ? guestCustomerForm.full_name
+        : newCustomerForm.full_name,
+    selectedMovie?.title || selectedShowtime?.movie_title,
+    selectedSeatUnits.flatMap((unit) => unit.seatCodes).join(" "),
+  ].map(toTransferText).filter(Boolean).join("_").slice(0, 150), [
+    customerMode,
+    guestCustomerForm.full_name,
+    newCustomerForm.full_name,
+    selectedCustomer?.full_name,
+    selectedMovie?.title,
+    selectedSeatUnits,
+    selectedShowtime?.movie_title,
+  ]);
+  const selectedPaymentBank = PAYMENT_BANKS.find((bank) => bank.id === selectedBank) || PAYMENT_BANKS[0];
+  const bankQrUrl = useMemo(() => buildVietQROnlyImageUrl({
+    bankBin: BANK_BIN_MAP[selectedBank] || BANK_BIN_MAP.VCB,
+    accountNumber: PAYMENT_BANK_INFO.accountNumber,
+    amount: totalAmount,
+    addInfo: transferNote,
+    accountName: PAYMENT_BANK_INFO.accountName,
+  }), [selectedBank, totalAmount, transferNote]);
+  const filteredPaymentBanks = useMemo(() => PAYMENT_BANKS.filter((bank) => (
+    !bankSearch || bank.label.toLowerCase().includes(bankSearch.toLowerCase())
+  )), [bankSearch]);
   const singleFoodItems = useMemo(
     () => comboList.filter((item) => String(item?.category || "combo").toLowerCase() === "single"),
     [comboList],
@@ -609,8 +687,92 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     }));
   };
 
+  const choosePaymentMethod = (method) => {
+    setPaymentMethod(method);
+    if (method !== "card_nfc") {
+      nfcAbortRef.current?.abort();
+      nfcAbortRef.current = null;
+      setNfcStatus("idle");
+      setNfcMessage("");
+      setNfcReference("");
+    }
+  };
+
+  const finishNfcScan = () => {
+    const reference = `NFC-${Date.now().toString(36).toUpperCase()}`;
+    nfcAbortRef.current?.abort();
+    nfcAbortRef.current = null;
+    setNfcReference(reference);
+    setNfcStatus("scanned");
+    setNfcMessage("Đã nhận tín hiệu từ đầu đọc NFC/POS. Hãy kiểm tra trạng thái giao dịch trên máy POS trước khi tạo vé.");
+  };
+
+  const startNfcScan = async () => {
+    nfcAbortRef.current?.abort();
+    const controller = new AbortController();
+    nfcAbortRef.current = controller;
+    setNfcStatus("scanning");
+    setNfcMessage(
+      typeof window !== "undefined" && "NDEFReader" in window
+        ? "Đang chờ thẻ hoặc thiết bị chạm vào đầu đọc NFC…"
+        : "Đang chờ tín hiệu từ đầu đọc NFC/POS USB… Hãy chạm thẻ rồi chờ thiết bị gửi mã.",
+    );
+    setNfcReference("");
+
+    // Desktop POS/NFC readers commonly work as a USB keyboard. The key stream
+    // is handled by the effect below, so Web NFC support is not required.
+    if (typeof window === "undefined" || !("NDEFReader" in window)) return;
+
+    try {
+      const reader = new window.NDEFReader();
+      reader.onreading = finishNfcScan;
+      reader.onreadingerror = () => {
+        setNfcStatus("error");
+        setNfcMessage("Không đọc được NFC. Giữ thẻ sát đầu đọc và thử lại.");
+      };
+      await reader.scan({ signal: controller.signal });
+    } catch (error) {
+      if (error?.name !== "AbortError") {
+        setNfcStatus("error");
+        setNfcMessage(error?.message || "Không thể khởi động đầu đọc NFC.");
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (paymentMethod !== "card_nfc" || nfcStatus !== "scanning") return undefined;
+
+    let scanBuffer = "";
+    let lastKeyAt = 0;
+    const handleScannerKey = (event) => {
+      const now = Date.now();
+
+      if (event.key === "Enter") {
+        if (scanBuffer.length >= 4) {
+          event.preventDefault();
+          finishNfcScan();
+        }
+        scanBuffer = "";
+        lastKeyAt = 0;
+        return;
+      }
+
+      if (event.key.length !== 1 || event.ctrlKey || event.altKey || event.metaKey) return;
+      if (lastKeyAt && now - lastKeyAt > 180) scanBuffer = "";
+      scanBuffer += event.key;
+      lastKeyAt = now;
+    };
+
+    window.addEventListener("keydown", handleScannerKey, true);
+    return () => window.removeEventListener("keydown", handleScannerKey, true);
+  }, [nfcStatus, paymentMethod]);
+
   const handleSubmit = async () => {
     if (!canGoStep2()) return;
+    if (paymentMethod === "card_nfc" && nfcStatus !== "scanned") {
+      onToast?.("Vui lòng quét NFC và xác nhận giao dịch trên thiết bị POS trước.");
+      return;
+    }
     setSubmitting(true);
     try {
       const customerPayload = customerMode === "existing_user"
@@ -650,7 +812,8 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
         showtimeId: selectedShowtime?.showtime_id || selectedShowtime?.id,
         seatUnits,
         foodItems,
-        paymentMethod,
+        paymentMethod: paymentMethod === "banking" ? `banking:${selectedBank}` : paymentMethod,
+        nfcReference: paymentMethod === "card_nfc" ? nfcReference : undefined,
       };
 
       const res = await adminBookingService.staffCreateBooking(payload);
@@ -671,6 +834,7 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     setSearchResults([]);
     setNewCustomerForm({ full_name: "", email: "", phone: "", birthday: "", sex: "male" });
     setSelectedMovieId("");
+    setMovieStatusFilter("now_showing");
     setNewCustomerErrors({});
     setGuestCustomerForm({ full_name: "", phone: "", email: "" });
     setGuestCustomerErrors({});
@@ -680,6 +844,11 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
     setComboCounts(comboList.reduce((acc, c) => ({ ...acc, [c.combo_id]: 0 }), {}));
     setBookingResult(null);
     setPaymentMethod("cashier");
+    setSelectedBank("VCB");
+    setBankSearch("");
+    setNfcStatus("idle");
+    setNfcMessage("");
+    setNfcReference("");
   };
 
   // Result screen
@@ -723,6 +892,27 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
           </strong></div>
           <div className="sf-detail-row"><span>Ghế</span><strong>{(b.seats || selectedSeatUnits.flatMap((unit) => unit.seatCodes)).join(", ")}</strong></div>
           <div className="sf-detail-row"><span>Tổng tiền</span><strong style={{ color: "#fbbf24", fontSize: 18 }}>{fmtMoney(b.total_price || totalAmount)}</strong></div>
+          <div className="sf-detail-row"><span>Thanh toán</span><strong>{paymentMethod === "cashier" ? "Tiền mặt tại quầy" : paymentMethod === "banking" ? `Chuyển khoản · ${selectedPaymentBank.label}` : paymentMethod === "zalopay" ? "Ví ZaloPay" : "Thẻ NFC tại quầy"}</strong></div>
+          <div className="sf-detail-row"><span>Trạng thái</span><strong style={{ color: b.payment_status === "paid" ? "#4ade80" : "#fbbf24" }}>{b.payment_status === "paid" ? "Đã thanh toán" : "Chờ xác nhận thanh toán"}</strong></div>
+          {paymentMethod === "banking" && (
+            <div className="admin-payment-result-qr">
+              <img src={bankQrUrl} alt="VietQR chuyển khoản đặt vé" />
+              <div>
+                <strong>Quét VietQR để chuyển khoản</strong>
+                <p>{selectedPaymentBank.label} · {PAYMENT_BANK_INFO.accountNumber}</p>
+                <p>{PAYMENT_BANK_INFO.accountName}</p>
+                <p>Nội dung: {transferNote}</p>
+              </div>
+            </div>
+          )}
+          {paymentMethod === "card_nfc" && nfcReference && (
+            <div className="admin-payment-nfc-reference"><FaCheckCircle /> Đã nhận NFC · Mã phiên {nfcReference}</div>
+          )}
+          {paymentMethod === "zalopay" && b.payment_status !== "paid" && (
+            <div className="admin-payment-zalopay-notice">
+              <FaMobileAlt /> Vé đang chờ thanh toán ZaloPay. Khi khách thanh toán xong, mở nút Thanh toán trong danh sách vé và nhập mã giao dịch ZaloPay.
+            </div>
+          )}
           {nu && (
             <div style={{ marginTop: 16, padding: 14, borderRadius: 8, background: "rgba(251,191,36,0.12)", border: "1px dashed #fbbf24" }}>
               <strong style={{ color: "#fbbf24" }}>⚠ Tài khoản mới đã được tạo:</strong>
@@ -869,9 +1059,17 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                     <div className="sf-field">
                       <label>Số điện thoại *</label>
                       <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="0[0-9]*"
+                        minLength={10}
                         className={newCustomerErrors.phone ? "error" : ""}
                         value={newCustomerForm.phone}
-                        onChange={(e) => setNewCustomerForm((p) => ({ ...p, phone: e.target.value }))}
+                        onChange={(e) => {
+                          const phone = sanitizeBookingPhone(e.target.value);
+                          setNewCustomerForm((p) => ({ ...p, phone }));
+                          setNewCustomerErrors((previous) => ({ ...previous, phone: "" }));
+                        }}
                         placeholder="09xxxxxxxx"
                       />
                       {newCustomerErrors.phone && <span className="sf-error">{newCustomerErrors.phone}</span>}
@@ -918,9 +1116,17 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
                     <div className="sf-field">
                       <label>Số điện thoại *</label>
                       <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="0[0-9]*"
+                        minLength={10}
                         className={guestCustomerErrors.phone ? "error" : ""}
                         value={guestCustomerForm.phone}
-                        onChange={(e) => setGuestCustomerForm((previous) => ({ ...previous, phone: e.target.value }))}
+                        onChange={(e) => {
+                          const phone = sanitizeBookingPhone(e.target.value);
+                          setGuestCustomerForm((previous) => ({ ...previous, phone }));
+                          setGuestCustomerErrors((previous) => ({ ...previous, phone: "" }));
+                        }}
                         placeholder="09xxxxxxxx"
                       />
                       {guestCustomerErrors.phone && <span className="sf-error">{guestCustomerErrors.phone}</span>}
@@ -952,57 +1158,81 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
 
         {step === 2 && (
           <div>
-            <h3 style={{ marginBottom: 16 }}>Bước 2: Chọn phim đang chiếu</h3>
+            <h3 style={{ marginBottom: 16 }}>Bước 2: Chọn phim</h3>
             {movieList.length === 0 ? (
               <div style={{ padding: 24, textAlign: "center", color: "#8fa6ff", border: "1px solid #1e2a55", borderRadius: 10 }}>
-                Hiện chưa có phim đang chiếu để đặt vé.
+                Hiện chưa có phim để hiển thị.
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
-                {movieList.map((movie) => {
+              <>
+                <div className="admin-booking-movie-tabs" role="tablist" aria-label="Trạng thái phim">
+                  {MOVIE_STATUS_GROUPS.map((group) => (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={movieStatusFilter === group.value}
+                      key={group.value}
+                      className={`${group.className}${movieStatusFilter === group.value ? " active" : ""}`}
+                      onClick={() => setMovieStatusFilter(group.value)}
+                    >
+                      <span>{group.icon}</span>
+                      <strong>{group.label}</strong>
+                      <em>{movieStatusCounts[group.value] || 0}</em>
+                    </button>
+                  ))}
+                </div>
+
+                {filteredMovieList.length === 0 ? (
+                  <div className="admin-booking-movie-empty">
+                    Không có phim trong nhóm “{MOVIE_STATUS_GROUPS.find((group) => group.value === movieStatusFilter)?.label}”.
+                  </div>
+                ) : (
+              <div className="admin-booking-movie-grid">
+                {filteredMovieList.map((movie) => {
                   const isSelected = String(movie.movie_id) === String(selectedMovieId);
+                  const isEnded = movieStatusFilter === "ended";
                   const poster = movie.poster_url || movie.poster || movie.image || "";
                   return (
                     <button
                       type="button"
                       key={movie.movie_id}
+                      disabled={isEnded}
                       onClick={() => {
                         setSelectedMovieId(String(movie.movie_id));
                         setSelectedShowtime(null);
                         setStep(3);
                       }}
-                      style={{
-                        background: isSelected ? "rgba(124,97,255,0.14)" : "rgba(255,255,255,0.03)",
-                        border: isSelected ? "1px solid rgba(124,97,255,0.7)" : "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 14,
-                        padding: 10,
-                        textAlign: "left",
-                        color: "#eef4ff",
-                        cursor: "pointer",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 10,
-                        boxShadow: isSelected ? "0 0 0 1px rgba(124,97,255,0.3)" : "none",
-                      }}
+                      className={`admin-booking-movie-card${isSelected ? " selected" : ""}${isEnded ? " ended" : ""}`}
                     >
-                      <div style={{ width: "100%", aspectRatio: "2 / 3", borderRadius: 10, overflow: "hidden", background: "rgba(10,16,32,0.8)" }}>
+                      <div className="admin-booking-movie-poster">
                         {poster ? (
-                          <img src={toAbsoluteAssetUrl(poster)} alt={movie.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                          <img src={toAbsoluteAssetUrl(poster)} alt={movie.title} />
                         ) : (
-                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>🎬</div>
+                          <div className="admin-booking-movie-placeholder">🎬</div>
                         )}
+                        <span className={`admin-booking-movie-status ${movieStatusFilter}`}>
+                          {MOVIE_STATUS_GROUPS.find((group) => group.value === movieStatusFilter)?.label}
+                        </span>
                       </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.4 }}>{movie.title}</div>
-                        <div style={{ fontSize: 12, color: "#8fa6ff", marginTop: 4 }}>
+                      <div className="admin-booking-movie-info">
+                        <div className="admin-booking-movie-title">{movie.title}</div>
+                        <div className="admin-booking-movie-meta">
                           {movie.genre || "Phim chiếu rạp"}
                           {movie.age_limit ? ` • ${movie.age_limit}+` : ""}
                         </div>
+                        {movie.release_date && (
+                          <div className="admin-booking-movie-release">
+                            Khởi chiếu: {new Date(movie.release_date).toLocaleDateString("vi-VN")}
+                          </div>
+                        )}
+                        {isEnded && <small>Phim đã kết thúc, không thể đặt vé.</small>}
                       </div>
                     </button>
                   );
                 })}
               </div>
+                )}
+              </>
             )}
             <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between" }}>
               <button type="button" className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(1)}>← Quay lại</button>
@@ -1332,21 +1562,94 @@ export default function BookingWizard({ onToast, onBookingSuccess }) {
               <div className="sf-detail-row"><span>Giá ghế</span><strong>{fmtMoney(seatTotal)}</strong></div>
               {comboTotal > 0 && <div className="sf-detail-row"><span>Combo</span><strong>{fmtMoney(comboTotal)}</strong></div>}
               <div className="sf-detail-row"><span style={{ fontSize: 16 }}><strong>Tổng cộng</strong></span><strong style={{ color: "#fbbf24", fontSize: 22 }}>{fmtMoney(totalAmount)}</strong></div>
-              <div className="sf-field" style={{ marginTop: 10 }}>
-                <label>Hình thức thanh toán</label>
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-                  <option value="cashier">Tại quầy (tiền mặt)</option>
-                  <option value="cash">Tiền mặt</option>
-                  <option value="banking">Chuyển khoản</option>
-                  <option value="card">Thẻ (Visa/Master)</option>
-                  <option value="momo">Ví MoMo</option>
-                  <option value="vnpay">VNPay</option>
-                </select>
+              <div className="admin-payment-price-breakdown">
+                {membershipDiscount > 0 && <div><span>Ưu đãi thành viên ({membershipPercent}%)</span><strong>−{fmtMoney(membershipDiscount)}</strong></div>}
+                <div><span>Phí dịch vụ (8%)</span><strong>{fmtMoney(serviceFee)}</strong></div>
               </div>
+
+              <div className="admin-payment-methods" role="radiogroup" aria-label="Hình thức thanh toán">
+                <button type="button" className={paymentMethod === "cashier" ? "selected" : ""} onClick={() => choosePaymentMethod("cashier")}>
+                  <span className="admin-payment-method-icon cash"><FaMoneyBillWave /></span>
+                  <span><strong>Tiền mặt tại quầy</strong><small>Nhận tiền trực tiếp và in vé ngay</small></span>
+                  <span className="admin-payment-radio" aria-hidden="true" />
+                </button>
+                <button type="button" className={paymentMethod === "banking" ? "selected" : ""} onClick={() => choosePaymentMethod("banking")}>
+                  <span className="admin-payment-method-icon bank"><FaUniversity /></span>
+                  <span><strong>Chuyển khoản ngân hàng</strong><small>VietQR tự điền tài khoản, số tiền và nội dung</small></span>
+                  <span className="admin-payment-radio" aria-hidden="true" />
+                </button>
+                <button type="button" className={paymentMethod === "card_nfc" ? "selected" : ""} onClick={() => choosePaymentMethod("card_nfc")}>
+                  <span className="admin-payment-method-icon nfc"><FaCreditCard /></span>
+                  <span><strong>Thẻ tín dụng / Ghi nợ qua NFC</strong><small>Chạm thẻ hoặc điện thoại vào thiết bị POS/NFC</small></span>
+                  <span className="admin-payment-radio" aria-hidden="true" />
+                </button>
+                <button type="button" className={paymentMethod === "zalopay" ? "selected" : ""} onClick={() => choosePaymentMethod("zalopay")}>
+                  <span className="admin-payment-method-icon zalopay"><FaMobileAlt /></span>
+                  <span><strong>Ví ZaloPay</strong><small>Thanh toán bằng ứng dụng ZaloPay và xác nhận mã giao dịch</small></span>
+                  <span className="admin-payment-radio" aria-hidden="true" />
+                </button>
+              </div>
+
+              {paymentMethod === "banking" && (
+                <div className="admin-payment-panel">
+                  <h5><FaUniversity /> Chọn ngân hàng nhận chuyển khoản</h5>
+                  <label className="admin-payment-bank-search">
+                    <FaSearch />
+                    <input value={bankSearch} onChange={(event) => setBankSearch(event.target.value)} placeholder="Tìm ngân hàng…" />
+                  </label>
+                  <div className="admin-payment-bank-grid">
+                    {filteredPaymentBanks.map((bank) => (
+                      <button type="button" key={bank.id} className={selectedBank === bank.id ? "selected" : ""} onClick={() => setSelectedBank(bank.id)}>
+                        <img src={getPaymentBankLogo(bank.id)} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+                        <span>{bank.shortName}</span>
+                        {selectedBank === bank.id && <FaCheckCircle />}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="admin-payment-bank-info">
+                    <img src={getPaymentBankLogo(selectedBank)} alt={selectedPaymentBank.label} />
+                    <div><span>Ngân hàng</span><strong>{selectedPaymentBank.label}</strong></div>
+                    <div><span>Số tài khoản</span><strong>{PAYMENT_BANK_INFO.accountNumber}</strong></div>
+                    <div><span>Chủ tài khoản</span><strong>{PAYMENT_BANK_INFO.accountName}</strong></div>
+                    <div><span>Số tiền</span><strong className="amount">{fmtMoney(totalAmount)}</strong></div>
+                    <div className="wide"><span>Nội dung chuyển khoản</span><strong>{transferNote}</strong></div>
+                    <p>VietQR sẽ hiển thị sau khi tạo vé để khách quét và hoàn tất chuyển khoản.</p>
+                  </div>
+                </div>
+              )}
+
+              {paymentMethod === "card_nfc" && (
+                <div className={`admin-payment-panel admin-payment-nfc ${nfcStatus}`}>
+                  <div className="admin-payment-nfc-visual">
+                    <span className="admin-payment-nfc-waves"><FaWifi /></span>
+                    <FaCreditCard />
+                  </div>
+                  <div className="admin-payment-nfc-content">
+                    <h5>Quét thẻ bằng NFC</h5>
+                    <p>Đưa thẻ hoặc điện thoại của khách sát đầu đọc NFC/POS. Trên máy tính có thể dùng đầu đọc USB gửi mã tự động.</p>
+                    {nfcMessage && <div className="admin-payment-nfc-status">{nfcStatus === "scanned" && <FaCheckCircle />} {nfcMessage}</div>}
+                    <button type="button" onClick={startNfcScan} disabled={nfcStatus === "scanning"}>
+                      <FaWifi /> {nfcStatus === "scanning" ? "Đang chờ quét NFC…" : nfcStatus === "scanned" ? "Quét lại NFC" : "Bắt đầu quét NFC"}
+                    </button>
+                    <small>Không lưu số thẻ trên website. Giao dịch chỉ được xác nhận bởi thiết bị POS/cổng thanh toán; tín hiệu quét không tự ghi nhận đã thu tiền.</small>
+                  </div>
+                </div>
+              )}
+
+              {paymentMethod === "zalopay" && (
+                <div className="admin-payment-panel admin-payment-zalopay">
+                  <span className="admin-payment-zalopay-logo">Z</span>
+                  <div>
+                    <h5><FaMobileAlt /> Thanh toán bằng ZaloPay</h5>
+                    <p>Cho khách hoàn tất thanh toán trên ZaloPay. Vé sẽ ở trạng thái chờ cho đến khi nhân viên nhập mã giao dịch thành công bằng nút Thanh toán trong danh sách vé.</p>
+                  </div>
+                  <div className="admin-payment-zalopay-amount"><span>Số tiền</span><strong>{fmtMoney(totalAmount)}</strong></div>
+                </div>
+              )}
             </div>
             <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between" }}>
               <button type="button" className="sf-btn sf-btn-secondary sf-btn-lg" onClick={() => setStep(5)}>← Quay lại</button>
-              <button type="button" className="sf-btn sf-btn-add sf-btn-lg" disabled={submitting} onClick={handleSubmit} style={{ paddingLeft: 30, paddingRight: 30 }}>
+              <button type="button" className="sf-btn sf-btn-add sf-btn-lg" disabled={submitting || (paymentMethod === "card_nfc" && nfcStatus !== "scanned")} onClick={handleSubmit} style={{ paddingLeft: 30, paddingRight: 30 }}>
                 {submitting ? "Đang đặt vé…" : "✅ Xác nhận & Đặt vé"}
               </button>
             </div>

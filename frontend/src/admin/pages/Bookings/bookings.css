@@ -51,6 +51,121 @@
 .bk-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .bk-detail-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; padding: 18px; }
 .bk-detail-card h4 { margin: 0 0 14px; font-size: 14px; color: #8fa6ff; text-transform: uppercase; letter-spacing: 0.08em; }
+.bk-btn-pay {
+  border-color: rgba(251, 191, 36, 0.42) !important;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.95), rgba(217, 119, 6, 0.95)) !important;
+  color: #fff !important;
+  font-weight: 750;
+}
+.bk-btn-pay:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(245, 158, 11, 0.28); }
+.bk-btn-pay:disabled { opacity: 0.5; cursor: wait; }
+
+.admin-modal-portal .bk-modal.bk-payment-modal {
+  width: min(900px, calc(100vw - 32px)) !important;
+  max-width: 900px !important;
+}
+
+.bk-payment-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.bk-payment-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 13px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.bk-payment-summary span { color: #7486ad; font-size: 11px; }
+.bk-payment-summary strong { color: #edf2ff; font-size: 13px; overflow-wrap: anywhere; }
+.bk-payment-summary > div:last-child strong { color: #fbbf24; font-size: 18px; }
+
+.bk-payment-method-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.bk-payment-method-grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-height: 100px;
+  padding: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.09);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #dfe7fb;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bk-payment-method-grid button:hover,
+.bk-payment-method-grid button.selected {
+  border-color: #7c61ff;
+  background: rgba(124, 97, 255, 0.11);
+}
+
+.bk-payment-method-grid button > span { font-size: 23px; }
+.bk-payment-method-grid button > strong { font-size: 13px; }
+.bk-payment-method-grid button > small { color: #7486ad; font-size: 11px; }
+.bk-payment-method-grid .bk-zalopay-mark {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #0068ff, #00b2ff);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.bk-payment-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.bk-payment-field > span { color: #9cb0de; font-size: 12px; font-weight: 700; }
+.bk-payment-field input,
+.bk-payment-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  outline: none;
+  background: #0d152b;
+  color: #edf2ff;
+}
+.bk-payment-field input:focus,
+.bk-payment-field select:focus { border-color: rgba(124, 97, 255, 0.7); }
+.bk-payment-field > small { color: #66789e; font-size: 11px; }
+
+.bk-payment-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  border-radius: 10px;
+  background: rgba(248, 113, 113, 0.09);
+  color: #fca5a5;
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .bk-payment-summary,
+  .bk-payment-method-grid { grid-template-columns: 1fr; }
+}
 .bk-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 12px; }
 .bk-detail-row:last-child { border-bottom: none; }
 .bk-detail-row span { color: #7a8fc0; font-size: 13px; flex-shrink: 0; }
@@ -211,6 +326,521 @@
 }
 .admin-bookings .table-card tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* Movie status groups in the staff booking wizard. */
+.admin-booking-movie-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.admin-booking-movie-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #8799bd;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.admin-booking-movie-tabs button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-booking-movie-tabs button > span { font-size: 14px; }
+.admin-booking-movie-tabs button > strong { font-size: 13px; }
+.admin-booking-movie-tabs button > em {
+  min-width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.admin-booking-movie-tabs button.showing.active {
+  color: #86efac;
+  border-color: rgba(74, 222, 128, 0.52);
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.admin-booking-movie-tabs button.coming.active {
+  color: #fde68a;
+  border-color: rgba(251, 191, 36, 0.52);
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.admin-booking-movie-tabs button.ended.active {
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.42);
+  background: rgba(148, 163, 184, 0.09);
+}
+
+.admin-booking-movie-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.admin-booking-movie-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #eef4ff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.admin-booking-movie-card:hover:not(:disabled) {
+  transform: translateY(-3px);
+  border-color: rgba(124, 97, 255, 0.55);
+  background: rgba(124, 97, 255, 0.08);
+}
+
+.admin-booking-movie-card.selected {
+  border-color: rgba(124, 97, 255, 0.75);
+  background: rgba(124, 97, 255, 0.14);
+  box-shadow: 0 0 0 1px rgba(124, 97, 255, 0.28);
+}
+
+.admin-booking-movie-card.ended {
+  opacity: 0.62;
+  cursor: not-allowed;
+  filter: grayscale(0.28);
+}
+
+.admin-booking-movie-poster {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgba(10, 16, 32, 0.8);
+}
+
+.admin-booking-movie-poster > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.admin-booking-movie-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+}
+
+.admin-booking-movie-status {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 4px 8px;
+  border-radius: 99px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  backdrop-filter: blur(8px);
+}
+
+.admin-booking-movie-status.now_showing { background: rgba(22, 163, 74, 0.88); }
+.admin-booking-movie-status.coming_soon { background: rgba(202, 138, 4, 0.9); }
+.admin-booking-movie-status.ended { background: rgba(71, 85, 105, 0.9); }
+
+.admin-booking-movie-info { display: flex; flex-direction: column; gap: 4px; }
+.admin-booking-movie-title { font-size: 14px; font-weight: 700; line-height: 1.4; }
+.admin-booking-movie-meta { color: #8fa6ff; font-size: 12px; }
+.admin-booking-movie-release { color: #7182a8; font-size: 11px; }
+.admin-booking-movie-info > small { margin-top: 3px; color: #fca5a5; font-size: 10px; }
+
+.admin-booking-movie-empty {
+  padding: 32px 20px;
+  border: 1px dashed rgba(124, 97, 255, 0.3);
+  border-radius: 14px;
+  background: rgba(124, 97, 255, 0.045);
+  color: #899bc1;
+  text-align: center;
+}
+
+@media (max-width: 680px) {
+  .admin-booking-movie-tabs { grid-template-columns: 1fr; }
+  .admin-booking-movie-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Staff booking payment — mirrors the customer checkout experience. */
+.admin-payment-price-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 14px 0 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.admin-payment-price-breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: #8fa6c9;
+  font-size: 13px;
+}
+
+.admin-payment-price-breakdown strong { color: #86efac; }
+
+.admin-payment-methods {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.admin-payment-methods > button {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 86px;
+  padding: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #dbe6ff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.admin-payment-methods > button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(124, 97, 255, 0.48);
+  background: rgba(124, 97, 255, 0.07);
+}
+
+.admin-payment-methods > button.selected {
+  border-color: #7c61ff;
+  background: rgba(124, 97, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(124, 97, 255, 0.2);
+}
+
+.admin-payment-methods button > span:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-payment-methods button strong { color: #f3f6ff; font-size: 13px; }
+.admin-payment-methods button small { color: #7587aa; font-size: 11px; line-height: 1.45; }
+
+.admin-payment-method-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+}
+
+.admin-payment-method-icon.cash { color: #4ade80; background: rgba(74, 222, 128, 0.12); }
+.admin-payment-method-icon.bank { color: #93a8ff; background: rgba(124, 97, 255, 0.14); }
+.admin-payment-method-icon.nfc { color: #fbbf24; background: rgba(251, 191, 36, 0.12); }
+.admin-payment-method-icon.zalopay { color: #38bdf8; background: rgba(0, 104, 255, 0.16); }
+
+.admin-payment-radio {
+  width: 15px;
+  height: 15px;
+  border: 2px solid #64748b;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 3px #0c1328;
+}
+
+.admin-payment-methods button.selected .admin-payment-radio {
+  border-color: #9d8aff;
+  background: #9d8aff;
+}
+
+.admin-payment-panel {
+  align-self: start;
+  flex: none;
+  width: 100%;
+  height: auto !important;
+  min-height: 0 !important;
+  box-sizing: border-box;
+  margin-top: 14px;
+  padding: 18px;
+  border: 1px solid rgba(124, 97, 255, 0.24);
+  border-radius: 16px;
+  background: rgba(10, 16, 34, 0.72);
+}
+
+.admin-payment-panel h5 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: #eef4ff;
+  font-size: 14px;
+}
+
+.admin-payment-zalopay {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  border-color: rgba(0, 145, 255, 0.35);
+  background: linear-gradient(135deg, rgba(0, 104, 255, 0.12), rgba(10, 16, 34, 0.82));
+}
+
+.admin-payment-zalopay-logo {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #0068ff, #00b2ff);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.admin-payment-zalopay h5 { margin-bottom: 6px; }
+.admin-payment-zalopay p { margin: 0; color: #8fa1c5; font-size: 12px; line-height: 1.55; }
+.admin-payment-zalopay-amount { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.admin-payment-zalopay-amount span { color: #7182a8; font-size: 10px; text-transform: uppercase; }
+.admin-payment-zalopay-amount strong { color: #fbbf24; font-size: 19px; white-space: nowrap; }
+.admin-payment-zalopay-notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 145, 255, 0.32);
+  border-radius: 10px;
+  background: rgba(0, 104, 255, 0.1);
+  color: #93c5fd;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-payment-bank-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
+  color: #7182a8;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-payment-bank-search input {
+  width: 100%;
+  padding: 11px 0 !important;
+  border: 0 !important;
+  outline: 0;
+  background: transparent !important;
+  color: #e7eaf9;
+}
+
+.admin-payment-bank-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(94px, 1fr));
+  gap: 8px;
+  max-height: 230px;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: none;
+}
+
+.admin-payment-bank-grid::-webkit-scrollbar { display: none; }
+
+.admin-payment-bank-grid button {
+  position: relative;
+  min-height: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #9fb0d2;
+  cursor: pointer;
+}
+
+.admin-payment-bank-grid button:hover,
+.admin-payment-bank-grid button.selected {
+  border-color: #7c61ff;
+  background: rgba(124, 97, 255, 0.12);
+  color: #e4ddff;
+}
+
+.admin-payment-bank-grid img { width: 50px; height: 24px; object-fit: contain; }
+.admin-payment-bank-grid span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+.admin-payment-bank-grid svg { position: absolute; top: 6px; right: 6px; color: #4ade80; font-size: 12px; }
+
+.admin-payment-bank-info {
+  display: grid;
+  grid-template-columns: auto repeat(4, minmax(100px, 1fr));
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 13px;
+  background: rgba(124, 97, 255, 0.08);
+}
+
+.admin-payment-bank-info > img { width: 58px; max-height: 34px; object-fit: contain; }
+.admin-payment-bank-info > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.admin-payment-bank-info span { color: #7182a8; font-size: 10px; text-transform: uppercase; }
+.admin-payment-bank-info strong { color: #e7eaf9; font-size: 12px; overflow-wrap: anywhere; }
+.admin-payment-bank-info .amount { color: #fbbf24; font-size: 15px; }
+.admin-payment-bank-info .wide { grid-column: 2 / -1; }
+.admin-payment-bank-info p { grid-column: 1 / -1; margin: 0; color: #8496bc; font-size: 11px; }
+
+.admin-payment-nfc {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 22px;
+  align-items: center;
+  padding-block: 22px;
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+.admin-payment-nfc.scanned { border-color: rgba(74, 222, 128, 0.45); }
+.admin-payment-nfc.error { border-color: rgba(248, 113, 113, 0.45); }
+
+.admin-payment-nfc-visual {
+  position: relative;
+  min-height: 130px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.18), transparent 65%);
+  color: #fbbf24;
+  font-size: 72px;
+}
+
+.admin-payment-nfc-waves {
+  position: absolute;
+  top: 13px;
+  right: 24px;
+  font-size: 30px;
+  transform: rotate(90deg);
+  animation: admin-nfc-pulse 1.25s ease-in-out infinite;
+}
+
+@keyframes admin-nfc-pulse {
+  50% { opacity: 0.35; transform: rotate(90deg) scale(1.18); }
+}
+
+.admin-payment-nfc-content p { color: #8fa1c5; font-size: 12px; line-height: 1.55; }
+.admin-payment-nfc-content > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid rgba(251, 191, 36, 0.38);
+  border-radius: 10px;
+  background: rgba(251, 191, 36, 0.12);
+  color: #fde68a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-payment-nfc-content > button:disabled { opacity: 0.55; cursor: wait; }
+.admin-payment-nfc-content > small { display: block; margin-top: 10px; color: #66789e; line-height: 1.5; }
+
+.admin-bookings .sf-btn:disabled {
+  opacity: 0.42;
+  filter: saturate(0.45);
+  box-shadow: none !important;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.admin-payment-nfc-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #b7c5e5;
+  font-size: 12px;
+}
+
+.admin-payment-nfc.scanned .admin-payment-nfc-status { color: #86efac; background: rgba(74, 222, 128, 0.09); }
+.admin-payment-nfc.error .admin-payment-nfc-status { color: #fca5a5; background: rgba(248, 113, 113, 0.09); }
+
+.admin-payment-result-qr {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(124, 97, 255, 0.28);
+  border-radius: 14px;
+  background: rgba(124, 97, 255, 0.07);
+}
+
+.admin-payment-result-qr img { width: 150px; height: 150px; object-fit: contain; padding: 6px; border-radius: 10px; background: #fff; }
+.admin-payment-result-qr p { margin: 5px 0 0; color: #8fa1c5; font-size: 12px; overflow-wrap: anywhere; }
+
+.admin-payment-nfc-reference {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: rgba(74, 222, 128, 0.09);
+  color: #86efac;
+}
+
+@media (max-width: 1100px) {
+  .admin-payment-methods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-payment-bank-grid { grid-template-columns: repeat(4, minmax(88px, 1fr)); }
+  .admin-payment-bank-info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-payment-bank-info > img { grid-column: 1 / -1; }
+  .admin-payment-bank-info .wide { grid-column: 1 / -1; }
+}
+
+@media (max-width: 680px) {
+  .admin-payment-methods { grid-template-columns: 1fr; }
+  .admin-payment-zalopay { grid-template-columns: auto 1fr; }
+  .admin-payment-zalopay-amount { grid-column: 1 / -1; align-items: flex-start; }
+}
+
+@media (max-width: 680px) {
+  .admin-payment-bank-grid { grid-template-columns: repeat(3, minmax(76px, 1fr)); }
+  .admin-payment-nfc { grid-template-columns: 1fr; }
+  .admin-payment-nfc-visual { min-height: 100px; }
+  .admin-payment-result-qr { flex-direction: column; align-items: flex-start; }
 }
 
 /* ── field-group inside bookings ── */

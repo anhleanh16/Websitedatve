@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import './staff.css';
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 import { BIRTH_DATE_ERROR, getBirthDateBounds, isValidBirthDate } from "../../../utils/birthDate.js";
 import {
   adminUserService,
@@ -126,6 +127,7 @@ function Toast({ message, onClose }) {
 // ─── Confirm ─────────────────────────────────────────────────────────────────
 function Confirm({ message, onClose, onConfirm }) {
   return (
+    <AdminModalPortal>
     <div className="sf-overlay" onClick={onClose}>
       <div className="sf-modal sf-modal-sm" onClick={e => e.stopPropagation()}>
         <div className="sf-modal-header"><h2>Xác nhận</h2><button className="sf-modal-close" onClick={onClose}>✕</button></div>
@@ -136,6 +138,7 @@ function Confirm({ message, onClose, onConfirm }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -218,6 +221,7 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
   };
 
   return (
+    <AdminModalPortal>
     <div className="sf-overlay" onClick={onClose}>
       <div className="sf-modal sf-modal-lg" onClick={e => e.stopPropagation()}>
         <div className="sf-modal-header">
@@ -452,6 +456,7 @@ function StaffForm({ staff, customerAccounts = [], onClose, onSave }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -473,6 +478,7 @@ function TaskModal({ staff, onClose, onSave }) {
   const updateTaskStatus = (id, status) => setTasks(p => p.map(t => t.id === id ? { ...t, status } : t));
 
   return (
+    <AdminModalPortal>
     <div className="sf-overlay" onClick={onClose}>
       <div className="sf-modal sf-modal-lg" onClick={e => e.stopPropagation()}>
         <div className="sf-modal-header">
@@ -535,6 +541,7 @@ function TaskModal({ staff, onClose, onSave }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -557,6 +564,7 @@ function AttendanceModal({ staff, onClose, onSave }) {
   records.forEach(r => totals[r.status] = (totals[r.status] || 0) + 1);
 
   return (
+    <AdminModalPortal>
     <div className="sf-overlay" onClick={onClose}>
       <div className="sf-modal sf-modal-lg" onClick={e => e.stopPropagation()}>
         <div className="sf-modal-header">
@@ -628,6 +636,7 @@ function AttendanceModal({ staff, onClose, onSave }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
@@ -646,6 +655,7 @@ function StaffDetail({ staff, onClose, onEdit, onTask, onAttend }) {
   const taskDone = staff.tasks.filter(t => t.status === "done").length;
 
   return (
+    <AdminModalPortal>
     <div className="sf-overlay" onClick={onClose}>
       <div className="sf-modal sf-modal-lg" onClick={e => e.stopPropagation()}>
         <div className="sf-modal-header">
@@ -750,6 +760,7 @@ function StaffDetail({ staff, onClose, onEdit, onTask, onAttend }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 

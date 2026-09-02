@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { adminNewsService } from "../../services/adminApi";
 import AdminPagination, { useAdminPagination } from "../../components/AdminPagination.jsx";
+import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 import { toAbsoluteAssetUrl } from "../../../utils/api";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
@@ -322,6 +323,7 @@ function NewsModal({ open, form, setForm, onClose, onSubmit, saving, editingId }
   const editorConfig = getEditorConfig();
 
   return (
+    <AdminModalPortal>
     <div className="nm-overlay" onClick={onClose}>
       <div className="nm-modal" onClick={(event) => event.stopPropagation()}>
         <div className="nm-modal-header">
@@ -476,6 +478,7 @@ function NewsModal({ open, form, setForm, onClose, onSubmit, saving, editingId }
         </form>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 

@@ -520,6 +520,12 @@ export const ShowtimeModel = {
       const earlyEnabled = Boolean(movieEntry.early_show_enabled ?? movieEntry.earlyShowEnabled ?? data.early_show_enabled ?? data.earlyShowEnabled ?? false);
       const earlyShowDays = Math.max(0, Number(movieEntry.early_show_days ?? movieEntry.earlyShowDays ?? data.early_show_days ?? data.earlyShowDays ?? 0));
       const earlyShowDurationDays = Math.max(0, Number(movieEntry.early_show_duration_days ?? movieEntry.earlyShowDurationDays ?? data.early_show_duration_days ?? data.earlyShowDurationDays ?? 0));
+      const standardPrice = Number(movieEntry.price_standard ?? movieEntry.priceStandard ?? data.price_standard ?? data.priceStandard ?? data.price ?? 0) || 0;
+      const vipPrice = Number(movieEntry.price_vip ?? movieEntry.priceVip ?? data.price_vip ?? data.priceVip ?? standardPrice) || standardPrice;
+      const couplePrice = Number(movieEntry.price_couple ?? movieEntry.priceCouple ?? data.price_couple ?? data.priceCouple ?? standardPrice) || standardPrice;
+      if (standardPrice <= 0 || vipPrice <= 0 || couplePrice <= 0) {
+        throw buildAppError("Giá vé thường, VIP và ghế đôi phải lớn hơn 0.");
+      }
 
       let campaignId = null;
       if (caps.campaigns.hasCampaignsTable) {
@@ -563,9 +569,6 @@ export const ShowtimeModel = {
         }
       }
 
-      const standardPrice = Number(movieEntry.price_standard ?? movieEntry.priceStandard ?? data.price_standard ?? data.priceStandard ?? data.price ?? 0) || 0;
-      const vipPrice = Number(movieEntry.price_vip ?? movieEntry.priceVip ?? data.price_vip ?? data.priceVip ?? standardPrice) || standardPrice;
-      const couplePrice = Number(movieEntry.price_couple ?? movieEntry.priceCouple ?? data.price_couple ?? data.priceCouple ?? standardPrice) || standardPrice;
       const seats = Number(movieEntry.available_seats ?? movieEntry.availableSeats ?? data.available_seats ?? data.availableSeats ?? 0) || 0;
       const normalizedSeats = Number.isNaN(seats) ? 0 : seats;
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { adminNotificationService } from "../../services/adminApi";
 import { useSelector } from "react-redux";
+import AdminModalPortal from "../../components/AdminModalPortal.jsx";
 
 const TYPE_OPTIONS = [
   { value: "system", label: "Hệ thống" },
@@ -30,6 +31,7 @@ function NotificationDetailModal({ detail, onClose }) {
   });
 
   return (
+    <AdminModalPortal>
     <div className="pr-overlay" onClick={onClose}>
       <div className="pr-modal" onClick={(e) => e.stopPropagation()}>
         <div className="pr-modal-header">
@@ -95,6 +97,7 @@ function NotificationDetailModal({ detail, onClose }) {
         </div>
       </div>
     </div>
+    </AdminModalPortal>
   );
 }
 
