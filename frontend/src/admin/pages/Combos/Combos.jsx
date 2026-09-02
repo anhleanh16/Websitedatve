@@ -414,6 +414,7 @@ export default function AdminCombos() {
     }
   };
 
+<<<<<<< HEAD
   const handleDelete = async (combo) => {
     if (Number(combo?.usage_count || 0) > 0) {
       showToast("Combo đã được sử dụng trong khu vực đơn hàng nên không thể ngừng bán hoặc xóa.", "error");
@@ -423,10 +424,40 @@ export default function AdminCombos() {
     try {
       const result = await adminComboService.delete(combo.combo_id);
       showToast(result?.message || "Đã xóa combo.");
+=======
+  const handleToggleStatus = async (combo) => {
+    const nextStatus = !combo.is_active;
+    const confirmed = window.confirm(
+      nextStatus
+        ? `Bạn có chắc muốn bán lại combo "${combo.combo_name}" không?`
+        : `Bạn có chắc muốn ngừng bán combo "${combo.combo_name}" không?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      const payload = new FormData();
+      payload.append("is_active", String(nextStatus));
+      payload.append("combo_name", combo.combo_name || "");
+      payload.append("description", combo.description || "");
+      payload.append("price", String(combo.price ?? 0));
+      payload.append("category", combo.category || "combo");
+      payload.append("popcorn_quantity", String(combo.popcorn_quantity ?? 0));
+      payload.append("drink_quantity", String(combo.drink_quantity ?? 0));
+      payload.append("popcorn_options", JSON.stringify(combo.popcorn_options || []));
+      payload.append("drink_options", JSON.stringify(combo.drink_options || []));
+      payload.append("sort_order", String(combo.sort_order ?? 0));
+      payload.append("image", combo.image || "");
+
+      await adminComboService.update(combo.combo_id, payload);
+      showToast(
+        nextStatus ? "Đã chuyển combo sang trạng thái đang bán." : "Đã chuyển combo sang trạng thái ngừng bán.",
+        nextStatus ? "success" : "warning",
+      );
+>>>>>>> efc00ff2b78dac988db386def94f1fdaf41c6f9b
       await loadCombos();
-    } catch (deleteError) {
-      console.error(deleteError);
-      showToast(deleteError.message || "Không thể xóa combo.", "error");
+    } catch (toggleError) {
+      console.error(toggleError);
+      showToast(toggleError.message || "Không thể cập nhật trạng thái combo.", "error");
     }
   };
 
@@ -565,8 +596,13 @@ export default function AdminCombos() {
                         <button className="bk-btn bk-btn-view" onClick={() => setEditingCombo(combo)}>
                           Sửa
                         </button>
+<<<<<<< HEAD
                         <button className="bk-btn bk-btn-refund" onClick={() => handleDelete(combo)}>
                           {combo.usage_count > 0 ? "Không thể xóa" : "Xóa"}
+=======
+                        <button className="bk-btn bk-btn-refund" onClick={() => handleToggleStatus(combo)}>
+                          {combo.is_active ? "Ngừng bán" : "Bán lại"}
+>>>>>>> efc00ff2b78dac988db386def94f1fdaf41c6f9b
                         </button>
                       </div>
                     </td>
