@@ -724,7 +724,7 @@ function AttendanceModal({ staff, onClose, onSave }) {
 }
 
 // ─── Staff Detail Modal ───────────────────────────────────────────────────────
-function StaffDetail({ staff, onClose, onEdit, onTask, onAttend }) {
+function StaffDetail({ staff, onClose, onEdit, onTask }) {
   if (!staff) return null;
   const st  = STATUS_MAP[staff.status] || STATUS_MAP.active;
   const rl  = ROLE_MAP[staff.role]     || ROLE_MAP.staff;
@@ -838,7 +838,6 @@ function StaffDetail({ staff, onClose, onEdit, onTask, onAttend }) {
         <div className="sf-modal-footer">
           <button className="sf-btn sf-btn-edit sf-btn-lg"   onClick={() => onEdit(staff)}>Sửa thông tin</button>
           <button className="sf-btn sf-btn-task sf-btn-lg"   onClick={() => onTask(staff)}>Phân công</button>
-          <button className="sf-btn sf-btn-attend sf-btn-lg" onClick={() => onAttend(staff)}>Chấm công</button>
           <button className="sf-btn sf-btn-secondary sf-btn-lg" onClick={onClose}>Đóng</button>
         </div>
       </div>
@@ -849,7 +848,7 @@ function StaffDetail({ staff, onClose, onEdit, onTask, onAttend }) {
 
 
 // ─── Staff List Tab ───────────────────────────────────────────────────────────
-function StaffList({ staff, onView, onEdit, onTask, onAttend, onDelete }) {
+function StaffList({ staff, onView, onEdit, onTask, onDelete }) {
   const [search, setSearch]   = useState("");
   const [filterCinema, setFC] = useState("all");
   const [filterType,   setFT] = useState("all");
@@ -951,7 +950,6 @@ function StaffList({ staff, onView, onEdit, onTask, onAttend, onDelete }) {
                       <button className="sf-btn sf-btn-view"   onClick={() => onView(s)}>Xem</button>
                       <button className="sf-btn sf-btn-edit"   onClick={() => onEdit(s)}>Sửa</button>
                       <button className="sf-btn sf-btn-task"   onClick={() => onTask(s)}>Việc</button>
-                      <button className="sf-btn sf-btn-attend" onClick={() => onAttend(s)}>Công</button>
                       <button className="sf-btn sf-btn-delete" onClick={() => onDelete(s)}>Xóa</button>
                     </div>
                   </td>
@@ -968,7 +966,7 @@ function StaffList({ staff, onView, onEdit, onTask, onAttend, onDelete }) {
 }
 
 // ─── Attendance Overview Tab ──────────────────────────────────────────────────
-function AttendanceOverview({ staff }) {
+function AttendanceOverview({ staff, onAttend }) {
   const [filterCinema, setFC] = useState("all");
   const [today, setToday] = useState(getToday);
 
@@ -1000,6 +998,7 @@ function AttendanceOverview({ staff }) {
               <th>Đi trễ</th>
               <th>Vắng mặt</th>
               <th>Tỷ lệ chuyên cần</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -1037,6 +1036,9 @@ function AttendanceOverview({ staff }) {
                       <div className="sf-att-rate-bar" style={{ width: `${rate}%`, background: rate >= 80 ? "#4ade80" : rate >= 60 ? "#fbbf24" : "#f87171" }} />
                       <span>{rate}%</span>
                     </div>
+                  </td>
+                  <td>
+                    <button className="sf-btn sf-btn-attend sm" onClick={() => onAttend(s)}>Chấm công</button>
                   </td>
                 </tr>
               );
@@ -1102,7 +1104,6 @@ export default function AdminStaff() {
   const [viewStaff,   setViewStaff]   = useState(null);
   const [editStaff,   setEditStaff]   = useState(undefined); // undefined=closed, null=new
   const [taskStaff,   setTaskStaff]   = useState(null);
-  const [attendStaff, setAttendStaff] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toast, setToast] = useState("");
 
@@ -1182,13 +1183,6 @@ export default function AdminStaff() {
     setTaskStaff(null); setViewStaff(null);
   };
 
-  const handleSaveAttend = (data) => {
-    const updatedList = staffList.map(s => s.id === data.id ? data : s);
-    setStaffList(updatedList);
-    showToast(`Đã cập nhật chấm công cho "${data.name}".`);
-    setAttendStaff(null); setViewStaff(null);
-  };
-
   const handleConfirmDelete = async () => {
     try {
       await adminEmployeeService.delete(deleteTarget.id);
@@ -1202,7 +1196,6 @@ export default function AdminStaff() {
 
   const openEdit = (s) => { setViewStaff(null); setEditStaff(s); };
   const openTask = (s) => { setViewStaff(null); setTaskStaff(s); };
-  const openAtt  = (s) => { setViewStaff(null); setAttendStaff(s); };
 
   const stats = [
     { label: "Tổng nhân viên",   value: staffList.length,                                          color: "#7c61ff" },
@@ -1212,9 +1205,8 @@ export default function AdminStaff() {
   ];
 
   const TABS = [
-    { key: "list",       label: "Danh sách nhân viên"  },
-    { key: "attendance", label: "Theo dõi chấm công"   },
-    { key: "tasks",      label: "Tổng quan công việc"  },
+    { key: "list",  label: "Danh sách nhân viên" },
+    { key: "tasks", label: "Tổng quan công việc" },
   ];
 
   return (
@@ -1244,16 +1236,57 @@ export default function AdminStaff() {
         ))}
       </div>
 
-      {activeTab === "list"       && <StaffList staffList={staffList} staff={staffList} onView={setViewStaff} onEdit={openEdit} onTask={openTask} onAttend={openAtt} onDelete={setDeleteTarget} />}
-      {activeTab === "attendance" && <AttendanceOverview staff={staffList} />}
+      {activeTab === "list"       && <StaffList staffList={staffList} staff={staffList} onView={setViewStaff} onEdit={openEdit} onTask={openTask} onDelete={setDeleteTarget} />}
       {activeTab === "tasks"      && <TaskOverview staff={staffList} />}
 
-      {viewStaff   && <StaffDetail staff={viewStaff} onClose={() => setViewStaff(null)} onEdit={openEdit} onTask={openTask} onAttend={openAtt} />}
+      {viewStaff   && <StaffDetail staff={viewStaff} onClose={() => setViewStaff(null)} onEdit={openEdit} onTask={openTask} />}
       {editStaff  !== undefined && <StaffForm  staff={editStaff} customerAccounts={customerAccounts} onClose={() => setEditStaff(undefined)} onSave={handleSave} />}
       {taskStaff   && <TaskModal   staff={taskStaff}   onClose={() => setTaskStaff(null)}   onSave={handleSaveTasks} />}
-      {attendStaff && <AttendanceModal staff={attendStaff} onClose={() => setAttendStaff(null)} onSave={handleSaveAttend} />}
       {deleteTarget && <Confirm message={`Xóa nhân viên "${deleteTarget.name}"? Hành động này không thể hoàn tác.`} onClose={() => setDeleteTarget(null)} onConfirm={handleConfirmDelete} />}
 
+      <Toast message={toast} onClose={() => setToast("")} />
+    </div>
+  );
+}
+
+export function AdminAttendance() {
+  const [staffList, setStaffList] = useState([]);
+  const [attendStaff, setAttendStaff] = useState(null);
+  const [toast, setToast] = useState("");
+
+  const showToast = (message) => {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 3200);
+  };
+
+  const handleSaveAttend = (data) => {
+    setStaffList((current) => current.map((staff) => staff.id === data.id ? data : staff));
+    setAttendStaff(null);
+    showToast(`Đã cập nhật chấm công cho "${data.name}".`);
+  };
+
+  useEffect(() => {
+    adminEmployeeService.getAll()
+      .then((response) => setStaffList((response?.employees || []).map(mapEmployeeToStaff)))
+      .catch((err) => showToast(`Không thể tải dữ liệu chấm công: ${err.message}`));
+  }, []);
+
+  return (
+    <div className="admin-staff-page">
+      <div className="sf-page-header">
+        <div>
+          <h2>Chấm công nhân viên</h2>
+          <p>Theo dõi chấm công theo ngày hôm nay và theo từng rạp</p>
+        </div>
+      </div>
+      <AttendanceOverview staff={staffList} onAttend={setAttendStaff} />
+      {attendStaff && (
+        <AttendanceModal
+          staff={attendStaff}
+          onClose={() => setAttendStaff(null)}
+          onSave={handleSaveAttend}
+        />
+      )}
       <Toast message={toast} onClose={() => setToast("")} />
     </div>
   );

@@ -13,7 +13,7 @@ import Statistics from "../pages/Statistics/Statistics";
 import Settings from "../pages/Settings/Settings";
 import Notifications from "../pages/Notifications/Notifications";
 import Comments from "../pages/Comments/Comments";
-import Staff from "../pages/Staff/Staff";
+import Staff, { AdminAttendance } from "../pages/Staff/Staff";
 import NewsManagement from "../pages/NewsManagement/NewsManagement";
 import BlogManagement from "../pages/BlogManagement/BlogManagement";
 import PointsManagement from "../pages/PointsManagement/PointsManagement";
@@ -47,6 +47,7 @@ export function AdminRoutes() {
     <Route key="dashboard" path="dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />,
     <Route key="roles" path="roles" element={<Navigate to="/admin/dashboard" replace />} />,
     <Route key="staff" path="staff" element={<AdminLayout><Staff /></AdminLayout>} />,
+    <Route key="attendance" path="attendance" element={<AdminLayout><AdminAttendance /></AdminLayout>} />,
     <Route key="users" path="users" element={<AdminLayout><Users /></AdminLayout>} />,
     <Route key="movies" path="movies" element={<AdminLayout><Movies /></AdminLayout>} />,
     <Route key="showtimes" path="showtimes" element={<AdminLayout><Showtimes /></AdminLayout>} />,

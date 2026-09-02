@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { to: "/admin/dashboard",     label: "Tổng quan",        icon: "⊞", roles: ["admin"] },
   { to: "/admin/users",         label: "Tài khoản",         icon: "👥", roles: ["admin"] },
   { to: "/admin/staff",         label: "Nhân viên",        icon: "🧑‍💼", roles: ["admin"] },
+  { to: "/admin/attendance",    label: "Chấm công",        icon: "🕘", roles: ["admin"] },
   { to: "/admin/movies",        label: "Phim",             icon: "🎬", roles: ["admin","employee"] },
   { to: "/admin/showtimes",     label: "Lịch chiếu",       icon: "🕐", roles: ["admin","employee"] },
   { to: "/admin/cinemas",       label: "Rạp chiếu",        icon: "🎭", roles: ["admin","employee"] },
