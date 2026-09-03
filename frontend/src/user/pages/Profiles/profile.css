@@ -481,7 +481,15 @@
   transition: filter .2s ease, transform .2s ease;
 }
 
-.email-inline-action:hover { filter: brightness(1.12); transform: translateY(-50%) scale(1.02); }
+.email-inline-action:hover {
+  animation: none;
+  filter: brightness(1.12);
+  transform: translateY(-50%) scale(1.02);
+}
+.email-inline-action:active {
+  animation: none;
+  transform: translateY(-50%) scale(0.98);
+}
 .email-inline-action:disabled { cursor: wait; opacity: .7; }
 .email-unlinked-note { margin-top: -0.1rem; color: #fbbf24; font-size: 0.78rem; }
 
@@ -1140,6 +1148,11 @@
     width: 100%;
     min-height: 42px;
     margin-top: 0.55rem;
+    transform: none;
+  }
+
+  .email-inline-action:hover,
+  .email-inline-action:active {
     transform: none;
   }
 }

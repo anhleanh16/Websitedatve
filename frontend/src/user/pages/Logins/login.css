@@ -265,8 +265,11 @@
   transition: color 0.3s;
 }
 
-.toggle-pwd:hover {
+.toggle-pwd:hover,
+.toggle-pwd:active {
   color: #a78bfa;
+  animation: none;
+  transform: translateY(-50%);
 }
 
 .auth-form .error-message,

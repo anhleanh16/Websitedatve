@@ -484,7 +484,7 @@
   input[type='reset'],
   a[class*='btn'],
   a[class*='button']
-):not(:disabled):hover {
+):not(.toggle-pwd):not(.email-inline-action):not(:disabled):hover {
   animation: user-button-hover 0.26s var(--user-motion-ease) both;
 }
 
@@ -496,7 +496,7 @@
   input[type='reset'],
   a[class*='btn'],
   a[class*='button']
-):not(:disabled):active {
+):not(.toggle-pwd):not(.email-inline-action):not(:disabled):active {
   transform: translateY(0) scale(0.96);
 }
 
