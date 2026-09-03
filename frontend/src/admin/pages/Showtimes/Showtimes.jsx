@@ -376,7 +376,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
 
           const maxLanes = Math.max(1, ...arrangedShows.map(show => show.laneIndex + 1));
           const rtColor   = ROOM_TYPE_COLOR[room.type] || "#8fa6ff";
-          const laneSpacing = 52;
+          const laneSpacing = 56;
 
           return (
             <div key={room.id} className="sh-timeline-row">
@@ -386,7 +386,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
                   {room.type} · {room.totalSeats} ghế
                 </span>
               </div>
-              <div className="sh-timeline-track" style={{ height: `${Math.max(72, 16 + maxLanes * laneSpacing)}px` }}>
+              <div className="sh-timeline-track" style={{ height: `${Math.max(74, 16 + maxLanes * laneSpacing)}px` }}>
                 {HOURS.map(h => (
                   <div key={h} className="sh-track-grid-line" style={{ left: `${((h - DISPLAY_START_HOUR) / (DISPLAY_END_HOUR - DISPLAY_START_HOUR)) * 100}%` }} />
                 ))}
@@ -397,7 +397,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
                   const isFull = s.availableSeats === 0;
                   const isEnded = s.status === "ended";
                   const laneTop = 8 + (s.laneIndex * laneSpacing);
-                  const blockHeight = 44;
+                  const blockHeight = 48;
                   const safeWidth = Math.min(100 - left, width);
 
                   return (
@@ -415,10 +415,10 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
                             ? "rgba(248,113,113,0.25)"
                             : "rgba(124,97,255,0.28)",
                         borderColor: isEnded
-                          ? "rgba(148,163,184,0.34)"
+                          ? "rgba(148,163,184,0.88)"
                           : isFull
-                            ? "rgba(248,113,113,0.5)"
-                            : "rgba(124,97,255,0.6)",
+                            ? "rgba(248,113,113,0.95)"
+                            : "rgba(139,111,255,0.98)",
                         opacity: isEnded ? 0.78 : 1,
                       }}
                       title={`${movie?.title} | ${fmtTime(s.startTime)} – ${fmtTime(s.endTime)} | Thường ${fmtMoney(s.priceStandard)} | VIP ${fmtMoney(s.priceVip)} | Ghế đôi ${fmtMoney(s.priceCouple)}`}
