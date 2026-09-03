@@ -15,6 +15,14 @@ const DEPARTMENTS = [
   { id: 3, name: "Phục vụ & F&B" },
   { id: 4, name: "Bảo vệ & An ninh" },
   { id: 5, name: "Quản lý rạp" },
+  { id: 6, name: "Phục vụ khách hàng" },
+  { id: 7, name: "Thực phẩm & Đồ uống" },
+  { id: 8, name: "Vận hành rạp" },
+  { id: 9, name: "An ninh & Sảnh" },
+  { id: 10, name: "Âm thanh & Ánh sáng" },
+  { id: 11, name: "Điện & Thiết bị" },
+  { id: 12, name: "Hệ thống & Mạng" },
+  { id: 13, name: "Bảo trì phòng chiếu" },
 ];
 
 const CINEMAS = [
