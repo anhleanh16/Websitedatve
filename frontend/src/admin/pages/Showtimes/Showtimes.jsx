@@ -306,10 +306,10 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
     s.startTime.startsWith(selectedDate)
   );
 
-  const DISPLAY_START_HOUR = 8;
-  const DISPLAY_END_HOUR = 23;
-  const HOURS = Array.from({ length: DISPLAY_END_HOUR - DISPLAY_START_HOUR + 1 }, (_, i) => DISPLAY_START_HOUR + i);
-  const totalMin = (DISPLAY_END_HOUR - DISPLAY_START_HOUR + 1) * 60;
+  const DISPLAY_START_HOUR = 0;
+  const DISPLAY_END_HOUR = 24;
+  const HOURS = Array.from({ length: DISPLAY_END_HOUR - DISPLAY_START_HOUR }, (_, i) => DISPLAY_START_HOUR + i);
+  const totalMin = (DISPLAY_END_HOUR - DISPLAY_START_HOUR) * 60;
 
   function minutesFromMidnight(iso) {
     const d = new Date(iso);
