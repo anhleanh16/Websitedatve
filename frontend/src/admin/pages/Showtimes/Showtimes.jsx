@@ -422,7 +422,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
                       title={`${movie?.title} | ${fmtTime(s.startTime)} – ${fmtTime(s.endTime)} | Thường ${fmtMoney(s.priceStandard)} | VIP ${fmtMoney(s.priceVip)} | Ghế đôi ${fmtMoney(s.priceCouple)}`}
                     >
                       <span className="sh-block-title">{movie?.title}</span>
-                      <span className="sh-block-time">{new Date(s.startTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</span>
+                      <span className="sh-block-time">{fmtRange(s.startTime, s.endTime)}</span>
                     </div>
                   );
                 })}
