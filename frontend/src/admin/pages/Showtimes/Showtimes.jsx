@@ -306,8 +306,10 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
     s.startTime.startsWith(selectedDate)
   );
 
-  const HOURS = Array.from({ length: 24 }, (_, i) => i); // 00:00 – 23:00
-  const totalMin = 24 * 60;
+  const DISPLAY_START_HOUR = 8;
+  const DISPLAY_END_HOUR = 23;
+  const HOURS = Array.from({ length: DISPLAY_END_HOUR - DISPLAY_START_HOUR + 1 }, (_, i) => DISPLAY_START_HOUR + i);
+  const totalMin = (DISPLAY_END_HOUR - DISPLAY_START_HOUR + 1) * 60;
 
   function minutesFromMidnight(iso) {
     const d = new Date(iso);
@@ -315,20 +317,20 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
   }
 
   function pct(iso) {
-    const minFromStart = minutesFromMidnight(iso);
+    const minFromStart = Math.max(0, minutesFromMidnight(iso) - DISPLAY_START_HOUR * 60);
     return Math.max(0, Math.min(100, (minFromStart / totalMin) * 100));
   }
   function widthPct(startIso, endIso) {
     const start = new Date(startIso);
     const end   = new Date(endIso);
-    let startMin = minutesFromMidnight(start);
-    let endMin = minutesFromMidnight(end);
+    let startMin = Math.max(0, minutesFromMidnight(start) - DISPLAY_START_HOUR * 60);
+    let endMin = minutesFromMidnight(end) - DISPLAY_START_HOUR * 60;
 
     if (endMin <= startMin) {
       endMin += 24 * 60;
     }
 
-    return Math.min(100, ((endMin - startMin) / totalMin) * 100);
+    return Math.max(0, Math.min(100, ((endMin - startMin) / totalMin) * 100));
   }
 
   return (
@@ -374,7 +376,7 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
 
           const maxLanes = Math.max(1, ...arrangedShows.map(show => show.laneIndex + 1));
           const rtColor   = ROOM_TYPE_COLOR[room.type] || "#8fa6ff";
-          const laneSpacing = 40;
+          const laneSpacing = 52;
 
           return (
             <div key={room.id} className="sh-timeline-row">
@@ -384,9 +386,9 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
                   {room.type} · {room.totalSeats} ghế
                 </span>
               </div>
-              <div className="sh-timeline-track" style={{ height: `${Math.max(68, 18 + maxLanes * laneSpacing)}px` }}>
+              <div className="sh-timeline-track" style={{ height: `${Math.max(72, 16 + maxLanes * laneSpacing)}px` }}>
                 {HOURS.map(h => (
-                  <div key={h} className="sh-track-grid-line" style={{ left: `${((h - 8) / 15) * 100}%` }} />
+                  <div key={h} className="sh-track-grid-line" style={{ left: `${((h - DISPLAY_START_HOUR) / (DISPLAY_END_HOUR - DISPLAY_START_HOUR)) * 100}%` }} />
                 ))}
                 {arrangedShows.map(s => {
                   const movie = movies.find(m => m.id === s.movieId);
@@ -395,8 +397,8 @@ function RoomAllocation({ showtimes, rooms, movies, cinemas, fixedCinemaId = nul
                   const isFull = s.availableSeats === 0;
                   const isEnded = s.status === "ended";
                   const laneTop = 8 + (s.laneIndex * laneSpacing);
-                  const blockHeight = Math.max(34, laneSpacing - 5);
-                  const safeWidth = Math.max(8, Math.min(100 - left, width));
+                  const blockHeight = 44;
+                  const safeWidth = Math.min(100 - left, width);
 
                   return (
                     <div

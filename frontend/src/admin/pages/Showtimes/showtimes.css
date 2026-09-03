@@ -63,10 +63,10 @@
 .sh-timeline-track { flex: 1; position: relative; height: 60px; min-width: 0; display: flex; align-items: center; }
 .sh-track-grid-line { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.05); }
 .sh-track-empty { position: absolute; left: 16px; color: #3a4a6e; font-size: 12px; font-style: italic; }
-.sh-block { position: absolute; top: 8px; border-radius: 9px; border: 1px solid; display: flex; flex-direction: column; justify-content: center; padding: 3px 7px; overflow: hidden; cursor: pointer; min-width: 128px; transition: filter 0.2s; box-sizing: border-box; }
-.sh-block:hover { filter: brightness(1.3); }
-.sh-block-title { display: -webkit-box; overflow: hidden; color: #eef4ff; font-size: 10px; font-weight: 600; line-height: 1.05; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.sh-block-time  { font-size: 9px; color: rgba(255,255,255,0.6); }
+.sh-block { position: absolute; top: 8px; border-radius: 12px; border: 1px solid; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 4px 9px; overflow: hidden; cursor: pointer; min-width: 0; width: auto; transition: filter 0.2s, box-shadow 0.2s, transform 0.15s; box-sizing: border-box; box-shadow: 0 10px 20px rgba(8, 12, 24, 0.32); }
+.sh-block:hover { filter: brightness(1.35); transform: translateY(-1px); }
+.sh-block-title { display: -webkit-box; flex: none; overflow: hidden; color: #ffffff; font-size: 10px; font-weight: 800; line-height: 1.15; letter-spacing: 0.02em; -webkit-box-orient: vertical; -webkit-line-clamp: 2; text-shadow: 0 1px 2px rgba(0,0,0,0.28); overflow-wrap: anywhere; white-space: normal; }
+.sh-block-time  { flex: none; font-size: 9.2px; line-height: 1.15; color: #ffffff; font-weight: 700; letter-spacing: 0.03em; text-shadow: 0 1px 2px rgba(0,0,0,0.32); white-space: nowrap; }
 .sh-legend { display: flex; gap: 16px; margin-top: 12px; padding: 0 4px; }
 .sh-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #8fa6ff; }
 .sh-legend-item::before { content: ""; width: 14px; height: 14px; border-radius: 4px; }
