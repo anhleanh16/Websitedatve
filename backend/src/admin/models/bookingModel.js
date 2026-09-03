@@ -397,12 +397,15 @@ export const ensureBookingSchema = async () => {
     if (!orderColumnSet.has('payment_confirmed_at')) {
       await db.query('ALTER TABLE Orders ADD COLUMN payment_confirmed_at DATETIME NULL AFTER payment_reference');
     }
+    if (!orderColumnSet.has('booking_source')) {
+      await db.query("ALTER TABLE Orders ADD COLUMN booking_source VARCHAR(20) NOT NULL DEFAULT 'user' AFTER user_id");
+    }
     const [qrIndexes] = await db.query("SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Orders' AND INDEX_NAME = 'uq_orders_ticket_qr_token'");
     if (!qrIndexes.length) {
       await db.query('ALTER TABLE Orders ADD UNIQUE INDEX uq_orders_ticket_qr_token (ticket_qr_token)');
     }
     const [ordersWithoutToken] = await db.query(
-      "SELECT order_id FROM Orders WHERE user_id IS NOT NULL AND payment_status = 'paid' AND ticket_qr_token IS NULL",
+      "SELECT order_id FROM Orders WHERE user_id IS NOT NULL AND payment_status = 'paid' AND COALESCE(booking_source, 'user') <> 'admin' AND ticket_qr_token IS NULL",
     );
     for (const order of ordersWithoutToken) {
       const token = await getUniqueTicketQrToken(db);
@@ -508,6 +511,7 @@ export const BookingModel = {
         o.total_amount  AS total_price,
         o.payment_method,
         o.payment_status,
+        o.booking_source,
         o.status,
         o.created_at,
         MIN(m.title)        AS movie_title,
@@ -535,6 +539,7 @@ export const BookingModel = {
         o.total_amount,
         o.payment_method,
         o.payment_status,
+        o.booking_source,
         o.status,
         o.created_at,
         o.ticket_qr_token
@@ -558,6 +563,7 @@ export const BookingModel = {
         o.total_amount AS total_price,
         o.payment_method,
         o.payment_status,
+        o.booking_source,
         o.status,
         o.created_at,
         COALESCE(NULLIF(TRIM(u.full_name), ''), NULLIF(TRIM(o.guest_name), ''), 'Khách vãng lai') AS full_name,
@@ -619,6 +625,7 @@ export const BookingModel = {
         o.total_amount,
         o.payment_method,
         o.payment_status,
+        o.booking_source,
         o.status,
         o.created_at,
         o.user_id,
@@ -649,6 +656,7 @@ export const BookingModel = {
         o.total_amount AS total_price,
         o.payment_method,
         o.payment_status,
+        o.booking_source,
         o.status,
         o.created_at,
         u.id AS user_id,
@@ -679,6 +687,7 @@ export const BookingModel = {
         o.total_amount,
         o.payment_method,
         o.payment_status,
+        o.booking_source,
         o.status,
         o.created_at,
         o.user_id,
@@ -837,6 +846,7 @@ export const BookingModel = {
     foodItems = [],
     promoCode = '',
     paymentMethod = "zalopay",
+    bookingSource = 'user',
   }) {
     await ensureBookingSchema();
     await ensurePromotionSchema();
@@ -851,8 +861,15 @@ export const BookingModel = {
     const normalizedShowtimeId = Number(showtimeId || 0);
     const normalizedSeatUnits = normalizeSeatUnits(seatUnits);
     const normalizedFoodItems = normalizeFoodItems(foodItems);
-    const initialPaymentStatus = shouldMarkAsPaidImmediately(paymentMethod) ? 'paid' : 'pending';
-    const initialOrderStatus = shouldMarkAsPaidImmediately(paymentMethod) ? 'confirmed' : 'pending';
+    const normalizedBookingSource = String(bookingSource || '').trim().toLowerCase() === 'admin'
+      ? 'admin'
+      : 'user';
+    const isAdminBooking = normalizedBookingSource === 'admin';
+    const isPaidImmediately = shouldMarkAsPaidImmediately(paymentMethod);
+    const initialPaymentStatus = isPaidImmediately ? 'paid' : 'pending';
+    const initialOrderStatus = isPaidImmediately
+      ? (isAdminBooking ? 'completed' : 'confirmed')
+      : 'pending';
 
     if (!normalizedUserId && !isGuestBooking) {
       throw buildBookingError("Không xác định được khách hàng đặt vé.");
@@ -1037,7 +1054,7 @@ export const BookingModel = {
         if (!existing) break;
         bookingCode = generateBookingCode();
       }
-      const ticketQrToken = initialPaymentStatus === 'paid' && !isGuestBooking
+      const ticketQrToken = initialPaymentStatus === 'paid' && !isGuestBooking && !isAdminBooking
         ? await getUniqueTicketQrToken(connection)
         : null;
 
@@ -1045,6 +1062,7 @@ export const BookingModel = {
         `
         INSERT INTO Orders (
           user_id,
+          booking_source,
           guest_name,
           guest_phone,
           guest_email,
@@ -1057,10 +1075,11 @@ export const BookingModel = {
           ticket_qr_token,
           status
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
       `,
         [
           normalizedUserId || null,
+          normalizedBookingSource,
           isGuestBooking ? normalizedGuestCustomer.fullName : null,
           isGuestBooking ? normalizedGuestCustomer.phone : null,
           isGuestBooking ? normalizedGuestCustomer.email : null,
@@ -1088,15 +1107,18 @@ export const BookingModel = {
               showtime_id,
               seat_id,
               qr_code,
-              ticket_status
+              ticket_status,
+              check_in_time
             )
-            VALUES (?, ?, ?, ?, 'unused')
+            VALUES (?, ?, ?, ?, ?, ?)
           `,
             [
               orderId,
               normalizedShowtimeId,
               seat.seat_id,
               null,
+              isPaidImmediately && isAdminBooking ? 'used' : 'unused',
+              isPaidImmediately && isAdminBooking ? new Date() : null,
             ],
           );
         }
@@ -1273,7 +1295,7 @@ export const BookingModel = {
       await connection.beginTransaction();
 
       const [[order]] = await connection.query(
-        `SELECT order_id, user_id, promotion_id, total_amount, payment_status, status, ticket_qr_token
+        `SELECT order_id, user_id, promotion_id, total_amount, payment_status, status, ticket_qr_token, booking_source
          FROM Orders WHERE order_id = ? FOR UPDATE`,
         [normalizedOrderId],
       );
@@ -1285,6 +1307,7 @@ export const BookingModel = {
       }
 
       const normalizedUserId = Number(order.user_id || 0);
+      const isAdminBooking = order.booking_source === 'admin';
       let ticketQrToken = order.ticket_qr_token || null;
       let pointsResult = { earnedPoints: 0, newPoints: 0 };
 
@@ -1293,7 +1316,9 @@ export const BookingModel = {
           promotionId: order.promotion_id,
           userId: normalizedUserId,
         });
-        ticketQrToken = ticketQrToken || await getUniqueTicketQrToken(connection);
+        if (!isAdminBooking) {
+          ticketQrToken = ticketQrToken || await getUniqueTicketQrToken(connection);
+        }
 
         const [ticketRows] = await connection.query(
           `SELECT s.seat_type FROM Tickets t
@@ -1323,11 +1348,26 @@ export const BookingModel = {
 
       await connection.query(
         `UPDATE Orders
-         SET payment_method = ?, payment_status = 'paid', status = 'confirmed',
+         SET payment_method = ?, payment_status = 'paid', status = ?,
              payment_reference = ?, payment_confirmed_at = NOW(), ticket_qr_token = ?
          WHERE order_id = ?`,
-        [normalizedMethod, normalizedReference || null, ticketQrToken, normalizedOrderId],
+        [
+          normalizedMethod,
+          isAdminBooking ? 'completed' : 'confirmed',
+          normalizedReference || null,
+          ticketQrToken,
+          normalizedOrderId,
+        ],
       );
+
+      if (isAdminBooking) {
+        await connection.query(
+          `UPDATE Tickets
+           SET ticket_status = 'used', check_in_time = COALESCE(check_in_time, NOW())
+           WHERE order_id = ?`,
+          [normalizedOrderId],
+        );
+      }
 
       await connection.commit();
       const booking = await this.findById(normalizedOrderId, { includeTicketQr: true });

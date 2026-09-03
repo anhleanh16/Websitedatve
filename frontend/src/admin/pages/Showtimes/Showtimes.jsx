@@ -36,6 +36,12 @@ function fmtHour(iso) {
     ? "—"
     : d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
 }
+function fmtRange(isoStart, isoEnd) {
+  const start = fmtHour(isoStart);
+  const end = fmtHour(isoEnd);
+  if (start === "—" || end === "—") return "—";
+  return `Từ ${start} - ${end}`;
+}
 function fmtDateHeading(dateKey) {
   const d = new Date(`${dateKey}T00:00:00`);
   if (Number.isNaN(d.getTime())) return dateKey;
@@ -568,8 +574,7 @@ function ShowtimeSchedule({ showtimes, rooms, movies, cinemas, fixedCinemaId = n
                     return (
                       <article key={showtime.id} className={`sh-schedule-card${isEnded ? " ended" : isFull ? " full" : ""}`}>
                         <div className="sh-schedule-card-head">
-                          <strong className="sh-schedule-time">{fmtHour(showtime.startTime)}</strong>
-                          <span className="sh-schedule-end-time">– {fmtHour(showtime.endTime)}</span>
+                          <strong className="sh-schedule-time">{fmtRange(showtime.startTime, showtime.endTime)}</strong>
                           <span className={`sh-schedule-state${isEnded ? " ended" : isFull ? " full" : " active"}`}>
                             {isEnded ? "Đã kết thúc" : isFull ? "Hết chỗ" : "Đang hoạt động"}
                           </span>

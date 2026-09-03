@@ -11,12 +11,116 @@
 .bk-tab:hover:not(.disabled) { color: #c8d8ff; }
 .bk-tab.active { color: #fff; border-bottom-color: #7c61ff; }
 .bk-tab.disabled { opacity: 0.35; cursor: not-allowed; }
-.bk-toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.bk-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 30;
+  overflow: visible;
+}
 .bk-search { flex: 1; min-width: 220px; padding: 0 16px; height: 46px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; transition: border-color 0.2s; }
 .bk-search:focus { border-color: rgba(124,97,255,0.45); }
 .bk-search::placeholder { color: #5a6e9e; }
-.bk-filter-select { padding: 0 16px; height: 46px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eef4ff; font-size: 14px; outline: none; cursor: pointer; }
-.bk-filter-select option { background: #0d1224; }
+.bk-filter-select {
+  min-height: 46px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #eef4ff;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.bk-filter-select option { background: #0d1224; color: #eef4ff; }
+
+.bk-multiselect {
+  position: relative;
+  min-width: 170px;
+  z-index: 15;
+}
+
+.bk-multiselect-trigger {
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #eef4ff;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  cursor: pointer;
+  gap: 2px;
+}
+
+.bk-multiselect-label {
+  font-size: 11px;
+  color: #9fb4ff;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.bk-multiselect-text {
+  font-size: 13px;
+  color: #eef4ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.bk-multiselect-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #0d152b;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  box-shadow: 0 16px 30px rgba(0,0,0,0.28);
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+  z-index: 999;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.bk-multiselect-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: #edf2ff;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.bk-multiselect-item:hover {
+  background: rgba(124, 97, 255, 0.12);
+}
+
+.bk-multiselect-item input {
+  accent-color: #8b5cf6;
+  flex-shrink: 0;
+}
+
+.bk-multiselect-item span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
 .bk-code { font-family: monospace; font-size: 13px; color: #a8baff; background: rgba(124,97,255,0.12); padding: 3px 8px; border-radius: 6px; }
 .bk-user-cell { display: flex; flex-direction: column; gap: 2px; }
 .bk-user-cell strong { color: #f0f6ff; font-size: 14px; }
@@ -297,6 +401,8 @@
 
 /* ── Table overrides bên trong bookings ── */
 .admin-bookings .table-card {
+  position: relative;
+  z-index: 1;
   background: #080d1a;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;

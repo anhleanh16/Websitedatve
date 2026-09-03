@@ -62,10 +62,23 @@ function getCameraErrorMessage(error) {
   return "Không thể khởi động camera. Hãy kiểm tra quyền camera và kết nối HTTPS.";
 }
 
+function toLocalDateKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function mapBookingFromApi(item) {
   const seatCodes = Array.isArray(item?.seats)
     ? item.seats
     : (item?.seat_codes ? String(item.seat_codes).split(",").map((s) => s.trim()).filter(Boolean) : []);
+
+  const createdAtValue = item?.created_at || item?.createdAt || null;
+  const showtimeValue = item?.start_time || item?.showtime_time || item?.showtime || null;
 
   return {
     id: String(item?.booking_id || item?.id || `B${Date.now()}`),
@@ -78,28 +91,102 @@ function mapBookingFromApi(item) {
     cinemaId: item?.cinema_id || item?.cinemaId || null,
     cinema: item?.cinema_name || item?.cinema || "",
     room: item?.room_name || item?.room || "",
-    showtime: item?.start_time ? new Date(item.start_time).toLocaleString("vi-VN") : "",
+    showtime: showtimeValue ? new Date(showtimeValue).toLocaleString("vi-VN") : "",
     seats: seatCodes,
     combo: item?.combo_name || item?.combo || null,
     totalAmount: Number(item?.total_price || item?.total_amount || 0),
     paymentMethod: item?.payment_method || "",
     paymentStatus: item?.payment_status || "pending",
+    bookingSource: item?.booking_source || item?.bookingSource || "user",
     status: item?.status || "pending",
     bookingCode: item?.booking_code || "",
     qrCode: "",
     qrCodes: Array.isArray(item?.qr_codes) ? item.qr_codes.filter(Boolean) : [],
     combos: Array.isArray(item?.combos) ? item.combos : [],
     checkInTime: item?.check_in_time ? new Date(item.check_in_time).toLocaleString("vi-VN") : null,
-    createdAt: item?.created_at ? new Date(item.created_at).toLocaleString("vi-VN") : "",
+    createdAt: createdAtValue ? new Date(createdAtValue).toLocaleString("vi-VN") : "",
+    showtimeISO: showtimeValue ? new Date(showtimeValue).toISOString() : "",
   };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+function MultiSelectDropdown({ label, options, value, onChange, placeholder = "Tất cả" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedPreview = value.length === 0
+    ? placeholder
+    : value.slice(0, 2).join(", ") + (value.length > 2 ? ` +${value.length - 2}` : "");
+
+  const toggleItem = (item) => {
+    if (value.includes(item)) {
+      onChange(value.filter((entry) => entry !== item));
+      return;
+    }
+
+    onChange([...value, item]);
+  };
+
+  return (
+    <div className="bk-multiselect" ref={containerRef}>
+      <button
+        type="button"
+        className="bk-multiselect-trigger"
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <span className="bk-multiselect-label">{label}</span>
+        <span className="bk-multiselect-text">{selectedPreview}</span>
+      </button>
+
+      {isOpen && (
+        <div className="bk-multiselect-menu">
+          <label className="bk-multiselect-item">
+            <input
+              type="checkbox"
+              checked={value.length === 0}
+              onChange={() => onChange([])}
+            />
+            <span>Tất cả</span>
+          </label>
+
+          {options.map((option) => (
+            <label key={option} className="bk-multiselect-item">
+              <input
+                type="checkbox"
+                checked={value.includes(option)}
+                onChange={() => toggleItem(option)}
+              />
+              <span>{option}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Danh sách vé */
 function BookingList({ bookings, onView, onCheck, onPay }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterDate, setFilterDate] = useState("");
+  const [filterCinema, setFilterCinema] = useState([]);
+  const [filterMovie, setFilterMovie] = useState([]);
+
+  const cinemaOptions = Array.from(new Set(bookings.map((b) => b.cinema).filter(Boolean)));
+  const movieOptions = Array.from(new Set(bookings.map((b) => b.movie).filter(Boolean)));
 
   const filtered = bookings.filter((b) => {
     const q = String(search || "").toLowerCase();
@@ -109,30 +196,69 @@ function BookingList({ bookings, onView, onCheck, onPay }) {
       b.movie,
       b.bookingCode,
       b.phone,
+      b.cinema,
     ]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
+
     const matchSearch = searchableText.includes(q);
     const matchStatus = filterStatus === "all" || b.status === filterStatus;
-    return matchSearch && matchStatus;
+    const matchCinema = filterCinema.length === 0 || filterCinema.includes(b.cinema);
+    const matchMovie = filterMovie.length === 0 || filterMovie.includes(b.movie);
+
+    const bookingDateKey = toLocalDateKey(b.showtimeISO || b.showtime || b.createdAt);
+    const selectedDateKey = filterDate ? filterDate : "";
+    const sameDay = !selectedDateKey || !bookingDateKey || bookingDateKey === selectedDateKey;
+
+    return matchSearch && matchStatus && matchCinema && matchMovie && sameDay;
   });
   const { page, setPage, totalPages, pageItems } = useAdminPagination(filtered);
 
   return (
     <div className="bk-section">
       {/* Toolbar */}
-      <div className="bk-toolbar">
+      <div className="bk-toolbar" style={{ display: "grid", gridTemplateColumns: "1.6fr minmax(200px, 1.2fr) minmax(200px, 1.2fr) minmax(140px, 1fr) minmax(140px, 1fr) auto", gap: 10, alignItems: "center" }}>
         <input
           className="bk-search"
           placeholder="Tìm mã vé, tên khách, phim…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          aria-label="Tìm kiếm vé"
         />
+
+        <MultiSelectDropdown
+          label="Rạp"
+          options={cinemaOptions}
+          value={filterCinema}
+          onChange={setFilterCinema}
+          placeholder="Tất cả rạp"
+        />
+
+        <MultiSelectDropdown
+          label="Phim"
+          options={movieOptions}
+          value={filterMovie}
+          onChange={setFilterMovie}
+          placeholder="Tất cả phim"
+        />
+
+        <label style={{ display: "grid", gap: 6 }}>
+          <span style={{ fontSize: 12, color: "#9fb4ff", fontWeight: 600 }}>Ngày suất chiếu</span>
+          <input
+            type="date"
+            className="bk-filter-select"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            aria-label="Chọn ngày suất chiếu"
+          />
+        </label>
+
         <select
           className="bk-filter-select"
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
+          aria-label="Chọn trạng thái"
         >
           <option value="all">Tất cả trạng thái</option>
           <option value="pending">Đang chờ</option>
@@ -140,6 +266,21 @@ function BookingList({ bookings, onView, onCheck, onPay }) {
           <option value="completed">Hoàn thành</option>
           <option value="cancelled">Đã hủy</option>
         </select>
+
+        <button
+          type="button"
+          className="bk-btn bk-btn-secondary"
+          onClick={() => {
+            setSearch("");
+            setFilterStatus("all");
+            setFilterDate("");
+            setFilterCinema([]);
+            setFilterMovie([]);
+          }}
+          style={{ minWidth: 90 }}
+        >
+          Xóa lọc
+        </button>
       </div>
 
       <div className="table-card">
@@ -199,7 +340,7 @@ function BookingList({ bookings, onView, onCheck, onPay }) {
                         <button className="bk-btn bk-btn-view" onClick={() => onView(b)} title="Chi tiết">
                           Chi tiết
                         </button>
-                        {b.status === "confirmed" && (
+                        {b.status === "confirmed" && b.bookingSource !== "admin" && (
                           <button className="bk-btn bk-btn-check" onClick={() => onCheck(b)} title={b.customerType === "guest" ? "Hoàn thành vé" : "Kiểm tra vé"}>
                             {b.customerType === "guest" ? "Hoàn thành" : "Kiểm tra"}
                           </button>
@@ -295,7 +436,7 @@ function BookingDetail({ booking, onClose, onCheck, onPay }) {
               Thanh toán
             </button>
           )}
-          {booking.status === "confirmed" && (
+          {booking.status === "confirmed" && booking.bookingSource !== "admin" && (
             <button className="bk-btn bk-btn-check bk-btn-lg" onClick={() => onCheck(booking)}>
               {booking.customerType === "guest" ? "Đánh dấu hoàn thành" : "Kiểm tra vé"}
             </button>
@@ -676,7 +817,6 @@ export default function AdminBookings() {
     try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
   })(), ...(reduxProfile || {}) };
   const role = String(profile.role || "").toLowerCase();
-  const isManager = role === "manager" || (role === "employee" && /quản lý|quan ly|manager/i.test(String(profile.employee_position || profile.position || "")));
   const isCinemaScopedStaff = role === "employee" || role === "manager";
   const currentUserId = profile.id || profile.userId || profile.user_id;
   const [bookings, setBookings] = useState([]);
@@ -734,6 +874,7 @@ export default function AdminBookings() {
 
   // Mở kiểm tra vé
   const handleCheck = (b) => {
+    if (b?.bookingSource === "admin") return;
     setSelectedBooking(b);
     setActiveTab("check");
   };
@@ -799,7 +940,12 @@ export default function AdminBookings() {
   const tabs = [
     { key: "list",  label: "Danh sách vé" },
     { key: "create", label: "➕ Đặt vé" },
-    { key: "check", label: "Kiểm tra vé", disabled: activeTab !== "check" && activeTab !== "detail" },
+    {
+      key: "check",
+      label: "Kiểm tra vé",
+      disabled: selectedBooking?.bookingSource === "admin"
+        || (activeTab !== "check" && activeTab !== "detail"),
+    },
   ];
 
   return (
@@ -888,10 +1034,11 @@ export default function AdminBookings() {
               totalAmount: Number(b.total_price || 0),
               paymentMethod: b.payment_method || b.paymentMethod || "",
               paymentStatus: b.payment_status || (b.status === "cancelled" ? "failed" : "pending"),
+              bookingSource: b.booking_source || b.bookingSource || "admin",
               status: b.status || "confirmed",
               bookingCode: b.booking_code || "",
               qrCode: b.booking_code ? `QR_${b.booking_code}` : "",
-              checkInTime: null,
+              checkInTime: b.check_in_time ? new Date(b.check_in_time).toLocaleString("vi-VN") : null,
               createdAt: new Date().toLocaleString("vi-VN"),
             };
             setBookings(prev => [newItem, ...prev]);

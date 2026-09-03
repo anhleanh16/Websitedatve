@@ -37,7 +37,9 @@ export const getPointsHistory = async (req, res) => {
 export const getPointsUserSummary = async (req, res) => {
   try {
     const userId = Number(req.params.userId || req.userId);
-    const summary = await PointsModel.getUserPointSummary(userId);
+    const historyPage = Number(req.query.historyPage || 1);
+    const historyLimit = Number(req.query.historyLimit || 20);
+    const summary = await PointsModel.getUserPointSummary(userId, { historyPage, historyLimit });
     if (!summary) {
       return res.status(404).json({ message: 'Không tìm thấy người dùng.' });
     }

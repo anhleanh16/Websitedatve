@@ -80,15 +80,6 @@ const MAX_POSTER_SIZE = 5 * 1024 * 1024;
 const MAX_TRAILER_SIZE = 100 * 1024 * 1024;
 const VALID_VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/ogg"]);
 
-const isValidYouTubeUrl = (value) => {
-  try {
-    const url = new URL(value);
-    const host = url.hostname.replace(/^www\./, "").toLowerCase();
-    return url.protocol === "https:" && ["youtube.com", "m.youtube.com", "youtu.be"].includes(host);
-  } catch {
-    return false;
-  }
-};
 
 // ─── Custom Tag Dropdown ────────────────────────────────────────────────────────
 function TagDropdown({ value, onChange, categories }) {
@@ -447,10 +438,6 @@ function MovieForm({ movie, categories, onClose, onSave }) {
     if (!STATUS_OPTS.some(option => option.value === form.status)) e.status = "Trạng thái phim không hợp lệ.";
     if (![0, 13, 16, 18].includes(Number(form.ageLimit))) e.ageLimit = "Giới hạn tuổi không hợp lệ.";
     if (!Array.isArray(form.categories) || form.categories.length === 0) e.categories = "Chọn ít nhất một Tag cho phim.";
-    if (!deleteTrailer && trailerType === "youtube" && youtubeUrl.trim() && !isValidYouTubeUrl(youtubeUrl.trim())) {
-      e.trailer = "Link trailer phải là đường dẫn YouTube HTTPS hợp lệ.";
-    }
-
     if (isEdit) {
       if (allPosters.length < 1) e.posters = "Phim cần ít nhất 1 poster để lưu.";
     } else if (allPosters.length < 6) {
@@ -634,7 +621,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
                       className={`trailer-type-btn ${trailerType === 'youtube' ? 'active' : ''}`}
                       onClick={() => { setTrailerType('youtube'); setTrailerFile(null); }}
                     >
-                      🔗 Link YouTube
+                      🔗 Link trailer
                     </button>
                     <button
                       type="button"
@@ -651,7 +638,7 @@ function MovieForm({ movie, categories, onClose, onSave }) {
                   <div className="trailer-input-wrapper">
                     <input
                       type="text"
-                      placeholder="Nhập link YouTube (vd: https://www.youtube.com/watch?v=...)"
+                      placeholder="Nhập link trailer (ví dụ: https://www.youtube.com/watch?v=... hoặc https://example.com/video.mp4)"
                       value={youtubeUrl}
                       onChange={(e) => { setYoutubeUrl(e.target.value); setErrors(previous => ({ ...previous, trailer: undefined })); }}
                       className={`trailer-youtube-input${errors.trailer ? " error" : ""}`}

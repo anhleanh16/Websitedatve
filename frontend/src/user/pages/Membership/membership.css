@@ -873,6 +873,73 @@
   font-size: 1.15rem;
 }
 
+.membership-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.membership-pagination-summary {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.membership-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.membership-page-number-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.membership-pagination-controls button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 0.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.membership-pagination-controls button:hover:not(:disabled) {
+  border-color: rgba(167, 139, 250, 0.45);
+  background: rgba(124, 58, 237, 0.14);
+  color: #fff;
+}
+
+.membership-pagination-controls button.active {
+  border-color: #8b5cf6;
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+  color: #fff;
+}
+
+.membership-pagination-controls button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.membership-page-ellipsis {
+  color: #64748b;
+  padding: 0 0.1rem;
+}
+
 /* =============================================
    GUIDE
 ============================================= */
@@ -1102,6 +1169,21 @@
   .bt-head,
   .bt-row {
     min-width: 520px;
+  }
+
+  .membership-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .membership-pagination-controls {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .membership-pagination-controls button {
+    min-width: 40px;
+    height: 40px;
   }
 }
 

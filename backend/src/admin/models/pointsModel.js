@@ -436,7 +436,7 @@ export const PointsModel = {
     };
   },
 
-  async getUserPointSummary(userId) {
+  async getUserPointSummary(userId, { historyPage = 1, historyLimit = 20 } = {}) {
     await ensurePointsSchema();
     const [users] = await db.query(`
       SELECT id, full_name, email, point, status
@@ -451,13 +451,28 @@ export const PointsModel = {
     const user = users[0];
     await expireUserPoints(userId);
 
+    const requestedPage = Math.max(1, Number(historyPage) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(historyLimit) || 20));
+    const [[historyMeta]] = await db.query(`
+      SELECT
+        COUNT(*) AS total,
+        COALESCE(SUM(CASE WHEN points_change > 0 THEN points_change ELSE 0 END), 0) AS earned,
+        COALESCE(SUM(CASE WHEN points_change < 0 THEN points_change ELSE 0 END), 0) AS spent
+      FROM Point_History
+      WHERE user_id = ?
+    `, [userId]);
+    const historyTotal = Number(historyMeta?.total || 0);
+    const historyTotalPages = Math.max(1, Math.ceil(historyTotal / pageSize));
+    const currentHistoryPage = Math.min(requestedPage, historyTotalPages);
+    const historyOffset = (currentHistoryPage - 1) * pageSize;
+
     const [historyRows] = await db.query(`
       SELECT history_id, points_change, description, created_at, expires_at
       FROM Point_History
       WHERE user_id = ?
       ORDER BY created_at DESC, history_id DESC
-      LIMIT 20
-    `, [userId]);
+      LIMIT ? OFFSET ?
+    `, [userId, pageSize, historyOffset]);
 
     const [levelRows] = await db.query(`
       SELECT level_id, level_name, min_points, max_points, benefits, discount_percent, created_at
@@ -493,6 +508,16 @@ export const PointsModel = {
         tier,
       },
       history: historyRows.map(formatHistory),
+      historyPagination: {
+        page: currentHistoryPage,
+        limit: pageSize,
+        total: historyTotal,
+        totalPages: historyTotalPages,
+      },
+      historyTotals: {
+        earned: Number(historyMeta?.earned || 0),
+        spent: Number(historyMeta?.spent || 0),
+      },
       levels,
       rules: ruleRows.map(formatRule),
       rewards: rewardRows.map(formatReward),

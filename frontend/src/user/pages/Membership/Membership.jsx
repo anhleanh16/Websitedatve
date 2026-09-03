@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { FaCrown, FaStar, FaGift, FaTicketAlt, FaHistory, FaInfoCircle, FaCopy, FaChevronDown, FaChevronUp } from 'react-icons/fa'
 import { MdCardMembership, MdLocalOffer } from 'react-icons/md'
-import { useEffect } from 'react'
 import { userPromotionService } from '../../services/userApi'
 import './membership.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const HISTORY_PAGE_SIZE = 1
 
 const MOCK_BENEFITS = [
   { icon: '🎟️', title: 'Đặt vé ưu tiên', desc: 'Đặt trước 30 phút so với khách thường' },
@@ -56,6 +56,42 @@ function getNextTier(points) {
   return idx < TIERS.length - 1 ? TIERS[idx + 1] : null
 }
 
+function MembershipPagination({ page, totalItems, pageSize, onChange }) {
+  if (totalItems <= 0) return null
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
+  const currentPage = Math.min(Math.max(1, page), totalPages)
+  const start = (currentPage - 1) * pageSize + 1
+  const end = Math.min(currentPage * pageSize, totalItems)
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
+    .filter(number => totalPages <= 5 || number === 1 || number === totalPages || Math.abs(number - currentPage) <= 1)
+
+  return (
+    <div className='membership-pagination' aria-label='Phân trang lịch sử điểm'>
+      <span className='membership-pagination-summary'>
+        {pageSize === 1 ? `Giao dịch ${start} / ${totalItems}` : `Hiển thị ${start}–${end} / ${totalItems} giao dịch`}
+      </span>
+      <div className='membership-pagination-controls'>
+        <button type='button' onClick={() => onChange(currentPage - 1)} disabled={currentPage <= 1} aria-label='Trang trước'>‹</button>
+        {pages.map((number, index) => (
+          <span key={number} className='membership-page-number-wrap'>
+            {index > 0 && number - pages[index - 1] > 1 && <span className='membership-page-ellipsis'>…</span>}
+            <button
+              type='button'
+              className={number === currentPage ? 'active' : ''}
+              onClick={() => onChange(number)}
+              aria-current={number === currentPage ? 'page' : undefined}
+            >
+              {number}
+            </button>
+          </span>
+        ))}
+        <button type='button' onClick={() => onChange(currentPage + 1)} disabled={currentPage >= totalPages} aria-label='Trang sau'>›</button>
+      </div>
+    </div>
+  )
+}
+
 export default function Membership() {
   const profile = useSelector((state) => state.user.profile)
   const [activeTab, setActiveTab] = useState('overview')
@@ -65,6 +101,8 @@ export default function Membership() {
   const [coupons, setCoupons] = useState([])
   const [rewards, setRewards] = useState([])
   const [history, setHistory] = useState([])
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: HISTORY_PAGE_SIZE, total: 0, totalPages: 1 })
   const [pointsSummary, setPointsSummary] = useState(null)
   const [loadingPromotions, setLoadingPromotions] = useState(false)
   const [promotionError, setPromotionError] = useState('')
@@ -88,12 +126,15 @@ export default function Membership() {
   }
 
   useEffect(() => {
+    let ignore = false
+
     const loadPromotions = async () => {
       if (!profile?.id) {
         setVouchers([])
         setCoupons([])
         setRewards([])
         setHistory([])
+        setHistoryPagination({ page: 1, limit: HISTORY_PAGE_SIZE, total: 0, totalPages: 1 })
         setPointsSummary(null)
         return
       }
@@ -102,27 +143,45 @@ export default function Membership() {
       setPromotionError('')
       try {
         const data = await userPromotionService.getAll(profile.id)
+        if (ignore) return
         setVouchers(Array.isArray(data?.vouchers) ? data.vouchers : [])
         setCoupons(Array.isArray(data?.coupons) ? data.coupons : [])
 
-        const res = await fetch(`${API_BASE}/points/user/${profile.id}`, {
+        const res = await fetch(`${API_BASE}/points/user/${profile.id}?historyPage=${historyPage}&historyLimit=${HISTORY_PAGE_SIZE}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
         })
         const pointData = await res.json()
+        if (ignore) return
         if (res.ok) {
           setPointsSummary(pointData)
           setRewards(Array.isArray(pointData?.rewards) ? pointData.rewards : [])
           setHistory(Array.isArray(pointData?.history) ? pointData.history : [])
+          const nextHistoryPagination = pointData?.historyPagination || {
+            page: historyPage,
+            limit: HISTORY_PAGE_SIZE,
+            total: Array.isArray(pointData?.history) ? pointData.history.length : 0,
+            totalPages: 1,
+          }
+          setHistoryPagination(nextHistoryPagination)
+          if (nextHistoryPagination.page !== historyPage) {
+            setHistoryPage(nextHistoryPagination.page)
+          }
         }
       } catch (err) {
+        if (ignore) return
         console.error(err)
         setPromotionError(err.message || 'Không thể tải khuyến mãi.')
       } finally {
-        setLoadingPromotions(false)
+        if (!ignore) setLoadingPromotions(false)
       }
     }
 
     loadPromotions()
+    return () => { ignore = true }
+  }, [profile?.id, historyPage])
+
+  useEffect(() => {
+    setHistoryPage(1)
   }, [profile?.id])
 
   const handleRedeem = async (rewardId) => {
@@ -140,7 +199,7 @@ export default function Membership() {
       setVouchers(Array.isArray(promotionData?.vouchers) ? promotionData.vouchers : [])
       setCoupons(Array.isArray(promotionData?.coupons) ? promotionData.coupons : [])
       setPromotionError('')
-      const res2 = await fetch(`${API_BASE}/points/user/${profile.id}`, {
+      const res2 = await fetch(`${API_BASE}/points/user/${profile.id}?historyPage=1&historyLimit=${HISTORY_PAGE_SIZE}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
       })
       const pointData = await res2.json()
@@ -148,6 +207,8 @@ export default function Membership() {
         setPointsSummary(pointData)
         setRewards(Array.isArray(pointData?.rewards) ? pointData.rewards : [])
         setHistory(Array.isArray(pointData?.history) ? pointData.history : [])
+        setHistoryPagination(pointData?.historyPagination || { page: 1, limit: HISTORY_PAGE_SIZE, total: 0, totalPages: 1 })
+        setHistoryPage(1)
       }
       return data
     } catch (err) {
@@ -490,7 +551,7 @@ export default function Membership() {
                 <FaStar />
                 <div>
                   <div className='hs-label'>Tổng điểm đã kiếm</div>
-                  <div className='hs-value'>+{history.filter(h => h.points > 0).reduce((s, h) => s + h.points, 0)} điểm</div>
+                  <div className='hs-value'>+{Number(pointsSummary?.historyTotals?.earned || 0).toLocaleString()} điểm</div>
                 </div>
               </div>
               <div className='hs-divider' />
@@ -498,7 +559,7 @@ export default function Membership() {
                 <FaGift />
                 <div>
                   <div className='hs-label'>Tổng điểm đã dùng</div>
-                  <div className='hs-value'>{history.filter(h => h.points < 0).reduce((s, h) => s + h.points, 0)} điểm</div>
+                  <div className='hs-value'>{Number(pointsSummary?.historyTotals?.spent || 0).toLocaleString()} điểm</div>
                 </div>
               </div>
               <div className='hs-divider' />
@@ -527,6 +588,12 @@ export default function Membership() {
                   </div>
                 ))}
               </div>
+              <MembershipPagination
+                page={historyPagination.page}
+                totalItems={historyPagination.total}
+                pageSize={historyPagination.limit || HISTORY_PAGE_SIZE}
+                onChange={setHistoryPage}
+              />
             </div>
           </div>
         )}

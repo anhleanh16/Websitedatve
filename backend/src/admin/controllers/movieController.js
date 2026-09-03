@@ -14,16 +14,6 @@ const parseJsonArray = (value) => {
   }
 };
 
-const isValidYouTubeUrl = (value) => {
-  try {
-    const url = new URL(value);
-    const host = url.hostname.replace(/^www\./, "").toLowerCase();
-    return url.protocol === "https:" && ["youtube.com", "m.youtube.com", "youtu.be"].includes(host);
-  } catch {
-    return false;
-  }
-};
-
 const validateMoviePayload = (body = {}, files = {}, { creating = false } = {}) => {
   const title = String(body.title || "").trim();
   const director = String(body.director || "").trim();
@@ -52,7 +42,6 @@ const validateMoviePayload = (body = {}, files = {}, { creating = false } = {}) 
   if (creating && posterCount < 6) return "Phim mới phải có ít nhất 6 poster.";
   if (!creating && posterCount < 1) return "Phim phải có ít nhất 1 poster.";
   if (posterCount > 12) return "Phim chỉ được có tối đa 12 poster.";
-  if (body.trailer && !isValidYouTubeUrl(String(body.trailer).trim())) return "Link trailer YouTube không hợp lệ.";
   return "";
 };
 

@@ -156,15 +156,8 @@ export const staffCreateBooking = async (req, res) => {
       seatUnits: normalizedSeatUnits,
       foodItems: normalizedFoodItems,
       paymentMethod: finalPaymentMethod,
+      bookingSource: 'admin',
     });
-
-    if (mode !== 'guest' && bookingResult?.payment_status === 'paid') {
-      try {
-        await sendTicketQrEmail(bookingResult);
-      } catch (mailError) {
-        console.warn('Ticket email send failed (staff booking):', mailError.message);
-      }
-    }
 
     return res.status(201).json({
       message: "Đặt vé thành công.",
@@ -222,7 +215,7 @@ export const confirmAdminBookingPayment = async (req, res) => {
       paymentReference,
     });
 
-    if (booking?.customer_type !== 'guest') {
+    if (booking?.customer_type !== 'guest' && booking?.booking_source !== 'admin') {
       try {
         await sendTicketQrEmail(booking);
       } catch (mailError) {

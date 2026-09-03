@@ -236,6 +236,7 @@ CREATE TABLE Screening_Campaign_Notes (
 CREATE TABLE Orders (
     order_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
+    booking_source VARCHAR(20) NOT NULL DEFAULT 'user',
     guest_name VARCHAR(100) NULL,
     guest_phone VARCHAR(20) NULL,
     guest_email VARCHAR(100) NULL,
